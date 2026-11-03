@@ -1,0 +1,12 @@
+{
+  "name": "wind-solar-site-estimator",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Browser-only wind + solar + battery site viability estimator",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "python3 -m http.server 8000"
+  }
+}
