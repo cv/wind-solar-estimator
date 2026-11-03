@@ -59,7 +59,7 @@ Push to GitHub, then *Settings → Pages → Deploy from a branch → `main` / r
 - Weather: Open-Meteo historical weather API (ERA5, Copernicus Climate Change Service),
   CC BY 4.0. The free API is for **non-commercial use** and allows roughly 10,000 weighted
   calls a day per IP; 20 years for one site costs about 500. For commercial use, buy an
-  Open-Meteo API key and enter it under *Data source* (it stays in the browser and is
+  Open-Meteo API key and enter it under *Weather data* (it stays in the browser and is
   never put in shared links).
 - Downloaded weather is cached in the browser (IndexedDB), so revisiting a site is instant.
 - Map: Leaflet with OpenStreetMap tiles. Charts: Chart.js. Both load from CDNs.

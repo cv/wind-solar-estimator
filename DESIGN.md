@@ -183,7 +183,7 @@ components:
 
 The interface reads like a trustworthy engineering site report that a salesperson can hand straight to a customer. It is calm, credible and plain-spoken: a white page on a cool paper ground, hairline rules, a single confident blue for action and identity, and colour otherwise spent only on meaning (wind, solar, good, caution, problem). Numbers are the heroes; they are set large, bold and in tabular figures, and every claim sits next to the caveat that qualifies it.
 
-Density is that of a working document, not a dashboard. The sidebar holds the inputs as a quiet form; the report column leads with the verdict and four key figures, then lays out evidence in plainly titled sections with charts in simple cards. Print is a first-class output: the same report has to stand on paper without the app around it.
+Density is that of a working document, not a dashboard. The sidebar holds the inputs as a quiet form; the report column leads with the verdict and four key figures, then shows only what wind adds through the year. Everything else (diagnostics, monthly table) waits behind a disclosure, and the assumptions close the report. Print is a first-class output: the same report has to stand on paper without the app around it.
 
 The system explicitly rejects two neighbours: clean-tech marketing gloss (gradient heroes, glassy cards, stock turbine photography) and dense trading-terminal dashboards (dark mode, neon accents, tiny type).
 
@@ -242,8 +242,8 @@ Each state has a solid tone, a wash for backgrounds, a line for borders and an i
 ### Hierarchy
 - **Display** (700, 1.75rem, 1.15): report title (site name) and the empty-state headline.
 - **Figure** (700, 1.75rem, 1.2, tabular): the four key figures under the verdict. Units sit beside them at label size in Muted Ink.
-- **Headline** (700, 1.375rem, 1.25): the verdict sentence, with its status tag inline.
-- **Title** (700, 1.25rem, 1.25): report section headings ("Through the year", "Wind at this site").
+- **Headline** (700, 1.375rem, 1.25): the verdict sentence, led by its status tag.
+- **Title** (700, 1.25rem, 1.25): report section headings ("Through the year", "Behind the numbers").
 - **Stat** (650, 1.125rem, tabular): secondary statistics in section stat rows.
 - **Prose** (400, 1rem, 1.45): verdict explanation and empty-state copy; max 68–72ch.
 - **Body** (400, 0.9375rem, 1.45): default text, inputs, tables, notes, card captions (captions at 600).
@@ -259,11 +259,11 @@ Each state has a solid tone, a wash for backgrounds, a line for borders and an i
 
 ## Layout
 
-A two-column working layout: a fixed-width input panel (300–360px) beside a fluid report column, with 24px gutters and page padding. On wide screens the panel is sticky and scrolls independently. At 960px and below it collapses to one column with the panel first and 12px padding; at 600px the header actions span the width and the key figures drop to two columns.
+A two-column working layout: a fixed-width input panel (300–360px) beside a fluid report column, with 24px gutters and page padding. On wide screens the panel is sticky and scrolls independently. At 960px and below it collapses to one column with 12px padding: the explanation leads before the first report, then the panel comes first and a finished analysis scrolls the report into view; at 600px the header actions span the width and the key figures drop to two columns.
 
 Spacing follows a 4px base (`s1`–`s7`: 4, 8, 12, 16, 24, 32, 48). Inside the report, major sections are separated by 24px, items within a section by 12px, and cards and charts sit in an auto-fill grid with a 26rem minimum track and 16px gaps. Long text is capped at 68–72ch.
 
-The report reads top-down in a fixed order: report header, summary (verdict + key figures), notes, then evidence sections, then monthly table and assumptions. For print the panel, header actions, intro and status disappear, the app bar becomes a blue rule, and charts sit two per row.
+The report reads top-down in a fixed order: report header, summary (verdict + key figures; a supporting sentence only when the verdict needs one), notes, "Through the year" (monthly energy and grid purchases), then two closed disclosures, "Behind the numbers" (supporting stats and four diagnostic charts; opened automatically when the power curve fails the physics check) and "Monthly figures" (table + CSV), then "Assumptions and data". Nothing is repeated: a value shown in the summary or the assumptions doesn't reappear in the stats. For print the panel, header actions, intro and status disappear, every disclosure opens, the app bar becomes a blue rule, and charts sit two per row.
 
 ## Elevation & Depth
 
@@ -286,14 +286,15 @@ Quiet and exact: small radii, hairlines, colour reserved for meaning.
 
 ### Buttons
 - **Shape:** gently rounded (6px), 600 weight at label size.
-- **Primary:** Grid Blue fill, white text. Full-width and slightly taller in the sidebar form ("Analyse this site"). Hover deepens to Night Grid Blue. While working, it shows progress text and a progress cursor.
+- **Primary:** Grid Blue fill, white text. Full-width and slightly taller in the sidebar form ("Analyse this site"). Hover deepens to Night Grid Blue. While working, it shows progress in its label ("Loading weather… 3 of 20") and a progress cursor.
+- **Confirmation:** buttons whose result isn't otherwise visible briefly relabel themselves ("Link copied", "Cache cleared") for two seconds.
 - **Secondary:** white with Grid Blue text and a strong hairline; hover turns the border Grid Blue on a faint blue tint. Used for Find, Download CSV, Clear cache.
 - **On dark:** transparent with a translucent white outline on the app bar (Copy link, Print report); hover adds a faint white wash. Disabled until a report exists.
 - **Link button:** inline underlined Grid Blue text for minor actions ("Restore default").
 - **Focus:** the focus ring above; transitions 150ms ease-out on colour and border only.
 
 ### Chips
-- **Status tag:** pill, bold label-size text, state wash with state ink (good / caution / problem). Sits inline at the end of the verdict headline: "Viable", "Marginal", "Not viable", "Unverified".
+- **Status tag:** pill, bold label-size text, state wash with state ink (good / caution / problem). Leads the verdict headline, inline before the sentence: "Promising", "Marginal", "Weak", "Not viable", "Unverified".
 
 ### Cards / Containers
 - **Corner Style:** 10px.
@@ -307,12 +308,12 @@ Quiet and exact: small radii, hairlines, colour reserved for meaning.
 - **Style:** white, 1px Hairline Strong border, 6px corners, body size, tabular numbers; labels sit above in Muted Ink. Text areas for curves and profiles use the mono face.
 - **Hover:** border darkens slightly.
 - **Focus:** border turns Grid Blue with the focus ring.
-- **Error:** Problem Red border on a faint red field.
+- **Error:** Problem Red border on the Problem Wash, marked `aria-invalid`. The message (label size, 600, Problem Ink) appears directly under the field or field row at fault, or under the Analyse button for non-field errors; on submit the field's group opens and the field takes focus.
 - **Disabled:** 50% opacity, not-allowed cursor.
 
 ### Navigation
 - **App bar:** slim, Night Grid Blue blending to Grid Blue left to right; the wordmark in Signal Green (800 weight), the product title in white, a "Prototype" pill badge, and on-dark buttons pushed right. On small screens the buttons wrap below and share the width.
-- **Sidebar groups:** each assumption group is a disclosure with a small chevron and a Night Grid Blue heading that turns Grid Blue on hover; groups are separated by hairlines. The Site group is always open and holds search, map and coordinates.
+- **Sidebar groups:** each assumption group is a disclosure with a small chevron and a Night Grid Blue heading that turns Grid Blue on hover; groups are separated by hairlines. The Site group is always open and holds search, map and coordinates. Disclosure rows are at least 44px tall.
 
 ### Summary (signature)
 The report's first surface: the verdict headline with its status tag, one or two sentences of plain explanation (second in Muted Ink), then a hairline and four key figures in an auto-fit grid. Wind energy is set in Wind Blue; the others in Report Ink. Each figure has a term above and a short qualifier below.
@@ -321,7 +322,7 @@ The report's first surface: the verdict headline with its status tag, one or two
 Caveats that change how to read the result, shown directly under the summary as a list of washed boxes (caution or problem), max 72ch, with the first phrase bolded. No side stripe.
 
 ### Stat rows
-Definition lists of secondary statistics at the top of evidence sections: Muted Ink term, Stat-size value, optional caption sub-line.
+Definition list of supporting statistics at the top of "Behind the numbers": Muted Ink term, Stat-size value, optional caption sub-line.
 
 ## Do's and Don'ts
 

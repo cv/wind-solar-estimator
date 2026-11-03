@@ -75,8 +75,12 @@ function readHash() {
 class InputError extends Error {}
 
 function invalid(key, message) {
-  form.elements[key]?.classList.add("invalid");
-  return new InputError(message);
+  const el = form.elements[key];
+  el?.classList.add("invalid");
+  el?.setAttribute("aria-invalid", "true");
+  const err = new InputError(message);
+  err.field = el;
+  return err;
 }
 
 function num(v, key, label, { min = -Infinity, max = Infinity, optional = false } = {}) {
@@ -146,6 +150,24 @@ function modelParams(v) {
 
 // ---------- status ----------
 
+// Input problems are shown under the field at fault (or the Analyse button), so they're in view on every screen size.
+function formError(message, field) {
+  const el = $("#formError");
+  el.textContent = message;
+  el.hidden = !message;
+  if (!message) return;
+  (field ? field.closest(".row") || field.closest("label") || field : $("#run")).after(el);
+  field?.setAttribute("aria-describedby", "formError");
+}
+
+// Brief confirmation on the button that was pressed.
+function flash(btn, text, ms = 2000) {
+  clearTimeout(btn._flash);
+  btn.dataset.label ??= btn.textContent;
+  btn.textContent = text;
+  btn._flash = setTimeout(() => { btn.textContent = btn.dataset.label; }, ms);
+}
+
 function status(html, kind = "info") {
   const el = $("#status");
   el.hidden = !html;
@@ -159,7 +181,8 @@ let runToken = 0;
 let abortCtl = null;
 
 async function analyse({ fetchIfNeeded = true } = {}) {
-  form.querySelectorAll(".invalid").forEach((el) => el.classList.remove("invalid"));
+  form.querySelectorAll(".invalid").forEach((el) => { el.classList.remove("invalid"); el.removeAttribute("aria-invalid"); el.removeAttribute("aria-describedby"); });
+  formError("");
   const v = readForm();
   let req, params;
   try {
@@ -167,7 +190,12 @@ async function analyse({ fetchIfNeeded = true } = {}) {
     params = modelParams(v);
   } catch (e) {
     if (!(e instanceof InputError)) throw e;
-    status(esc(e.message), "error");
+    formError(e.message, e.field);
+    if (fetchIfNeeded && e.field) {
+      const group = e.field.closest("details");
+      if (group) group.open = true;
+      e.field.focus();
+    }
     return;
   }
 
@@ -182,6 +210,7 @@ async function analyse({ fetchIfNeeded = true } = {}) {
     const runBtn = $("#run");
     runBtn.disabled = true;
     runBtn.textContent = "Loading weather…";
+    const period = req.startYear === req.endYear ? String(req.endYear) : `${req.startYear}–${req.endYear}`;
     state.loading = true;
     try {
       const wx = await fetchWeather({
@@ -189,7 +218,8 @@ async function analyse({ fetchIfNeeded = true } = {}) {
         signal: abortCtl.signal,
         onProgress: (done, total) => {
           if (token !== runToken) return;
-          status(`Loading hourly weather for ${req.startYear}–${req.endYear}… ${done} of ${total} years` +
+          runBtn.textContent = `Loading weather… ${done} of ${total}`;
+          status(`Loading hourly weather for ${period}… ${done} of ${total} year${total === 1 ? "" : "s"}` +
             `<div class="progress"><div style="width:${Math.round((100 * done) / total)}%"></div></div>`);
         },
       });
@@ -210,7 +240,10 @@ async function analyse({ fetchIfNeeded = true } = {}) {
   state.capped = check.worstRatio > 1 && !params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: true }) : null;
   status("");
   render(v, check);
-  if (fetchIfNeeded && matchMedia("(max-width: 900px)").matches) $("#results").scrollIntoView({ behavior: "smooth" });
+  if (fetchIfNeeded && matchMedia("(max-width: 960px)").matches) {
+    // Single-column layout: the report sits below the form, so bring it into view.
+    $("#results").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
 }
 
 // ---------- rendering ----------
@@ -223,10 +256,11 @@ function render(v, check) {
   $("#print").disabled = false;
 
   const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
-  $("#reportHead").innerHTML = `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} years of hourly weather (${wx.startYear}–${wx.endYear}) · ` +
-    `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString()}</p>`;
+  $("#reportHead").innerHTML = `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} year${wx.years === 1 ? "" : "s"} of hourly weather (${wx.startYear === wx.endYear ? wx.endYear : `${wx.startYear}–${wx.endYear}`}) · ` +
+    `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString(undefined, { dateStyle: "medium" })}</p>`;
 
   renderVerdict(r, p);
+  if (state.capped) $("#more").open = true; // the power-curve chart is the evidence
   renderNotes(r, p, check);
   renderFigures(r, p, req);
   renderCharts(r, p);
@@ -238,6 +272,7 @@ function render(v, check) {
     state.cell = L.rectangle([[wx.gridLat - h, wx.gridLon - h], [wx.gridLat + h, wx.gridLon + h]], { color: COLORS.wind, weight: 1, fillOpacity: 0.08 })
       .bindTooltip("Weather data grid cell (~28 km): wind and sunlight are averaged over this area")
       .addTo(state.map);
+    state.cell.getElement()?.setAttribute("tabindex", "-1"); // hover-only hint, not a tab stop
   }
 }
 
@@ -245,27 +280,23 @@ const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function verdictFor(r) {
   const pb = r.econ.payback;
-  if (pb <= 10) return { cls: "good", label: "Promising", text: `the turbines pay back in about ${fmt(pb, 1)} years` };
-  if (pb <= 20) return { cls: "warn", label: "Marginal", text: `the turbines pay back in about ${fmt(pb, 1)} years` };
+  if (pb <= 10) return { cls: "good", label: "Promising", text: `the turbines pay back in about ${fmt(pb, pb < 10 ? 1 : 0)} years` };
+  if (pb <= 20) return { cls: "warn", label: "Marginal", text: `the turbines pay back in about ${fmt(pb)} years` };
   if (Number.isFinite(pb)) return { cls: "bad", label: "Weak", text: `the turbines take about ${fmt(pb)} years to pay back` };
   return { cls: "bad", label: "Not viable", text: "the turbines' savings don't cover their maintenance" };
 }
 
 function renderVerdict(r) {
   const v = verdictFor(r);
-  const cut = r.pvOnly.importKwh - r.withWind.importKwh;
-  const detail = `${fmt(r.windKwh)} kWh a year from wind cuts grid purchases by ${fmt(cut)} kWh and saves about ${money(r.econ.savings)} a year, ` +
-    `against ${money(r.econ.om)} a year of maintenance and ${money(r.econ.capex)} installed.`;
   let tag = v;
   let head = capitalize(v.text);
-  let lines = [detail];
+  let lines = []; // the figures under the headline carry the numbers
   if (state.capped) {
     const c = verdictFor(state.capped);
     tag = { cls: "bad", label: "Unverified" };
     head = "The power curve claims more than the wind can deliver";
     lines = [
-      `Taken at face value, ${v.text}: ${detail}`,
-      `Capped at the physical limit they would make ${fmt(state.capped.windKwh)} kWh a year: ${c.text}. The figures below use the curve as entered.`,
+      `The figures below take the curve at face value. Capped at the physical limit: ${fmt(state.capped.windKwh)} kWh a year from wind, and ${c.text}.`,
     ];
   }
   $("#verdict").innerHTML = `<h3 id="verdictHead" class="verdict-head"><span class="tag ${tag.cls}">${esc(tag.label)}</span> ${esc(head)}</h3>` +
@@ -309,28 +340,38 @@ function renderFigures(r, p, req) {
     figure("Grid purchases cut by", fmt(cut), "kWh/yr", cutShare),
     figure("Savings from wind", money(e.savings), "/yr", `${money(e.netSavings)}/yr after maintenance`),
     Number.isFinite(e.payback)
-      ? figure("Simple payback", fmt(e.payback, 1), "years", `on ${money(e.capex)} installed`)
+      ? figure("Simple payback", fmt(e.payback, e.payback < 10 ? 1 : 0), "years", `on ${money(e.capex)} installed`)
       : figure("Simple payback", "Never", "", `on ${money(e.capex)} installed`),
   ].join("");
 
   const stat = (label, value, unit, sub) =>
     `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
-  $("#windStats").innerHTML = [
+  // Supporting figures only: anything already in the summary or the assumptions isn't repeated here.
+  $("#stats").innerHTML = [
     stat("Mean wind at hub", fmt(r.meanHub, 1), "km/h", `Weather data: ${fmt(r.meanW10, 1)} at 10 m, ${fmt(r.meanW100, 1)} at 100 m`),
-    stat("Capacity factor", pct(r.capacityFactor, 1), "", `of ${fmt(r.ratedKw, 1)} kW rated`),
     stat("Turbines producing", pct(r.generatingShare), "", "of all hours"),
-    stat("Per turbine", fmt(r.windKwhPerTurbine), "kWh/yr", `${fmt(r.windKwhPerTurbine / 365, 1)} kWh a day`),
+    p.nTurbines > 1 ? stat("Per turbine", fmt(r.windKwhPerTurbine), "kWh/yr", `${fmt(r.windKwhPerTurbine / 365, 1)} kWh a day`) : "",
     stat("Wind cost per kWh", money(e.costPerKwh20, 2), "", `over 20 years, vs ${money(p.price, 2)} from the grid`),
-  ].join("");
-  const profile = LOAD_PRESETS[p.loadProfile]?.label ?? "Custom profile";
-  $("#systemStats").innerHTML = [
     stat("Solar energy", fmt(r.pvKwh), "kWh/yr", `${fmt(p.pvKwp, 1)} kWp, tilt ${req.tilt}°, facing ${req.compass}°`),
-    stat("Electricity use", fmt(r.loadKwh), "kWh/yr", profile),
     stat("Self-sufficiency", pct(B.selfSufficiency), "", `${pct(A.selfSufficiency)} without wind`),
-    stat("Bought from the grid", fmt(B.importKwh), "kWh/yr", `${fmt(A.importKwh)} without wind`),
     stat("Surplus exported", fmt(B.exportKwh), "kWh/yr", `${fmt(A.exportKwh)} without wind`),
   ].join("");
 }
+
+// Legend keys match the marks: a swatch for bars, a short line (dashed if the series is) for lines.
+const legendLabels = {
+  usePointStyle: true,
+  boxHeight: 8,
+  pointStyleWidth: 16,
+  generateLabels(chart) {
+    return Chart.defaults.plugins.legend.labels.generateLabels(chart).map((item) => {
+      const ds = chart.data.datasets[item.datasetIndex];
+      return (ds.type || chart.config.type) === "line"
+        ? { ...item, pointStyle: "line", strokeStyle: ds.borderColor, lineWidth: 2.5 }
+        : { ...item, pointStyle: "rect", lineWidth: 0 };
+    });
+  },
+};
 
 function drawChart(id, config) {
   if (typeof Chart === "undefined") return;
@@ -340,7 +381,7 @@ function drawChart(id, config) {
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
-      plugins: { legend: { labels: { boxWidth: 12 } }, ...config.options?.plugins },
+      plugins: { legend: { labels: legendLabels }, ...config.options?.plugins },
       ...config.options,
     },
   });
@@ -516,7 +557,7 @@ function initMap() {
   const lat = Number(form.elements.lat.value) || 0, lon = Number(form.elements.lon.value) || 0;
   const map = L.map("map", { scrollWheelZoom: false }).setView([lat, lon], 6);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap contributors" }).addTo(map);
-  const marker = L.marker([lat, lon], { draggable: true }).addTo(map);
+  const marker = L.marker([lat, lon], { draggable: true, alt: "Site location", title: "Drag to move the site" }).addTo(map);
   marker.on("dragend", () => { const ll = marker.getLatLng(); setLocation(ll.lat, ll.lng, ""); });
   map.on("click", (e) => setLocation(e.latlng.lat, e.latlng.lng, ""));
   Object.assign(state, { map, marker });
@@ -615,17 +656,27 @@ function init() {
   $("#print").addEventListener("click", () => window.print());
   $("#share").addEventListener("click", async () => {
     writeHash(readForm());
-    try { await navigator.clipboard.writeText(location.href); status("Link copied. Anyone opening it sees this site with these assumptions."); }
+    try { await navigator.clipboard.writeText(location.href); flash($("#share"), "Link copied"); status("Link copied. Anyone opening it sees this site with these assumptions."); }
     catch { window.prompt("Copy this link:", location.href); }
   });
   $("#clearCache").addEventListener("click", async () => {
     await clearWeatherCache();
     state.wxKey = null;
+    flash($("#clearCache"), "Cache cleared");
     status("Cached weather data cleared.");
   });
   const resizeCharts = () => Object.values(state.charts).forEach((c) => c.resize());
-  window.addEventListener("beforeprint", resizeCharts);
-  window.addEventListener("afterprint", resizeCharts);
+  // A printed report shows everything: expand collapsed sections, then restore them.
+  let closedForPrint = [];
+  window.addEventListener("beforeprint", () => {
+    closedForPrint = [...document.querySelectorAll("#results details:not([open])")];
+    closedForPrint.forEach((d) => { d.open = true; });
+    resizeCharts();
+  });
+  window.addEventListener("afterprint", () => {
+    closedForPrint.forEach((d) => { d.open = false; });
+    resizeCharts();
+  });
 
   if (typeof Chart !== "undefined") {
     Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;

@@ -572,7 +572,7 @@
       "name": "Status Tag",
       "kind": "chip",
       "refersTo": "tag-good",
-      "description": "Pill at the end of the verdict headline: good, caution or problem.",
+      "description": "Pill leading the verdict headline: good, caution or problem.",
       "html": "<span class=\"ds-tag ds-good\">Viable</span> <span class=\"ds-tag ds-warn\">Marginal</span> <span class=\"ds-tag ds-bad\">Unverified</span>",
       "css": ".ds-tag { display: inline-block; font: 700 0.8125rem/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; padding: 0.35rem 0.6rem; border-radius: 99px; white-space: nowrap; } .ds-good { background: #e4f3e5; color: #1d5520; } .ds-warn { background: #fdf1df; color: #6b3d00; } .ds-bad { background: #fde8e8; color: #8e1b1b; }"
     },
@@ -581,7 +581,7 @@
       "kind": "custom",
       "refersTo": "summary",
       "description": "Signature surface: verdict headline with tag, explanation, then four key figures.",
-      "html": "<section class=\"ds-summary\"><h3 class=\"ds-verdict\">Wind adds little here <span class=\"ds-tag ds-warn\">Marginal</span></h3><p class=\"ds-detail\">Two turbines would supply about 9% of this site's electricity.</p><dl class=\"ds-figures\"><div><dt>Wind energy</dt><dd class=\"ds-value ds-wind\">2,140<span class=\"ds-unit\">kWh/yr</span></dd></div><div><dt>Grid purchases cut</dt><dd class=\"ds-value\">1,610<span class=\"ds-unit\">kWh/yr</span></dd></div><div><dt>Savings</dt><dd class=\"ds-value\">$240<span class=\"ds-unit\">/yr</span></dd></div><div><dt>Simple payback</dt><dd class=\"ds-value\">&gt;40<span class=\"ds-unit\">years</span></dd></div></dl></section>",
+      "html": "<section class=\"ds-summary\"><h3 class=\"ds-verdict\"><span class=\"ds-tag ds-warn\">Marginal</span> Wind adds little here</h3><p class=\"ds-detail\">Two turbines would supply about 9% of this site's electricity.</p><dl class=\"ds-figures\"><div><dt>Wind energy</dt><dd class=\"ds-value ds-wind\">2,140<span class=\"ds-unit\">kWh/yr</span></dd></div><div><dt>Grid purchases cut</dt><dd class=\"ds-value\">1,610<span class=\"ds-unit\">kWh/yr</span></dd></div><div><dt>Savings</dt><dd class=\"ds-value\">$240<span class=\"ds-unit\">/yr</span></dd></div><div><dt>Simple payback</dt><dd class=\"ds-value\">&gt;40<span class=\"ds-unit\">years</span></dd></div></dl></section>",
       "css": ".ds-summary { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #172033; background: #fff; border: 1px solid #dce1ec; border-radius: 10px; padding: 24px; } .ds-verdict { margin: 0; font-size: 1.375rem; line-height: 1.25; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; } .ds-tag { display: inline-block; font-size: 0.8125rem; font-weight: 700; line-height: 1; padding: 0.35rem 0.6rem; border-radius: 99px; } .ds-warn { background: #fdf1df; color: #6b3d00; } .ds-detail { margin: 8px 0 0; font-size: 1rem; max-width: 70ch; } .ds-figures { margin: 24px 0 0; padding-top: 16px; border-top: 1px solid #dce1ec; display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 16px 24px; } .ds-figures dt { font-size: 0.8125rem; color: #556074; } .ds-figures dd { margin: 0; } .ds-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-wind { color: #1f77b4; } .ds-unit { font-size: 0.8125rem; font-weight: 600; margin-left: 0.2rem; color: #556074; }"
     },
     {
