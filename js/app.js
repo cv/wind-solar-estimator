@@ -238,6 +238,8 @@ async function analyse({ fetchIfNeeded = true } = {}) {
   state.result = simulate(state.wx, params);
   const check = checkCurve(params.curvePts, params.captureDiameterM, params.augmentation);
   state.capped = check.worstRatio > 1 && !params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: true }) : null;
+  // With the cap on, the uncapped run says what the cap took away (after losses, so it matches the figures).
+  state.uncapped = check.worstRatio > 1 && params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: false }) : null;
   status("");
   render(v, check);
   if (fetchIfNeeded && matchMedia("(max-width: 960px)").matches) {
@@ -303,12 +305,26 @@ function renderVerdict(r) {
     lines.map((l) => `<p class="verdict-detail">${esc(l)}</p>`).join("");
 }
 
+/** Says what the Betz cap does for the current curve, next to the checkbox, so toggling it never looks inert. */
+function renderClampStatus(r, p, check) {
+  let text;
+  if (check.worstRatio <= 1) {
+    text = `This curve stays within the limit at every wind speed (at most ${pct(check.worstRatio)} of it), so capping changes nothing.`;
+  } else if (p.clampPhysics) {
+    text = `Capped, wind makes ${fmt(r.windKwh)} kWh a year instead of the ${fmt(state.uncapped.windKwh)} the curve as entered would give.`;
+  } else {
+    text = `This curve is ${fmt(check.worstRatio)}× the limit at ${fmt(check.atKmh)} km/h. Capped, wind would make ${fmt(state.capped.windKwh)} kWh a year instead of ${fmt(r.windKwh)}.`;
+  }
+  $("#clampStatus").textContent = text;
+}
+
 function renderNotes(r, p, check) {
+  renderClampStatus(r, p, check);
   const items = [];
   if (check.worstRatio > 1) {
     const aug = p.augmentation > 1 ? `, even with ${fmt(p.augmentation, 1)}× duct augmentation` : "";
     if (p.clampPhysics) {
-      items.push(["warn", `<strong>Power curve:</strong> output is capped at the physical limit for a ${fmt(p.captureDiameterM, 2)} m rotor or intake, which removes ${fmt(r.clippedKwh)} kWh a year from the entered curve.`]);
+      items.push(["warn", `<strong>Power curve:</strong> output is capped at the physical limit for a ${fmt(p.captureDiameterM, 2)} m rotor or intake, which takes wind energy from ${fmt(state.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`]);
     } else {
       items.push(["bad", `<strong>Power curve:</strong> at ${fmt(check.atKmh)} km/h it is ${fmt(check.worstRatio)}× the most a ${fmt(p.captureDiameterM, 2)} m rotor or intake can physically capture (the Betz limit${aug}). ` +
         `The most it could capture here is about ${fmt(r.physicsCapKwh)} kWh a year. Have the curve measured independently, or correct the diameter, before quoting customers.`]);

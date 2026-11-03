@@ -140,6 +140,8 @@ details.group > summary:hover h2 { color: var(--blue); }
 label { display: block; font-size: var(--t-sm); color: var(--muted); margin-bottom: var(--s3); }
 label.check { display: flex; gap: var(--s2); align-items: flex-start; color: var(--text); }
 label.check input { width: 1rem; height: 1rem; margin: 0.1rem 0 0; flex: none; }
+.hint.clamp-status { margin: calc(-1 * var(--s2)) 0 var(--s3) calc(1rem + var(--s2)); }
+.clamp-status:empty { display: none; }
 input, select, textarea { font: inherit; }
 input[type=number], input[type=text], input[type=search], input[type=password], select, textarea {
   display: block; width: 100%; margin-top: var(--s1); padding: 0.45rem 0.55rem;
