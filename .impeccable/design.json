@@ -1,0 +1,659 @@
+{
+  "schemaVersion": 2,
+  "title": "Design System: Wind + Solar Site Viability Estimator",
+  "extensions": {
+    "colorMeta": {
+      "grid-blue": {
+        "role": "primary",
+        "displayName": "Grid Blue",
+        "canonical": "#0b2fbf",
+        "oklch": "oklch(40.7% 0.223 264.8)",
+        "tonalRamp": [
+          "#010038",
+          "#02116b",
+          "#0e2f9c",
+          "#214dcf",
+          "#4074fc",
+          "#78a1fe",
+          "#b2cafe",
+          "#e7effe"
+        ]
+      },
+      "night-grid-blue": {
+        "role": "primary",
+        "displayName": "Night Grid Blue",
+        "canonical": "#071f80",
+        "oklch": "oklch(30.9% 0.163 265.1)",
+        "tonalRamp": [
+          "#010330",
+          "#091c58",
+          "#1d3983",
+          "#3356b1",
+          "#537bdb",
+          "#7ca2f7",
+          "#b2caff",
+          "#e7efff"
+        ]
+      },
+      "signal-green": {
+        "role": "secondary",
+        "displayName": "Signal Green",
+        "canonical": "#5fd13a",
+        "oklch": "oklch(76.5% 0.213 139.3)",
+        "tonalRamp": [
+          "#001000",
+          "#082d00",
+          "#154d00",
+          "#247000",
+          "#359903",
+          "#65bd4c",
+          "#97e184",
+          "#cdffc0"
+        ]
+      },
+      "wind-series": {
+        "role": "tertiary",
+        "displayName": "Wind Blue",
+        "canonical": "#1f77b4",
+        "oklch": "oklch(54.9% 0.124 244.6)",
+        "tonalRamp": [
+          "#000c1c",
+          "#002641",
+          "#00436d",
+          "#0e6299",
+          "#3986c1",
+          "#6cabdf",
+          "#9cd1fe",
+          "#e1f1ff"
+        ]
+      },
+      "solar-series": {
+        "role": "tertiary",
+        "displayName": "Solar Amber",
+        "canonical": "#f2a900",
+        "oklch": "oklch(78.5% 0.164 77.6)",
+        "tonalRamp": [
+          "#140900",
+          "#332000",
+          "#563900",
+          "#7c5502",
+          "#a97502",
+          "#d29931",
+          "#f3c173",
+          "#ffecd0"
+        ]
+      },
+      "solar-ink": {
+        "role": "tertiary",
+        "displayName": "Solar Ink",
+        "canonical": "#8a6100",
+        "oklch": "oklch(52.2% 0.108 79.7)",
+        "tonalRamp": [
+          "#130900",
+          "#322000",
+          "#553a00",
+          "#7b5600",
+          "#a0792f",
+          "#c29f63",
+          "#e4c694",
+          "#ffecce"
+        ]
+      },
+      "load-series": {
+        "role": "tertiary",
+        "displayName": "Load Graphite",
+        "canonical": "#444444",
+        "oklch": "oklch(38.7% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#404040",
+          "#5d5d5d",
+          "#808080",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ]
+      },
+      "reference-grey": {
+        "role": "neutral",
+        "displayName": "Reference Grey",
+        "canonical": "#9aa3b5",
+        "oklch": "oklch(71.4% 0.028 264.4)",
+        "tonalRamp": [
+          "#080b12",
+          "#1f242e",
+          "#3a404c",
+          "#565e6d",
+          "#788091",
+          "#9da5b3",
+          "#c4cbd7",
+          "#e9eff9"
+        ]
+      },
+      "good": {
+        "role": "state",
+        "displayName": "Good",
+        "canonical": "#2e7d32",
+        "oklch": "oklch(52.3% 0.135 144.2)",
+        "tonalRamp": [
+          "#001000",
+          "#002e03",
+          "#0e4d14",
+          "#276f2b",
+          "#4b934c",
+          "#79b778",
+          "#a6dba5",
+          "#d1fdcf"
+        ]
+      },
+      "good-wash": {
+        "role": "state",
+        "displayName": "Good Wash",
+        "canonical": "#e4f3e5",
+        "oklch": "oklch(94.9% 0.024 147.3)",
+        "tonalRamp": [
+          "#080d08",
+          "#1f261f",
+          "#39433a",
+          "#566156",
+          "#788478",
+          "#9da89e",
+          "#c4cec4",
+          "#e9f1e9"
+        ]
+      },
+      "good-ink": {
+        "role": "state",
+        "displayName": "Good Ink",
+        "canonical": "#1d5520",
+        "oklch": "oklch(39.9% 0.102 144.2)",
+        "tonalRamp": [
+          "#001000",
+          "#092c0b",
+          "#214b22",
+          "#396b3a",
+          "#5b8f5b",
+          "#85b384",
+          "#b0d7ae",
+          "#d8f9d7"
+        ]
+      },
+      "warn": {
+        "role": "state",
+        "displayName": "Caution",
+        "canonical": "#a35c00",
+        "oklch": "oklch(54.5% 0.126 61.6)",
+        "tonalRamp": [
+          "#170600",
+          "#391c00",
+          "#5f3301",
+          "#894d01",
+          "#b26e29",
+          "#d3965f",
+          "#f4be91",
+          "#feeada"
+        ]
+      },
+      "warn-wash": {
+        "role": "state",
+        "displayName": "Caution Wash",
+        "canonical": "#fdf1df",
+        "oklch": "oklch(96.3% 0.027 78.2)",
+        "tonalRamp": [
+          "#0f0a05",
+          "#29231a",
+          "#463f33",
+          "#655c4e",
+          "#897f6f",
+          "#aca396",
+          "#d1c9be",
+          "#f4ede3"
+        ]
+      },
+      "warn-line": {
+        "role": "state",
+        "displayName": "Caution Line",
+        "canonical": "#f0d2a6",
+        "oklch": "oklch(87.8% 0.067 77.2)",
+        "tonalRamp": [
+          "#140900",
+          "#302107",
+          "#503c1d",
+          "#715934",
+          "#967c55",
+          "#b8a17f",
+          "#dcc7aa",
+          "#fdecd3"
+        ]
+      },
+      "warn-ink": {
+        "role": "state",
+        "displayName": "Caution Ink",
+        "canonical": "#6b3d00",
+        "oklch": "oklch(40.7% 0.092 64.4)",
+        "tonalRamp": [
+          "#170700",
+          "#381c00",
+          "#5a360e",
+          "#7e5325",
+          "#a47546",
+          "#c69b73",
+          "#e8c3a0",
+          "#feebd9"
+        ]
+      },
+      "bad": {
+        "role": "state",
+        "displayName": "Problem Red",
+        "canonical": "#c62828",
+        "oklch": "oklch(53.9% 0.194 26.7)",
+        "tonalRamp": [
+          "#210000",
+          "#4c0003",
+          "#7d0009",
+          "#ac1b1d",
+          "#d84640",
+          "#f7796e",
+          "#ffb5ac",
+          "#ffe9e6"
+        ]
+      },
+      "bad-wash": {
+        "role": "state",
+        "displayName": "Problem Wash",
+        "canonical": "#fde8e8",
+        "oklch": "oklch(94.8% 0.023 17.6)",
+        "tonalRamp": [
+          "#100909",
+          "#2b2121",
+          "#493c3c",
+          "#695959",
+          "#8d7b7b",
+          "#b0a0a0",
+          "#d5c7c7",
+          "#f7ebeb"
+        ]
+      },
+      "bad-line": {
+        "role": "state",
+        "displayName": "Problem Line",
+        "canonical": "#f3c0c0",
+        "oklch": "oklch(85.3% 0.059 18.4)",
+        "tonalRamp": [
+          "#170506",
+          "#351c1c",
+          "#563536",
+          "#795152",
+          "#9f7373",
+          "#c19999",
+          "#e4c1c1",
+          "#ffe8e8"
+        ]
+      },
+      "bad-ink": {
+        "role": "state",
+        "displayName": "Problem Ink",
+        "canonical": "#8e1b1b",
+        "oklch": "oklch(42.3% 0.150 26.6)",
+        "tonalRamp": [
+          "#210000",
+          "#4a0205",
+          "#721c1a",
+          "#9d3530",
+          "#c75951",
+          "#e7857b",
+          "#feb5ad",
+          "#ffe9e6"
+        ]
+      },
+      "info-wash": {
+        "role": "state",
+        "displayName": "Info Wash",
+        "canonical": "#e6ecfb",
+        "oklch": "oklch(94.3% 0.021 268.4)",
+        "tonalRamp": [
+          "#090b10",
+          "#21242b",
+          "#3c4049",
+          "#595d69",
+          "#7b808d",
+          "#a0a4b0",
+          "#c6cad4",
+          "#ebeef7"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Field Paper",
+        "canonical": "#f3f5fa",
+        "oklch": "oklch(97.0% 0.007 268.5)",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#232426",
+          "#3e4043",
+          "#5c5d61",
+          "#7e8084",
+          "#a3a4a8",
+          "#c9cace",
+          "#edeef1"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface White",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#404040",
+          "#5d5d5d",
+          "#808080",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#dce1ec",
+        "oklch": "oklch(90.9% 0.016 266.3)",
+        "tonalRamp": [
+          "#090b0f",
+          "#222429",
+          "#3d4047",
+          "#5a5e66",
+          "#7c808a",
+          "#a1a5ad",
+          "#c7cad2",
+          "#eceef5"
+        ]
+      },
+      "hairline-strong": {
+        "role": "neutral",
+        "displayName": "Hairline Strong",
+        "canonical": "#c3cadb",
+        "oklch": "oklch(83.9% 0.025 267.9)",
+        "tonalRamp": [
+          "#090b11",
+          "#20242c",
+          "#3b404b",
+          "#585d6b",
+          "#7a808f",
+          "#9fa4b2",
+          "#c6cad6",
+          "#eaeef8"
+        ]
+      },
+      "chart-grid": {
+        "role": "neutral",
+        "displayName": "Chart Grid",
+        "canonical": "#e6e9f2",
+        "oklch": "oklch(93.4% 0.013 271.3)",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#222428",
+          "#3e4045",
+          "#5b5d64",
+          "#7d8088",
+          "#a2a4ab",
+          "#c8cad0",
+          "#edeef3"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Report Ink",
+        "canonical": "#172033",
+        "oklch": "oklch(24.5% 0.039 264.4)",
+        "tonalRamp": [
+          "#070b14",
+          "#1e2431",
+          "#374051",
+          "#535e72",
+          "#758097",
+          "#9ba5b9",
+          "#c2cbdc",
+          "#e7effe"
+        ]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#556074",
+        "oklch": "oklch(48.7% 0.035 262.4)",
+        "tonalRamp": [
+          "#070b13",
+          "#1e2430",
+          "#38404f",
+          "#545e70",
+          "#768195",
+          "#9ba5b7",
+          "#c2cbdb",
+          "#e7effc"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Report title and empty-state headline."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "The four key figures under the verdict; tabular."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The verdict sentence with its inline status tag."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Report section headings."
+      },
+      "stat": {
+        "displayName": "Stat",
+        "purpose": "Secondary statistics in section stat rows; tabular."
+      },
+      "prose": {
+        "displayName": "Prose",
+        "purpose": "Verdict explanation and empty-state copy, max 68-72ch."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default text, inputs, tables, notes, card captions."
+      },
+      "group-heading": {
+        "displayName": "Group heading",
+        "purpose": "Sidebar section headings in Night Grid Blue."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, hints, figure terms and units in Muted Ink."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Button labels."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Footer, panel note, stat sub-lines, small buttons."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Power curve and load profile text areas only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px rgba(11, 47, 191, 0.35)",
+        "purpose": "Keyboard focus on buttons and fields."
+      },
+      {
+        "name": "focus-ring-on-dark",
+        "value": "0 0 0 3px rgba(255, 255, 255, 0.6)",
+        "purpose": "Keyboard focus on app bar buttons."
+      },
+      {
+        "name": "floating",
+        "value": "0 8px 24px rgba(23, 32, 51, 0.12)",
+        "purpose": "Reserved for floating layers (menus, popovers, dropdown results). Approved, not yet used."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state",
+        "value": "150ms ease-out",
+        "purpose": "Colour, border and focus-ring transitions; disclosure chevron rotation."
+      },
+      {
+        "name": "progress",
+        "value": "250ms ease-out",
+        "purpose": "Download progress bar width."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "none",
+        "purpose": "All transitions disabled under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "single-column",
+        "value": "960px"
+      },
+      {
+        "name": "narrow",
+        "value": "600px"
+      },
+      {
+        "name": "print",
+        "value": "print"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single main action, e.g. Analyse this site.",
+      "html": "<button class=\"ds-btn-primary\">Analyse this site</button>",
+      "css": ".ds-btn-primary { font: 600 0.8125rem/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--blue, #0b2fbf); color: #fff; border: 1px solid var(--blue, #0b2fbf); border-radius: 6px; padding: 0.45rem 0.85rem; cursor: pointer; transition: background-color 150ms ease-out, border-color 150ms ease-out; } .ds-btn-primary:hover { background: var(--blue-dark, #071f80); border-color: var(--blue-dark, #071f80); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(11, 47, 191, 0.35); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Supporting actions: Find, Download CSV, Clear cache.",
+      "html": "<button class=\"ds-btn-secondary\">Download CSV</button>",
+      "css": ".ds-btn-secondary { font: 600 0.8125rem/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #fff; color: var(--blue, #0b2fbf); border: 1px solid var(--line-strong, #c3cadb); border-radius: 6px; padding: 0.45rem 0.85rem; cursor: pointer; transition: background-color 150ms ease-out, border-color 150ms ease-out; } .ds-btn-secondary:hover { border-color: var(--blue, #0b2fbf); background: #f5f7fd; } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(11, 47, 191, 0.35); }"
+    },
+    {
+      "name": "App Bar",
+      "kind": "nav",
+      "refersTo": "app-bar",
+      "description": "Slim header with wordmark, title, prototype badge and on-dark actions.",
+      "html": "<header class=\"ds-bar\"><span class=\"ds-bar-brand\"><b>Wind&nbsp;+&nbsp;Solar</b> Site Viability Estimator</span><span class=\"ds-bar-badge\">Prototype</span><span class=\"ds-bar-actions\"><button class=\"ds-btn-on-dark\">Copy link</button><button class=\"ds-btn-on-dark\">Print report</button></span></header>",
+      "css": ".ds-bar { display: flex; align-items: center; gap: 12px; padding: 12px 24px; background: linear-gradient(90deg, #071f80, #0b2fbf); color: #fff; font: 400 1.125rem/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; } .ds-bar-brand b { color: #5fd13a; font-weight: 800; margin-right: 8px; } .ds-bar-badge { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; border: 1px solid rgba(255,255,255,0.55); border-radius: 99px; padding: 0.05rem 0.5rem; } .ds-bar-actions { margin-left: auto; display: flex; gap: 8px; } .ds-btn-on-dark { font: 600 0.8125rem/1.45 system-ui, sans-serif; background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.6); border-radius: 6px; padding: 0.45rem 0.85rem; cursor: pointer; transition: background-color 150ms ease-out, border-color 150ms ease-out; } .ds-btn-on-dark:hover { background: rgba(255,255,255,0.12); border-color: #fff; } .ds-btn-on-dark:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.6); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Labelled numeric or text input with label above in Muted Ink.",
+      "html": "<label class=\"ds-field\">Hub height (m)<input class=\"ds-input\" type=\"number\" value=\"18\"></label>",
+      "css": ".ds-field { display: block; font: 400 0.8125rem/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #556074; max-width: 14rem; } .ds-input { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 0.45rem 0.55rem; font: 400 0.9375rem/1.45 system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #172033; background: #fff; border: 1px solid #c3cadb; border-radius: 6px; transition: border-color 150ms ease-out, box-shadow 150ms ease-out; } .ds-input:hover { border-color: #9ea8bf; } .ds-input:focus-visible { outline: none; border-color: #0b2fbf; box-shadow: 0 0 0 3px rgba(11, 47, 191, 0.35); }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "tag-good",
+      "description": "Pill at the end of the verdict headline: good, caution or problem.",
+      "html": "<span class=\"ds-tag ds-good\">Viable</span> <span class=\"ds-tag ds-warn\">Marginal</span> <span class=\"ds-tag ds-bad\">Unverified</span>",
+      "css": ".ds-tag { display: inline-block; font: 700 0.8125rem/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; padding: 0.35rem 0.6rem; border-radius: 99px; white-space: nowrap; } .ds-good { background: #e4f3e5; color: #1d5520; } .ds-warn { background: #fdf1df; color: #6b3d00; } .ds-bad { background: #fde8e8; color: #8e1b1b; }"
+    },
+    {
+      "name": "Summary",
+      "kind": "custom",
+      "refersTo": "summary",
+      "description": "Signature surface: verdict headline with tag, explanation, then four key figures.",
+      "html": "<section class=\"ds-summary\"><h3 class=\"ds-verdict\">Wind adds little here <span class=\"ds-tag ds-warn\">Marginal</span></h3><p class=\"ds-detail\">Two turbines would supply about 9% of this site's electricity.</p><dl class=\"ds-figures\"><div><dt>Wind energy</dt><dd class=\"ds-value ds-wind\">2,140<span class=\"ds-unit\">kWh/yr</span></dd></div><div><dt>Grid purchases cut</dt><dd class=\"ds-value\">1,610<span class=\"ds-unit\">kWh/yr</span></dd></div><div><dt>Savings</dt><dd class=\"ds-value\">$240<span class=\"ds-unit\">/yr</span></dd></div><div><dt>Simple payback</dt><dd class=\"ds-value\">&gt;40<span class=\"ds-unit\">years</span></dd></div></dl></section>",
+      "css": ".ds-summary { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #172033; background: #fff; border: 1px solid #dce1ec; border-radius: 10px; padding: 24px; } .ds-verdict { margin: 0; font-size: 1.375rem; line-height: 1.25; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; } .ds-tag { display: inline-block; font-size: 0.8125rem; font-weight: 700; line-height: 1; padding: 0.35rem 0.6rem; border-radius: 99px; } .ds-warn { background: #fdf1df; color: #6b3d00; } .ds-detail { margin: 8px 0 0; font-size: 1rem; max-width: 70ch; } .ds-figures { margin: 24px 0 0; padding-top: 16px; border-top: 1px solid #dce1ec; display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 16px 24px; } .ds-figures dt { font-size: 0.8125rem; color: #556074; } .ds-figures dd { margin: 0; } .ds-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-wind { color: #1f77b4; } .ds-unit { font-size: 0.8125rem; font-weight: 600; margin-left: 0.2rem; color: #556074; }"
+    },
+    {
+      "name": "Note",
+      "kind": "custom",
+      "refersTo": "note-warn",
+      "description": "Caveat under the summary, caution or problem wash, no side stripe.",
+      "html": "<ul class=\"ds-notes\"><li><strong>Wind data is uncalibrated.</strong> Reanalysis averages a 28 km cell; enter a measured mean if you have one.</li><li class=\"ds-bad\"><strong>Power curve exceeds the physical limit.</strong> Results are capped at the Betz limit.</li></ul>",
+      "css": ".ds-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font: 400 0.9375rem/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; } .ds-notes li { max-width: 72ch; padding: 12px 16px; border-radius: 6px; background: #fdf1df; border: 1px solid #f0d2a6; color: #6b3d00; } .ds-notes li.ds-bad { background: #fde8e8; border-color: #f3c0c0; color: #8e1b1b; }"
+    },
+    {
+      "name": "Chart Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat white card with a plain caption above a chart or table.",
+      "html": "<figure class=\"ds-card\"><figcaption>Average energy per month</figcaption><div class=\"ds-chart\"><span style=\"background:#1f77b4\"></span><span style=\"background:#f2a900\"></span><span style=\"background:#1f77b4\"></span><span style=\"background:#f2a900\"></span></div></figure>",
+      "css": ".ds-card { margin: 0; background: #fff; border: 1px solid #dce1ec; border-radius: 10px; padding: 16px; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #172033; } .ds-card figcaption { font-size: 0.9375rem; font-weight: 600; margin-bottom: 12px; } .ds-chart { height: 120px; display: flex; align-items: flex-end; gap: 8px; border-bottom: 1px solid #e6e9f2; } .ds-chart span { flex: 1; height: 60%; } .ds-chart span:nth-child(2n) { height: 85%; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Field Report",
+    "overview": "The interface reads like a trustworthy engineering site report that a salesperson can hand straight to a customer. It is calm, credible and plain-spoken: a white page on a cool paper ground, hairline rules, a single confident blue for action and identity, and colour otherwise spent only on meaning (wind, solar, good, caution, problem). Numbers are the heroes; they are set large, bold and in tabular figures, and every claim sits next to the caveat that qualifies it.\n\nDensity is that of a working document, not a dashboard. The sidebar holds the inputs as a quiet form; the report column leads with the verdict and four key figures, then lays out evidence in plainly titled sections with charts in simple cards. Print is a first-class output: the same report has to stand on paper without the app around it.\n\nThe system explicitly rejects two neighbours: clean-tech marketing gloss (gradient heroes, glassy cards, stock turbine photography) and dense trading-terminal dashboards (dark mode, neon accents, tiny type).",
+    "keyCharacteristics": [
+      "White report surfaces on a cool, blue-tinted paper ground; flat, with hairline borders.",
+      "One brand blue for action and identity; green appears only in the wordmark.",
+      "Semantic colour is reserved: wind blue, solar amber, and good / caution / problem states.",
+      "Big tabular numbers; plain sentence-case headings; no decorative imagery.",
+      "Prints as a clean, single-colour-accented report."
+    ],
+    "rules": [
+      {
+        "name": "The Meaning-Only Colour Rule",
+        "body": "Outside Grid Blue for action, colour always encodes something: wind, solar, use, or a state. Never colour a surface or heading for decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Wind Blue Rule",
+        "body": "Wind is always `wind-series` and solar always `solar-series`, in every chart, figure and legend, so a reader learns the code once.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Numbers Rule",
+        "body": "Every number a reader might compare (figures, stats, tables, inputs) uses tabular figures, so columns and changing values never jitter.",
+        "section": "typography"
+      },
+      {
+        "name": "The Plain Heading Rule",
+        "body": "Headings are sentence case, never uppercase or letter-spaced, and say what the reader will find (\"Monthly figures\", not \"Data\").",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Paper Rule",
+        "body": "Surfaces sit flat on the page. If something needs to stand out, give it position, size or a semantic wash, not a shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep Grid Blue (`#0b2fbf`) as the only action colour and Signal Green to the wordmark.",
+      "**Do** use `wind-series` for wind and `solar-series` for solar everywhere, and Reference Grey for \"without wind\" comparisons.",
+      "**Do** set comparable numbers in tabular figures, with units in Muted Ink at label size.",
+      "**Do** put caveats next to the numbers they qualify, in caution or problem washes.",
+      "**Do** check every new view in print: it must still read as a report on white paper.",
+      "**Do** use the 4px spacing scale and the 6px / 10px / pill radii only."
+    ],
+    "donts": [
+      "**Don't** use clean-tech marketing gloss: gradient heroes, glassy or blurred cards, stock turbine or solar photography.",
+      "**Don't** drift toward trading-terminal dashboards: dark mode, neon accents, tiny dense type.",
+      "**Don't** add drop shadows to cards or panels at rest; shadows are for floating layers only.",
+      "**Don't** use colour for decoration, or a state colour for anything but its state.",
+      "**Don't** use coloured side stripes on notes or cards; use the full wash.",
+      "**Don't** uppercase or letter-space headings and labels."
+    ]
+  },
+  "generatedAt": "2026-11-03T09:33:28.619Z"
+}
