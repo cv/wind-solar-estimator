@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Wind + Solar Site Viability Estimator</title>
   <meta name="description" content="Estimate wind + solar + battery performance for any location from 20 years of hourly weather data.">
+  <meta name="theme-color" content="#071f80">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
@@ -13,28 +14,26 @@
 </head>
 <body>
 <header class="top">
-  <div class="brand">
-    <span class="logo">Wind&nbsp;+&nbsp;Solar</span>
-    <span class="title">Site Viability Estimator</span>
-    <span class="badge">Prototype</span>
-  </div>
+  <h1 class="brand"><span class="logo">Wind&nbsp;+&nbsp;Solar</span> <span class="title">Site Viability Estimator</span></h1>
+  <span class="badge">Prototype</span>
   <div class="actions">
-    <button type="button" id="share" class="ghost">Copy link</button>
-    <button type="button" id="print" class="ghost">Print report</button>
+    <button type="button" id="share" class="on-dark" disabled>Copy link</button>
+    <button type="button" id="print" class="on-dark" disabled>Print report</button>
   </div>
 </header>
 
 <main class="layout">
-  <aside class="panel">
+  <aside class="panel" aria-label="Site and assumptions">
     <form id="form" autocomplete="off" novalidate>
-      <section class="group">
-        <h2>1. Location</h2>
+      <section class="group location">
+        <h2>Site</h2>
         <div class="search">
           <input id="placeSearch" type="search" placeholder="Search a place, e.g. Amarillo" aria-label="Search a place">
           <button type="button" id="placeGo">Find</button>
         </div>
         <ul id="placeResults" class="place-results" hidden></ul>
         <input type="hidden" name="place">
+        <div id="map" class="map" role="application" aria-label="Map: click or drag the pin to choose a site"></div>
         <div class="row">
           <label>Latitude <input name="lat" type="number" step="0.0001" min="-90" max="90" required></label>
           <label>Longitude <input name="lon" type="number" step="0.0001" min="-180" max="180" required></label>
@@ -44,19 +43,21 @@
           <label>Last year <input name="endYear" type="number" min="1950" step="1"></label>
         </div>
         <button type="submit" id="run" class="primary">Analyse this site</button>
-        <p class="hint">Or click the map. The first analysis of a site downloads its weather history (up to a minute or two); after that it is cached in this browser.</p>
+        <p class="hint">The first analysis of a site downloads its weather history, which can take a minute or two. After that it's cached in this browser.</p>
       </section>
 
+      <p class="panel-note">Assumptions. Changes update the report instantly.</p>
+
       <details class="group" open>
-        <summary><h2>2. Wind turbines</h2></summary>
+        <summary><h2>Wind turbines</h2></summary>
         <div class="row">
           <label>Number of turbines <input name="nTurbines" type="number" min="1" step="1"></label>
           <label>Hub height (m) <input name="hubHeight" type="number" min="1" max="200" step="0.5"></label>
         </div>
-        <label>Power curve (wind km/h, output W per turbine)
-          <textarea name="curve" rows="8" spellcheck="false"></textarea>
+        <label>Power curve: wind km/h, watts per turbine
+          <textarea name="curve" rows="7" spellcheck="false"></textarea>
         </label>
-        <p class="hint">Default: an illustrative 3.5&nbsp;kW turbine with a 4&nbsp;m rotor. Replace it with the real turbine's independently measured curve. <button type="button" class="link" id="resetCurve">Reset</button></p>
+        <p class="hint">The default is an illustrative 3.5&nbsp;kW turbine with a 4&nbsp;m rotor. Paste the real turbine's independently measured curve. <button type="button" class="link" id="resetCurve">Restore default</button></p>
         <div class="row">
           <label>Rotor or intake diameter (m) <input name="captureM" type="number" min="0.05" step="0.05"></label>
           <label>Duct augmentation (×) <input name="augmentation" type="number" min="1" max="5" step="0.1"></label>
@@ -67,8 +68,8 @@
       </details>
 
       <details class="group">
-        <summary><h2>3. Site wind calibration</h2></summary>
-        <p class="hint">Reanalysis data averages wind over a ~30&nbsp;km grid cell, so it often understates (or overstates) wind at a specific site. If you know the site's long-term mean wind at hub height (from a nearby station or measurements), enter it and all hours are scaled to match.</p>
+        <summary><h2>Site wind calibration</h2></summary>
+        <p class="hint">Weather data averages wind over a ~28&nbsp;km grid cell, so it can be well off at a specific site. If you know the site's long-term mean wind at hub height, from a nearby station or measurements, enter it and every hour is scaled to match.</p>
         <div class="row">
           <label>Measured mean at hub (km/h) <input name="siteMeanKmh" type="number" min="0" step="0.1" placeholder="none"></label>
           <label>Or scale wind by (×) <input name="windScale" type="number" min="0.1" max="5" step="0.05"></label>
@@ -76,9 +77,9 @@
       </details>
 
       <details class="group">
-        <summary><h2>4. Solar PV</h2></summary>
+        <summary><h2>Solar panels</h2></summary>
         <div class="row">
-          <label>PV size (kWp) <input name="pvKwp" type="number" min="0" step="0.5"></label>
+          <label>Size (kWp) <input name="pvKwp" type="number" min="0" step="0.5"></label>
           <label>System losses (%) <input name="pvLossPct" type="number" min="0" max="50" step="1"></label>
         </div>
         <div class="row">
@@ -86,11 +87,11 @@
           <label>Facing (compass °) <input name="azimuth" type="number" min="0" max="360" step="1" placeholder="auto"></label>
         </div>
         <label>Temperature coefficient (%/°C) <input name="tempCoeffPct" type="number" min="-1" max="0" step="0.01"></label>
-        <p class="hint">Auto: tilt ≈ latitude, facing the equator (180° = south). Changing tilt or facing downloads new irradiance data.</p>
+        <p class="hint">Auto tilts the panels at about the latitude, facing the equator (180° is south). Changing tilt or facing downloads new sunlight data.</p>
       </details>
 
       <details class="group">
-        <summary><h2>5. Electricity use</h2></summary>
+        <summary><h2>Electricity use</h2></summary>
         <div class="row">
           <label>Annual use (kWh) <input name="loadKwh" type="number" min="0" step="100"></label>
           <label>Profile <select name="loadProfile"></select></label>
@@ -100,7 +101,7 @@
       </details>
 
       <details class="group">
-        <summary><h2>6. Battery</h2></summary>
+        <summary><h2>Battery</h2></summary>
         <div class="row">
           <label>Capacity (kWh) <input name="battKwh" type="number" min="0" step="1"></label>
           <label>Max power (kW) <input name="battKw" type="number" min="0" step="0.5"></label>
@@ -112,75 +113,96 @@
       </details>
 
       <details class="group">
-        <summary><h2>7. Economics</h2></summary>
+        <summary><h2>Costs and prices</h2></summary>
         <div class="row">
           <label>Currency symbol <input name="currency" type="text" maxlength="4"></label>
-          <label>Grid price (per kWh) <input name="price" type="number" min="0" step="0.01"></label>
+          <label>Grid price per kWh <input name="price" type="number" min="0" step="0.01"></label>
         </div>
         <div class="row">
-          <label>Export credit (per kWh) <input name="exportCredit" type="number" min="0" step="0.01"></label>
-          <label>Installed cost / turbine <input name="turbineCost" type="number" min="0" step="100"></label>
+          <label>Export credit per kWh <input name="exportCredit" type="number" min="0" step="0.01"></label>
+          <label>Installed cost per turbine <input name="turbineCost" type="number" min="0" step="100"></label>
         </div>
-        <label>Maintenance / turbine / year <input name="omPerTurbine" type="number" min="0" step="10"></label>
+        <label>Maintenance per turbine per year <input name="omPerTurbine" type="number" min="0" step="10"></label>
       </details>
 
       <details class="group">
         <summary><h2>Data source</h2></summary>
-        <p class="hint">Weather: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> historical API (ERA5 reanalysis, CC&nbsp;BY&nbsp;4.0). The free tier is for non-commercial use; commercial use needs an API key. The key stays in this browser and is never put in shared links.</p>
+        <p class="hint">Weather comes from the <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> historical API (ERA5 reanalysis, CC&nbsp;BY&nbsp;4.0). The free tier is for non-commercial use; commercial use needs an API key. The key stays in this browser and is never put in shared links.</p>
         <label>Open-Meteo API key (optional) <input name="apiKey" type="password" autocomplete="off"></label>
-        <button type="button" class="ghost small" id="clearCache">Clear cached weather data</button>
+        <button type="button" class="secondary small" id="clearCache">Clear cached weather data</button>
       </details>
     </form>
   </aside>
 
-  <section class="content">
-    <div id="map" class="map" role="application" aria-label="Map: click to choose a site"></div>
+  <section class="content" aria-label="Report">
     <div id="status" class="status" role="status" aria-live="polite" hidden></div>
 
-    <div id="intro" class="card intro">
-      <h2>How it works</h2>
+    <div id="intro" class="intro">
+      <h2>See how wind and solar would perform at any site</h2>
+      <p>Pick a place on the left: search for it, click the map or type its coordinates. The estimator replays every hour of the last 20 years of weather there through the turbines, the solar panels, the site's electricity use and a battery, then tells you what the turbines add.</p>
       <ol>
-        <li>Pick a site (search, click the map, or type coordinates) and press <strong>Analyse this site</strong>.</li>
-        <li>The tool downloads hourly wind (10&nbsp;m and 100&nbsp;m), temperature and sunlight for every hour of the chosen years.</li>
-        <li>It simulates every hour: turbine output from the power curve, solar output, the site's electricity use and a battery, with and without the turbines.</li>
-        <li>Change any assumption on the left and the results update instantly.</li>
+        <li><strong>Choose a site</strong> and press <em>Analyse this site</em>.</li>
+        <li><strong>Read the verdict</strong>: energy, grid savings and payback, with the charts behind them.</li>
+        <li><strong>Adjust the assumptions</strong> to match the customer; the report updates as you type.</li>
       </ol>
-      <p class="hint">Results are indicative, not a bankable energy assessment. They are only as good as the power curve and the wind data.</p>
+      <button type="button" id="tryExample" class="primary inline">Try the example: Amarillo, Texas</button>
+      <p class="hint">Estimates are indicative, not a bankable energy assessment. They're only as good as the power curve and the wind data.</p>
     </div>
 
-    <div id="results" hidden>
-      <div id="reportHead" class="report-head"></div>
-      <div id="verdict" class="verdict"></div>
-      <ul id="warnings" class="warnings"></ul>
-      <div id="kpis" class="kpis"></div>
+    <article id="results" hidden>
+      <header id="reportHead" class="report-head"></header>
 
-      <div class="charts">
-        <figure class="card"><figcaption>Wind at hub height: hours per year and energy by wind speed</figcaption><div class="chart"><canvas id="chDist"></canvas></div></figure>
-        <figure class="card"><figcaption>Average monthly energy</figcaption><div class="chart"><canvas id="chMonthly"></canvas></div></figure>
-        <figure class="card"><figcaption>Grid electricity bought, by month</figcaption><div class="chart"><canvas id="chImport"></canvas></div></figure>
-        <figure class="card">
-          <figcaption>Battery charge on an average day in
-            <select id="socMonth" aria-label="Month"></select>
-          </figcaption>
-          <div class="chart"><canvas id="chSoc"></canvas></div>
-        </figure>
-        <figure class="card"><figcaption>Wind energy, year by year</figcaption><div class="chart"><canvas id="chYearly"></canvas></div></figure>
-        <figure class="card"><figcaption>Power curve vs. physical limit for the rotor or intake (log scale)</figcaption><div class="chart"><canvas id="chCurve"></canvas></div></figure>
-      </div>
+      <section class="summary" aria-labelledby="verdictHead">
+        <div id="verdict" class="verdict"></div>
+        <dl id="figures" class="figures"></dl>
+      </section>
 
-      <div class="card">
-        <div class="card-head">
-          <h3>Monthly breakdown (kWh, average year)</h3>
-          <button type="button" id="csv" class="ghost small">Download CSV</button>
+      <ul id="notes" class="notes" aria-label="Notes on this estimate"></ul>
+
+      <section class="block" aria-labelledby="secEnergy">
+        <h3 id="secEnergy">Energy</h3>
+        <div class="grid">
+          <figure class="card"><figcaption>Average energy per month</figcaption><div class="chart"><canvas id="chMonthly" role="img" aria-label="Monthly wind and solar energy against electricity use"></canvas></div></figure>
+          <figure class="card"><figcaption>Wind energy, year by year</figcaption><div class="chart"><canvas id="chYearly" role="img" aria-label="Wind energy for each year"></canvas></div></figure>
         </div>
-        <div class="table-wrap"><table id="monthlyTable"></table></div>
-      </div>
+      </section>
 
-      <div class="card">
-        <h3>Assumptions and data</h3>
-        <table id="assumptions" class="kv"></table>
-      </div>
-    </div>
+      <section class="block" aria-labelledby="secWind">
+        <h3 id="secWind">Wind at this site</h3>
+        <dl id="windStats" class="stats"></dl>
+        <div class="grid">
+          <figure class="card"><figcaption>Hours per year and energy by wind speed at hub height</figcaption><div class="chart"><canvas id="chDist" role="img" aria-label="Wind speed distribution and energy by wind speed"></canvas></div></figure>
+          <figure class="card"><figcaption>Power curve against the physical limit (log scale)</figcaption><div class="chart"><canvas id="chCurve" role="img" aria-label="Turbine power curve compared with the Betz limit"></canvas></div></figure>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="secGrid">
+        <h3 id="secGrid">Solar, battery and grid</h3>
+        <dl id="systemStats" class="stats"></dl>
+        <div class="grid">
+          <figure class="card"><figcaption>Electricity bought from the grid per month</figcaption><div class="chart"><canvas id="chImport" role="img" aria-label="Monthly grid purchases with and without wind"></canvas></div></figure>
+          <figure class="card">
+            <figcaption><label for="socMonth">Battery charge on an average day in</label>
+              <select id="socMonth"></select>
+            </figcaption>
+            <div class="chart"><canvas id="chSoc" role="img" aria-label="Average battery charge through the day, with and without wind"></canvas></div>
+          </figure>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="secDetails">
+        <div class="block-head">
+          <h3 id="secDetails">Monthly figures</h3>
+          <button type="button" id="csv" class="secondary small">Download CSV</button>
+        </div>
+        <div class="card table-wrap"><table id="monthlyTable"><caption class="visually-hidden">Monthly energy in kWh for an average year</caption></table></div>
+      </section>
+
+      <section class="block" aria-labelledby="secAssumptions">
+        <h3 id="secAssumptions">Assumptions and data</h3>
+        <div class="card"><table id="assumptions" class="kv"></table></div>
+      </section>
+    </article>
   </section>
 </main>
 

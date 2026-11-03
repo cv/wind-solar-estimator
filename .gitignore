@@ -1,3 +1,13 @@
 # Private reference material: keep out of the public repository
 deck.pdf
 node_modules/
+
+# Local design-agent tooling (Impeccable skills and engine binaries)
+/.agents/
+/.claude/
+/.codex/
+/.dsh/
+/.hermes/
+/.pi/
+/.impeccable/live/sessions/
+/.impeccable/live/annotations/

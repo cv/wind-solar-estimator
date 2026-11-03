@@ -181,6 +181,7 @@ async function analyse({ fetchIfNeeded = true } = {}) {
     abortCtl = new AbortController();
     const runBtn = $("#run");
     runBtn.disabled = true;
+    runBtn.textContent = "Loading weather…";
     state.loading = true;
     try {
       const wx = await fetchWeather({
@@ -199,7 +200,7 @@ async function analyse({ fetchIfNeeded = true } = {}) {
       status(esc(e.message || e), "error");
       return;
     } finally {
-      if (token === runToken) { runBtn.disabled = false; state.loading = false; }
+      if (token === runToken) { runBtn.disabled = false; runBtn.textContent = "Analyse this site"; state.loading = false; }
     }
   }
 
@@ -218,14 +219,16 @@ function render(v, check) {
   const { result: r, params: p, req, wx } = state;
   $("#intro").hidden = true;
   $("#results").hidden = false;
+  $("#share").disabled = false;
+  $("#print").disabled = false;
 
-  const title = v.place || "Selected site";
+  const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
   $("#reportHead").innerHTML = `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} years of hourly weather (${wx.startYear}–${wx.endYear}) · ` +
-    `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m + ${p.pvKwp} kWp solar + ${p.battKwh} kWh battery · ${new Date().toLocaleDateString()}</p>`;
+    `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString()}</p>`;
 
-  renderVerdict(r, p, check);
-  renderWarnings(r, p, check);
-  renderKpis(r, p, req);
+  renderVerdict(r, p);
+  renderNotes(r, p, check);
+  renderFigures(r, p, req);
   renderCharts(r, p);
   renderMonthly(r);
   renderAssumptions(r, p, req, wx);
@@ -233,10 +236,12 @@ function render(v, check) {
     state.cell?.remove();
     const h = ERA5_CELL_DEG / 2;
     state.cell = L.rectangle([[wx.gridLat - h, wx.gridLon - h], [wx.gridLat + h, wx.gridLon + h]], { color: COLORS.wind, weight: 1, fillOpacity: 0.08 })
-      .bindTooltip("Weather data grid cell (~28 km): all wind and sun data is an average over this area")
+      .bindTooltip("Weather data grid cell (~28 km): wind and sunlight are averaged over this area")
       .addTo(state.map);
   }
 }
+
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function verdictFor(r) {
   const pb = r.econ.payback;
@@ -246,65 +251,85 @@ function verdictFor(r) {
   return { cls: "bad", label: "Not viable", text: "the turbines' savings don't cover their maintenance" };
 }
 
-function renderVerdict(r, p, check) {
-  const el = $("#verdict");
+function renderVerdict(r) {
   const v = verdictFor(r);
   const cut = r.pvOnly.importKwh - r.withWind.importKwh;
-  const detail = `${fmt(r.windKwh)} kWh/yr from wind cuts grid purchases by ${fmt(cut)} kWh/yr and saves about ${money(r.econ.savings)}/yr, against ${money(r.econ.om)}/yr maintenance and ${money(r.econ.capex)} installed.`;
+  const detail = `${fmt(r.windKwh)} kWh a year from wind cuts grid purchases by ${fmt(cut)} kWh and saves about ${money(r.econ.savings)} a year, ` +
+    `against ${money(r.econ.om)} a year of maintenance and ${money(r.econ.capex)} installed.`;
+  let tag = v;
+  let head = capitalize(v.text);
+  let lines = [detail];
   if (state.capped) {
     const c = verdictFor(state.capped);
-    el.className = "verdict bad";
-    el.innerHTML = `<strong>Not credible yet: the power curve is above the physical limit for a ${fmt(p.captureDiameterM, 2)} m rotor or intake</strong>` +
-      `<small>As entered (${esc(v.label.toLowerCase())}): ${esc(v.text)}. ${detail}</small>` +
-      `<small>Capped at the physical limit (${esc(c.label.toLowerCase())}): ${fmt(state.capped.windKwh)} kWh/yr; ${esc(c.text)}.</small>`;
-    return;
+    tag = { cls: "bad", label: "Unverified" };
+    head = "The power curve claims more than the wind can deliver";
+    lines = [
+      `Taken at face value, ${v.text}: ${detail}`,
+      `Capped at the physical limit they would make ${fmt(state.capped.windKwh)} kWh a year: ${c.text}. The figures below use the curve as entered.`,
+    ];
   }
-  el.className = `verdict ${v.cls}`;
-  el.innerHTML = `<strong>${esc(v.label)}: ${esc(v.text)}</strong><small>${detail} Indicative only.</small>`;
+  $("#verdict").innerHTML = `<h3 id="verdictHead" class="verdict-head"><span class="tag ${tag.cls}">${esc(tag.label)}</span> ${esc(head)}</h3>` +
+    lines.map((l) => `<p class="verdict-detail">${esc(l)}</p>`).join("");
 }
 
-function renderWarnings(r, p, check) {
+function renderNotes(r, p, check) {
   const items = [];
   if (check.worstRatio > 1) {
     const aug = p.augmentation > 1 ? `, even with ${fmt(p.augmentation, 1)}× duct augmentation` : "";
     if (p.clampPhysics) {
-      items.push(["warn", `Output is capped at the physical limit for the rotor or intake: ${fmt(r.clippedKwh)} kWh/yr of the entered curve was removed.`]);
+      items.push(["warn", `<strong>Power curve:</strong> output is capped at the physical limit for a ${fmt(p.captureDiameterM, 2)} m rotor or intake, which removes ${fmt(r.clippedKwh)} kWh a year from the entered curve.`]);
     } else {
-      items.push(["bad", `At ${fmt(check.atKmh)} km/h the power curve is <strong>${fmt(check.worstRatio)}×</strong> the most a ${fmt(p.captureDiameterM, 2)} m rotor or intake can physically capture (Betz limit${aug}). ` +
-        `The most it could capture at this site is about ${fmt(r.physicsCapKwh)} kWh/yr, against ${fmt(r.windKwh)} kWh/yr from the curve. ` +
-        `Have the curve measured independently (or correct the diameter) before quoting customers.`]);
+      items.push(["bad", `<strong>Power curve:</strong> at ${fmt(check.atKmh)} km/h it is ${fmt(check.worstRatio)}× the most a ${fmt(p.captureDiameterM, 2)} m rotor or intake can physically capture (the Betz limit${aug}). ` +
+        `The most it could capture here is about ${fmt(r.physicsCapKwh)} kWh a year. Have the curve measured independently, or correct the diameter, before quoting customers.`]);
     }
   }
   if (p.siteMeanKmh > 0) {
-    items.push(["warn", `Wind speeds scaled ×${fmt(r.scale, 2)} so the mean at hub height matches the measured ${fmt(p.siteMeanKmh, 1)} km/h (the reanalysis gave ${fmt(r.modelHubMean, 1)} km/h).`]);
+    items.push(["warn", `<strong>Wind data:</strong> scaled ×${fmt(r.scale, 2)} so the mean at hub height matches the measured ${fmt(p.siteMeanKmh, 1)} km/h. The weather data alone gave ${fmt(r.modelHubMean, 1)} km/h.`]);
   } else if (p.windScale !== 1) {
-    items.push(["warn", `Wind speeds scaled ×${fmt(p.windScale, 2)} by hand.`]);
+    items.push(["warn", `<strong>Wind data:</strong> scaled ×${fmt(p.windScale, 2)} by hand.`]);
   } else {
-    items.push(["warn", `Wind speeds are uncalibrated reanalysis data averaged over a ~28 km grid cell. Local terrain, trees, buildings and rooftops can change wind at the turbine a lot, and energy changes with the cube of wind speed. If a measured long-term mean exists, enter it under <em>Site wind calibration</em>.`]);
+    items.push(["warn", `<strong>Wind data:</strong> not calibrated. It's averaged over a ~28 km grid cell, and terrain, trees and buildings can change the wind at the turbine a lot; energy rises with the cube of wind speed. Enter a measured mean under <em>Site wind calibration</em> if one exists.`]);
   }
-  if (p.hubHeight < 10) items.push(["warn", `Hub height is below 10 m, so wind is extrapolated downward; wind near roofs and the ground is turbulent and hard to predict.`]);
-  if (state.wx.missing > 0) items.push(["warn", `${fmt(state.wx.missing)} hours had missing data and were skipped.`]);
-  $("#warnings").innerHTML = items.map(([cls, html]) => `<li class="${cls}">${html}</li>`).join("");
+  if (p.hubHeight < 10) items.push(["warn", `<strong>Hub height:</strong> below 10 m the wind is extrapolated downward, and wind near roofs and the ground is turbulent and hard to predict.`]);
+  if (state.wx.missing > 0) items.push(["warn", `<strong>Missing data:</strong> ${fmt(state.wx.missing)} hours had gaps and were skipped.`]);
+  $("#notes").innerHTML = items.map(([cls, html]) => `<li class="${cls}">${html}</li>`).join("");
 }
 
-function renderKpis(r, p, req) {
+/** One figure: label, value (with optional unit) and a supporting line. */
+const figure = (label, value, unit, sub, cls = "") =>
+  `<div><dt>${esc(label)}</dt><dd class="value ${cls}">${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>` +
+  (sub ? `<dd class="sub">${esc(sub)}</dd>` : "") + `</div>`;
+
+function renderFigures(r, p, req) {
   const A = r.pvOnly, B = r.withWind, e = r.econ;
-  const profile = LOAD_PRESETS[p.loadProfile]?.label ?? "custom profile";
-  const cards = [
-    ["wind", "Mean wind at hub", [fmt(r.meanHub, 1), "km/h"], `Reanalysis: ${fmt(r.meanW10, 1)} at 10 m, ${fmt(r.meanW100, 1)} at 100 m`],
-    ["wind", "Wind energy", [fmt(r.windKwh), "kWh/yr"], `${fmt(r.windKwhPerTurbine)} per turbine · ${fmt(r.windKwh / 365, 1)} kWh/day`],
-    ["wind", "Capacity factor", pct(r.capacityFactor, 1), `of ${fmt(r.ratedKw, 1)} kW rated; producing ${pct(r.generatingShare)} of hours`],
-    ["solar", "Solar energy", [fmt(r.pvKwh), "kWh/yr"], `${fmt(p.pvKwp, 1)} kWp, tilt ${req.tilt}°, facing ${req.compass}°`],
-    ["", "Electricity use", [fmt(r.loadKwh), "kWh/yr"], profile],
-    ["", "Grid purchases", [fmt(B.importKwh), "kWh/yr"], `vs ${fmt(A.importKwh)} with solar + battery only`],
-    ["", "Self-sufficiency", pct(B.selfSufficiency), `vs ${pct(A.selfSufficiency)} without wind`],
-    ["", "Surplus exported", [fmt(B.exportKwh), "kWh/yr"], `vs ${fmt(A.exportKwh)} without wind`],
-    ["", "Savings from wind", [money(e.savings), "/yr"], `before ${money(e.om)}/yr maintenance`],
-    ["", "Simple payback", Number.isFinite(e.payback) ? [fmt(e.payback, 1), "years"] : "never", `on ${money(e.capex)} installed`],
-    ["", "Wind cost per kWh", money(e.costPerKwh20, 2), `over 20 years, vs ${money(p.price, 2)} from the grid`],
-  ];
-  $("#kpis").innerHTML = cards.map(([cls, label, value, sub]) =>
-    `<div class="kpi ${cls}"><div class="label">${esc(label)}</div><div class="value">${Array.isArray(value) ? `${esc(value[0])}<span class="unit">${esc(value[1])}</span>` : esc(value)}</div><div class="sub">${esc(sub)}</div></div>`).join("");
+  const cut = A.importKwh - B.importKwh;
+  const cutShare = A.importKwh > 0 ? `${pct(cut / A.importKwh)} less than without wind` : "No grid purchases even without wind";
+  $("#figures").innerHTML = [
+    figure("Wind energy", fmt(r.windKwh), "kWh/yr", `${pct(r.capacityFactor, 1)} capacity factor`, "wind"),
+    figure("Grid purchases cut by", fmt(cut), "kWh/yr", cutShare),
+    figure("Savings from wind", money(e.savings), "/yr", `${money(e.netSavings)}/yr after maintenance`),
+    Number.isFinite(e.payback)
+      ? figure("Simple payback", fmt(e.payback, 1), "years", `on ${money(e.capex)} installed`)
+      : figure("Simple payback", "Never", "", `on ${money(e.capex)} installed`),
+  ].join("");
+
+  const stat = (label, value, unit, sub) =>
+    `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
+  $("#windStats").innerHTML = [
+    stat("Mean wind at hub", fmt(r.meanHub, 1), "km/h", `Weather data: ${fmt(r.meanW10, 1)} at 10 m, ${fmt(r.meanW100, 1)} at 100 m`),
+    stat("Capacity factor", pct(r.capacityFactor, 1), "", `of ${fmt(r.ratedKw, 1)} kW rated`),
+    stat("Turbines producing", pct(r.generatingShare), "", "of all hours"),
+    stat("Per turbine", fmt(r.windKwhPerTurbine), "kWh/yr", `${fmt(r.windKwhPerTurbine / 365, 1)} kWh a day`),
+    stat("Wind cost per kWh", money(e.costPerKwh20, 2), "", `over 20 years, vs ${money(p.price, 2)} from the grid`),
+  ].join("");
+  const profile = LOAD_PRESETS[p.loadProfile]?.label ?? "Custom profile";
+  $("#systemStats").innerHTML = [
+    stat("Solar energy", fmt(r.pvKwh), "kWh/yr", `${fmt(p.pvKwp, 1)} kWp, tilt ${req.tilt}°, facing ${req.compass}°`),
+    stat("Electricity use", fmt(r.loadKwh), "kWh/yr", profile),
+    stat("Self-sufficiency", pct(B.selfSufficiency), "", `${pct(A.selfSufficiency)} without wind`),
+    stat("Bought from the grid", fmt(B.importKwh), "kWh/yr", `${fmt(A.importKwh)} without wind`),
+    stat("Surplus exported", fmt(B.exportKwh), "kWh/yr", `${fmt(A.exportKwh)} without wind`),
+  ].join("");
 }
 
 function drawChart(id, config) {
@@ -399,7 +424,10 @@ function renderCharts(r, p) {
     options: {
       scales: {
         x: axis("Wind speed (km/h)", { ticks: { maxTicksLimit: 13 } }),
-        y: axis("Watts (log scale)", { type: "logarithmic", min: 0.1 }),
+        y: axis("Watts (log scale)", {
+          type: "logarithmic", min: 0.1,
+          ticks: { callback: (v) => ([0.1, 1, 10, 100, 1000, 10000, 100000].includes(v) ? (v >= 1000 ? `${v / 1000}k` : String(v)) : "") },
+        }),
       },
     },
   });
@@ -435,7 +463,7 @@ function monthlyRows(r) {
 function renderMonthly(r) {
   const { head, rows, total } = monthlyRows(r);
   const tr = (cells, tag = "td") => `<tr>${cells.map((c, i) => `<${tag}>${i ? fmt(c) : esc(c)}</${tag}>`).join("")}</tr>`;
-  $("#monthlyTable").innerHTML = `<thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>` +
+  $("#monthlyTable").innerHTML = `<caption class="visually-hidden">Monthly energy in kWh for an average year</caption><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>` +
     `<tbody>${rows.map((row) => tr(row)).join("")}</tbody><tfoot>${tr(total)}</tfoot>`;
 }
 
@@ -579,6 +607,10 @@ function init() {
   $("#placeGo").addEventListener("click", placeSearch);
   $("#resetCurve").addEventListener("click", () => { form.elements.curve.value = DEFAULTS.curve; onChange("curve"); });
   $("#socMonth").addEventListener("change", renderSoc);
+  $("#tryExample").addEventListener("click", () => {
+    setLocation(Number(DEFAULTS.lat), Number(DEFAULTS.lon), DEFAULTS.place, { pan: true });
+    analyse();
+  });
   $("#csv").addEventListener("click", downloadCsv);
   $("#print").addEventListener("click", () => window.print());
   $("#share").addEventListener("click", async () => {
@@ -597,7 +629,9 @@ function init() {
 
   if (typeof Chart !== "undefined") {
     Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
-    Chart.defaults.color = "#5d6779";
+    Chart.defaults.color = "#556074";
+    Chart.defaults.borderColor = "#e6e9f2";
+    Chart.defaults.font.size = 12;
   } else {
     status("Charts library failed to load; figures will still be calculated.", "error");
   }
