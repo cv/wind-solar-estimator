@@ -55,11 +55,23 @@
           <textarea name="curve" rows="7" spellcheck="false"></textarea>
         </label>
         <p class="hint">The default is an illustrative 3.5&nbsp;kW turbine with a 4&nbsp;m rotor. Paste the real turbine's independently measured curve. <button type="button" class="link" id="resetCurve">Restore default</button></p>
-        <div class="row">
-          <label>Rotor or intake diameter (m) <input name="captureM" type="number" min="0.05" step="0.05"></label>
-          <label>Duct augmentation (×) <input name="augmentation" type="number" min="1" max="5" step="0.1"></label>
+        <label>Capture opening
+          <select name="captureShape">
+            <option value="round">Round: rotor or duct diameter</option>
+            <option value="rect">Rectangular: width × height</option>
+          </select>
+        </label>
+        <div id="captureRound">
+          <label>Diameter (m) <input name="captureM" type="number" min="0.05" step="0.05"></label>
         </div>
-        <label class="check"><input name="clampPhysics" type="checkbox" aria-describedby="clampStatus"> Cap output at the physical (Betz) limit for this diameter</label>
+        <div class="row" id="captureRect" hidden>
+          <label>Width (m) <input name="captureW" type="number" min="0.05" step="0.05"></label>
+          <label>Height (m) <input name="captureH" type="number" min="0.05" step="0.05"></label>
+        </div>
+        <p class="hint"><strong id="captureArea" class="capture-area"></strong> Measure the whole device as the wind sees it, not the throat inside: a scoop's or duct's full front opening, or a 360° intake's side outline. Energy can only come from wind passing through this area.</p>
+        <label>Duct augmentation (×) <input name="augmentation" type="number" min="1" max="5" step="0.1" aria-describedby="augHint"></label>
+        <p class="hint" id="augHint">Leave at 1 when the area above is the device's full outline. Raise it only for a rotor inside a larger duct, and only by a measured gain.</p>
+        <label class="check"><input name="clampPhysics" type="checkbox" aria-describedby="clampStatus"> Cap output at the physical (Betz) limit for this capture area</label>
         <p class="hint clamp-status" id="clampStatus" aria-live="polite"></p>
         <label class="check"><input name="densityCorrection" type="checkbox"> Correct for air density (altitude, temperature)</label>
         <label>Wind system losses (%) <input name="windLossPct" type="number" min="0" max="50" step="1"></label>

@@ -7,13 +7,16 @@ export const HOURS_PER_YEAR = 8766;
 
 export const EXAMPLE_ROTOR_M = 4;
 
+/** Area (m²) of a circle of this diameter (m). */
+export const circleArea = (diameterM) => Math.PI * (diameterM / 2) ** 2;
+
 /**
  * Illustrative power curve for a generic 3.5 kW turbine with a 4 m rotor: cut-in at
  * 11 km/h, power coefficient rising from 0.2 to 0.33, rated from about 40 km/h,
  * cut-out above 90 km/h. Replace it with the real turbine's measured curve.
  */
 export function exampleCurve() {
-  const area = Math.PI * (EXAMPLE_ROTOR_M / 2) ** 2;
+  const area = circleArea(EXAMPLE_ROTOR_M);
   const pts = [[0, 0], [10.9, 0]];
   for (let v = 11; v <= 41; v += 3) {
     const cp = Math.min(0.33, 0.2 + (v - 11) * 0.02);
@@ -59,10 +62,13 @@ export function makeCurveFn(pts) {
   };
 }
 
-/** Most power (W) any device can take from wind through a circle of this diameter. */
-export function betzLimitW(vKmh, diameterM, rho = STD_RHO) {
-  const area = Math.PI * (diameterM / 2) ** 2;
-  return 0.5 * rho * area * (vKmh / 3.6) ** 3 * BETZ;
+/**
+ * Most power (W) any device can take from the wind blowing through its frontal capture
+ * area (m², the outline the wind sees). What happens inside (ducts, spirals, gearing,
+ * torque multiplication) can redirect this energy but not add to it.
+ */
+export function betzLimitW(vKmh, areaM2, rho = STD_RHO) {
+  return 0.5 * rho * areaM2 * (vKmh / 3.6) ** 3 * BETZ;
 }
 
 /** Air density from site elevation (standard atmosphere pressure) and air temperature. */
@@ -72,12 +78,12 @@ export function airDensity(elevationM, tempC) {
 }
 
 /** How far the curve exceeds the physical limit for a capture area (ratio > 1 is impossible). */
-export function checkCurve(pts, diameterM, augmentation) {
+export function checkCurve(pts, areaM2, augmentation) {
   let worst = 0;
   let atKmh = null;
   for (const [v, w] of pts) {
     if (v <= 0 || w <= 0) continue;
-    const ratio = w / (betzLimitW(v, diameterM) * augmentation);
+    const ratio = w / (betzLimitW(v, areaM2) * augmentation);
     if (ratio > worst) [worst, atKmh] = [ratio, v];
   }
   return { worstRatio: worst, atKmh };
@@ -181,7 +187,7 @@ export function simulate(wx, p) {
     const rho = airDensity(wx.elevation, t);
     let w = curve(v);
     if (p.densityCorrection) w *= rho / STD_RHO;
-    const limit = betzLimitW(v, p.captureDiameterM, rho) * p.augmentation;
+    const limit = betzLimitW(v, p.captureAreaM2, rho) * p.augmentation;
     if (p.clampPhysics && w > limit) { clipped += (w - limit) * p.nTurbines / 1000; w = limit; }
     const windKw = (w * p.nTurbines / 1000) * windLoss;
 

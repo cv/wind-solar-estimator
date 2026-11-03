@@ -1,5 +1,5 @@
 // UI: form <-> URL hash, map, data loading, rendering. Chart.js and Leaflet are loaded as globals.
-import { EXAMPLE_ROTOR_M, exampleCurve, parseCurve, formatCurve, checkCurve, betzLimitW, makeCurveFn, LOAD_PRESETS, simulate } from "./model.js";
+import { EXAMPLE_ROTOR_M, circleArea, exampleCurve, parseCurve, formatCurve, checkCurve, betzLimitW, makeCurveFn, LOAD_PRESETS, simulate } from "./model.js";
 import { fetchWeather, searchPlaces, clearWeatherCache } from "./weather.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -12,7 +12,7 @@ const ERA5_CELL_DEG = 0.25;
 const DEFAULTS = {
   place: "Amarillo, Texas, United States",
   lat: "35.2220", lon: "-101.8313", years: "20", endYear: String(new Date().getFullYear() - 1),
-  nTurbines: "1", hubHeight: "18", curve: formatCurve(exampleCurve()), captureM: String(EXAMPLE_ROTOR_M), augmentation: "1",
+  nTurbines: "1", hubHeight: "18", curve: formatCurve(exampleCurve()), captureShape: "round", captureM: String(EXAMPLE_ROTOR_M), captureW: "", captureH: "", augmentation: "1",
   clampPhysics: false, densityCorrection: true, windLossPct: "5",
   siteMeanKmh: "", windScale: "1",
   pvKwp: "10", pvLossPct: "14", tilt: "", azimuth: "", tempCoeffPct: "-0.4",
@@ -115,6 +115,29 @@ function dataRequest(v) {
 
 const requestKey = (r) => [r.lat.toFixed(4), r.lon.toFixed(4), r.startYear, r.endYear, r.tilt, r.azimuth].join("|");
 
+/** Frontal capture area (m²) and a short description of how it was entered. */
+function captureParams(v) {
+  if (v.captureShape === "rect") {
+    const w = num(v, "captureW", "Capture width", { min: 0.01, max: 500 });
+    const h = num(v, "captureH", "Capture height", { min: 0.01, max: 500 });
+    return { captureAreaM2: w * h, captureDesc: `${fmt(w, 2)} × ${fmt(h, 2)} m opening` };
+  }
+  const d = num(v, "captureM", "Diameter", { min: 0.01, max: 200 });
+  return { captureAreaM2: circleArea(d), captureDesc: `${fmt(d, 2)} m diameter` };
+}
+
+/** Shows the diameter or width × height fields to match the opening shape, and the area they give. */
+function syncCapture() {
+  const el = form.elements;
+  const rect = el.captureShape.value === "rect";
+  // Switching to a rectangle for the first time: start from a square as wide as the diameter.
+  if (rect && !el.captureW.value && !el.captureH.value) el.captureW.value = el.captureH.value = el.captureM.value;
+  $("#captureRound").hidden = rect;
+  $("#captureRect").hidden = !rect;
+  const area = rect ? Number(el.captureW.value) * Number(el.captureH.value) : circleArea(Number(el.captureM.value));
+  $("#captureArea").textContent = area > 0 ? `Capture area ${fmt(area, area < 10 ? 2 : 1)} m².` : "";
+}
+
 function modelParams(v) {
   let curvePts;
   try { curvePts = parseCurve(v.curve); } catch (e) { throw invalid("curve", e.message); }
@@ -122,7 +145,7 @@ function modelParams(v) {
     nTurbines: Math.round(num(v, "nTurbines", "Number of turbines", { min: 1, max: 100000 })),
     hubHeight: num(v, "hubHeight", "Hub height", { min: 1, max: 200 }),
     curvePts,
-    captureDiameterM: num(v, "captureM", "Rotor or intake diameter", { min: 0.01, max: 200 }),
+    ...captureParams(v),
     augmentation: num(v, "augmentation", "Duct augmentation", { min: 1, max: 10 }),
     clampPhysics: v.clampPhysics,
     densityCorrection: v.densityCorrection,
@@ -236,7 +259,7 @@ async function analyse({ fetchIfNeeded = true } = {}) {
 
   state.params = params;
   state.result = simulate(state.wx, params);
-  const check = checkCurve(params.curvePts, params.captureDiameterM, params.augmentation);
+  const check = checkCurve(params.curvePts, params.captureAreaM2, params.augmentation);
   state.capped = check.worstRatio > 1 && !params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: true }) : null;
   // With the cap on, the uncapped run says what the cap took away (after losses, so it matches the figures).
   state.uncapped = check.worstRatio > 1 && params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: false }) : null;
@@ -298,7 +321,7 @@ function renderVerdict(r) {
     tag = { cls: "bad", label: "Unverified" };
     head = "The power curve claims more than the wind can deliver";
     lines = [
-      `The figures below take the curve at face value. Capped at the physical limit: ${fmt(state.capped.windKwh)} kWh a year from wind, and ${c.text}.`,
+      `The figures below take the curve at face value. Capped at the physical limit: ${fmt(state.capped.windKwh)} kWh a year from wind, and ${c.text}. Only an independently measured power curve can settle it.`,
     ];
   }
   $("#verdict").innerHTML = `<h3 id="verdictHead" class="verdict-head"><span class="tag ${tag.cls}">${esc(tag.label)}</span> ${esc(head)}</h3>` +
@@ -322,12 +345,14 @@ function renderNotes(r, p, check) {
   renderClampStatus(r, p, check);
   const items = [];
   if (check.worstRatio > 1) {
+    const area = `${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m² of capture area (${p.captureDesc})`;
     const aug = p.augmentation > 1 ? `, even with ${fmt(p.augmentation, 1)}× duct augmentation` : "";
     if (p.clampPhysics) {
-      items.push(["warn", `<strong>Power curve:</strong> output is capped at the physical limit for a ${fmt(p.captureDiameterM, 2)} m rotor or intake, which takes wind energy from ${fmt(state.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`]);
+      items.push(["warn", `<strong>Power curve:</strong> output is capped at the physical limit for ${area}, which takes wind energy from ${fmt(state.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`]);
     } else {
-      items.push(["bad", `<strong>Power curve:</strong> at ${fmt(check.atKmh)} km/h it is ${fmt(check.worstRatio)}× the most a ${fmt(p.captureDiameterM, 2)} m rotor or intake can physically capture (the Betz limit${aug}). ` +
-        `The most it could capture here is about ${fmt(r.physicsCapKwh)} kWh a year. Have the curve measured independently, or correct the diameter, before quoting customers.`]);
+      items.push(["bad", `<strong>Power curve:</strong> at ${fmt(check.atKmh)} km/h it is ${fmt(check.worstRatio)}× the most the wind through ${area} can deliver (the Betz limit${aug}). ` +
+        `Even a perfect device this size could capture at most ${fmt(r.physicsCapKwh)} kWh a year here, before losses. Shapes inside the device, such as scoops, spirals or torque-multiplying coils, can redirect that energy but not add to it. ` +
+        `Before quoting customers, measure the electrical output against the free wind speed, and enter the device's full frontal outline as the capture area.`]);
     }
   }
   if (p.siteMeanKmh > 0) {
@@ -475,7 +500,7 @@ function renderCharts(r, p) {
       labels: speeds.map(String),
       datasets: [
         { label: "Entered power curve (W)", data: speeds.map((s) => positive(curve(s))), borderColor: COLORS.wind, backgroundColor: COLORS.wind, pointRadius: 0 },
-        { label: `Physical limit, ${fmt(p.captureDiameterM, 2)} m diameter${p.augmentation > 1 ? ` ×${fmt(p.augmentation, 1)}` : ""} (W)`, data: speeds.map((s) => positive(betzLimitW(s, p.captureDiameterM) * p.augmentation)), borderColor: COLORS.limit, backgroundColor: COLORS.limit, borderDash: [6, 4], pointRadius: 0 },
+        { label: `Physical limit, ${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m²${p.augmentation > 1 ? ` ×${fmt(p.augmentation, 1)}` : ""} (W)`, data: speeds.map((s) => positive(betzLimitW(s, p.captureAreaM2) * p.augmentation)), borderColor: COLORS.limit, backgroundColor: COLORS.limit, borderDash: [6, 4], pointRadius: 0 },
       ],
     },
     options: {
@@ -530,7 +555,7 @@ function assumptionRows(r, p, req, wx) {
     ["Site", `${req.lat.toFixed(4)}, ${req.lon.toFixed(4)}; weather grid cell centred ${wx.gridLat}, ${wx.gridLon}; elevation ${fmt(wx.elevation)} m; ${wx.timezone}`],
     ["Weather data", `ERA5 reanalysis via Open-Meteo, hourly, ${wx.startYear}–${wx.endYear} (${fmt(wx.n)} hours, ${fmt(wx.missing)} missing)`],
     ["Wind at hub", `${p.hubHeight} m, from 10 m and 100 m winds with an hourly shear exponent (mean ${fmt(r.meanAlpha, 2)}); scaled ×${fmt(r.scale, 2)}; air density correction ${p.densityCorrection ? "on" : "off"}; ${p.windLossPct}% losses`],
-    ["Turbines", `${p.nTurbines} × ${fmt(ratedKw, 2)} kW peak; ${p.curvePts.length}-point power curve; rotor or intake ${fmt(p.captureDiameterM, 2)} m, augmentation ×${fmt(p.augmentation, 1)}; ${p.clampPhysics ? "capped at" : "not capped at"} the physical limit`],
+    ["Turbines", `${p.nTurbines} × ${fmt(ratedKw, 2)} kW peak; ${p.curvePts.length}-point power curve; capture area ${fmt(p.captureAreaM2, 2)} m² (${p.captureDesc}), augmentation ×${fmt(p.augmentation, 1)}; ${p.clampPhysics ? "capped at" : "not capped at"} the physical limit`],
     ["Solar", `${p.pvKwp} kWp, tilt ${req.tilt}°, facing ${req.compass}°; ${p.pvLossPct}% losses; ${p.tempCoeffPct}%/°C`],
     ["Electricity use", `${fmt(p.loadKwh)} kWh/yr, ${LOAD_PRESETS[p.loadProfile]?.label ?? "custom profile"}`],
     ["Battery", `${p.battKwh} kWh, ${p.battKw} kW, kept above ${fmt(p.battMinSoc * 100)}%, ${fmt(p.battRte * 100)}% round trip; charged from surplus, then surplus exported`],
@@ -650,6 +675,7 @@ function init() {
   const preset = LOAD_PRESETS[fromHash.loadProfile];
   if (preset) Object.assign(fromHash, { loadHourly: preset.hourly.join(", "), loadMonthly: preset.monthly.join(", ") });
   setForm({ ...DEFAULTS, ...fromHash });
+  syncCapture();
   form.elements.apiKey.value = localStorage.getItem(API_KEY_STORAGE) || "";
   $("#placeSearch").value = form.elements.place.value;
   initMap();
@@ -658,6 +684,7 @@ function init() {
   form.addEventListener("input", (e) => {
     if (!e.target.name) return;
     if (e.target.name === "lat" || e.target.name === "lon") form.elements.place.value = "";
+    if (e.target.name.startsWith("capture")) syncCapture();
     onChange(e.target.name);
   });
   $("#placeSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); placeSearch(); } });

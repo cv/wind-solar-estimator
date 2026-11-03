@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EXAMPLE_ROTOR_M, exampleCurve, parseCurve, makeCurveFn, betzLimitW, checkCurve, airDensity, simulate } from "../js/model.js";
+import { EXAMPLE_ROTOR_M, circleArea, exampleCurve, parseCurve, makeCurveFn, betzLimitW, checkCurve, airDensity, simulate } from "../js/model.js";
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
 
@@ -15,7 +15,7 @@ function syntheticYear({ w10 = 50, w100 = 50, temp = 15, gti = 0 } = {}) {
 
 const base = {
   hubHeight: 10, siteMeanKmh: 0, windScale: 1, curvePts: exampleCurve(), nTurbines: 1, densityCorrection: false, clampPhysics: false,
-  captureDiameterM: 0.3048, augmentation: 1, windLossPct: 0, pvKwp: 0, pvLossPct: 0, tempCoeffPct: 0,
+  captureAreaM2: circleArea(0.3048), augmentation: 1, windLossPct: 0, pvKwp: 0, pvLossPct: 0, tempCoeffPct: 0,
   loadKwh: 0, loadProfile: "flat", loadHourly: Array(24).fill(1), loadMonthly: Array(12).fill(1),
   battKwh: 0, battMinSoc: 0, battRte: 1, battKw: 0, price: 0.2, exportCredit: 0, turbineCost: 25000, omPerTurbine: 0,
 };
@@ -26,7 +26,7 @@ test("example curve is plausible: zero below cut-in, rated 3.5 kW, within the Be
   assert.ok(f(20) > 0 && f(20) < f(30));
   assert.equal(f(50), 3500);
   assert.equal(f(91), 0);
-  assert.ok(checkCurve(exampleCurve(), EXAMPLE_ROTOR_M, 1).worstRatio < 1);
+  assert.ok(checkCurve(exampleCurve(), circleArea(EXAMPLE_ROTOR_M), 1).worstRatio < 1);
 });
 
 test("parseCurve accepts common separators and rejects junk", () => {
@@ -35,9 +35,10 @@ test("parseCurve accepts common separators and rejects junk", () => {
   assert.throws(() => parseCurve("10, 100"));
 });
 
-test("Betz limit flags a curve that claims too much for its diameter", () => {
-  close(betzLimitW(30, 0.3048), 15.4, 0.1); // a 12-inch circle at 30 km/h
-  const { worstRatio, atKmh } = checkCurve([[0, 0], [30, 3500]], 0.3048, 1);
+test("Betz limit flags a curve that claims too much for its capture area", () => {
+  close(betzLimitW(30, circleArea(0.3048)), 15.4, 0.1); // a 12-inch circle at 30 km/h
+  close(betzLimitW(30, 1), 210, 1); // per square metre of frontal area
+  const { worstRatio, atKmh } = checkCurve([[0, 0], [30, 3500]], circleArea(0.3048), 1);
   assert.equal(atKmh, 30);
   close(worstRatio, 228, 1);
 });
@@ -56,7 +57,7 @@ test("constant rated wind gives rated output every hour", () => {
 
 test("capping at the physical limit cuts output to Betz", () => {
   const r = simulate(syntheticYear(), { ...base, clampPhysics: true });
-  close(r.windKwh, (betzLimitW(50, 0.3048) * 8760) / 1000, 0.01);
+  close(r.windKwh, (betzLimitW(50, circleArea(0.3048)) * 8760) / 1000, 0.01);
 });
 
 test("calibration scales hub wind to the measured mean", () => {

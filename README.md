@@ -17,8 +17,13 @@ inputs, so a link reproduces a report.
 
 ## Physical sanity check
 
-The tool compares the power curve with the most a turbine of the given intake diameter
-can physically extract (the Betz limit, optionally with a duct augmentation factor). If a
+The tool compares the power curve with the most any device can physically extract from
+the wind passing through its frontal capture area (the Betz limit, optionally with a duct
+augmentation factor). The capture area is the device's whole outline as the wind sees it,
+entered as a diameter or as width × height: for a scoop or duct that is the full front
+opening, not the throat. Internal shapes such as spirals, vanes or torque-multiplying
+coils can redirect energy but not add to it, so they aren't modelled; only the measured
+power curve and the capture area matter. If a
 curve claims more than that, the report is flagged as not credible and shows what the
 site would produce with output capped at the limit, so an unverified curve can't quietly
 inflate a quote.
