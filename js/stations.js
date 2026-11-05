@@ -13,18 +13,25 @@ export const SEARCH_RADIUS_KM = 100;
 const ELEVATION_API = "https://api.open-meteo.com/v1/elevation";
 
 /**
- * How "auto" weighs height against distance when picking a station: 100 m of elevation
- * difference counts like 10 km of distance. A hilltop station 18 km away then loses to
- * one on the same plain 18 km away, but a nearby station wins over a distant one at
- * the same height.
+ * How "auto" weighs a station's drawbacks against distance when picking one: 100 m of
+ * elevation difference counts like 10 km, and each year of the period the station's
+ * record doesn't cover counts like 2 km. A hilltop station 18 km away then loses to one
+ * on the same plain 18 km away, and of several stations in one town the one whose record
+ * spans the period wins.
  */
 export const KM_PER_METRE_RISE = 0.1;
-export const stationScore = (s) => s.distanceKm + (Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0);
+export const KM_PER_MISSING_YEAR = 2;
+export const stationScore = (s, missingYears = 0) =>
+  s.distanceKm + (Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0) + Math.max(0, missingYears) * KM_PER_MISSING_YEAR;
 
-/** The station "auto" picks from a list: lowest score among those that pass ok(s). */
-export function pickStation(list, ok) {
-  let best = null;
-  for (const s of list) if (ok(s) && (!best || stationScore(s) < stationScore(best))) best = s;
+/** The station "auto" picks: lowest score among those that pass ok(s); missing(s) = years of the period it lacks. */
+export function pickStation(list, ok, missing = () => 0) {
+  let best = null, bestScore = Infinity;
+  for (const s of list) {
+    if (!ok(s)) continue;
+    const score = stationScore(s, missing(s));
+    if (score < bestScore) [best, bestScore] = [s, score];
+  }
   return best;
 }
 

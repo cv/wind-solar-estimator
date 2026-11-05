@@ -30,8 +30,13 @@ curve claims more than that, the report is flagged as not credible and shows wha
 site would produce with output capped at the limit, so an unverified curve can't quietly
 inflate a quote.
 
-The default curve is an illustrative generic 3.5 kW turbine with a 4 m rotor, not any
-real product; replace it with the measured curve of the turbine being sold.
+The default curve is an illustrative generic 3.5 kW turbine with a 6 m rotor (output from
+6 km/h, rated from 30 km/h, within the Betz limit at every speed), not any real product;
+replace it with the measured curve of the turbine being sold. The other defaults describe a
+small Alberta household system (11,800 kWh/yr; 3 kWp of solar; a 48 kWh battery kept above
+50%, 82% round trip; a 6 kW inverter shared by wind and solar; $20,000 installed and $200/yr
+maintenance per turbine) at Lethbridge, a windy Chinook city with a long, clean station
+record. Share links carry a version, so links made with earlier defaults keep their values.
 
 ## Wind data accuracy
 
@@ -44,9 +49,10 @@ For sites in Canada the tool therefore looks for Environment and Climate Change 
 stations with hourly records within 100 km (the station archive behind the Canadian
 Centre for Climate Services). By default it uses a station within 50 km with at least
 five years of records in the period, preferring one that is both close and at a similar
-height: 100 m of elevation difference counts like 10 km of distance (site elevation from
-Open-Meteo's terrain model), so a hilltop station doesn't stand in for a site on the plain
-below. If that station has wind readings for less than half of the period, the weather
+height and with a record that spans the period: 100 m of elevation difference counts like
+10 km of distance (site elevation from Open-Meteo's terrain model), and each year of the
+period without records like 2 km. A hilltop station then doesn't stand in for a site on the
+plain below, and of several stations in one town the one with the fullest record wins. If that station has wind readings for less than half of the period, the weather
 model is used instead. (The station list ignores the archive's "has hourly data" flag,
 which is wrong for some long hourly records, such as Stavely AAFC's.) Any station in the
 list can be picked under *Wind data*, or on the map.

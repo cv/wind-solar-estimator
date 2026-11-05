@@ -5,25 +5,26 @@ export const BETZ = 16 / 27; // 0.593, the most any open rotor can extract
 export const STD_RHO = 1.225; // kg/m³ at sea level, 15 °C (power curves are quoted at this)
 export const HOURS_PER_YEAR = 8766;
 
-export const EXAMPLE_ROTOR_M = 4;
+export const EXAMPLE_ROTOR_M = 6;
 
 /** Area (m²) of a circle of this diameter (m). */
 export const circleArea = (diameterM) => Math.PI * (diameterM / 2) ** 2;
 
 /**
- * Illustrative power curve for a generic 3.5 kW turbine with a 4 m rotor: cut-in at
- * 11 km/h, power coefficient rising from 0.2 to 0.33, rated from about 40 km/h,
- * cut-out above 90 km/h. Replace it with the real turbine's measured curve.
+ * Illustrative power curve for a generic 3.5 kW turbine with a 6 m rotor: output from
+ * 6 km/h, power coefficient rising from 0.12 to 0.36 by 16 km/h, rated 3.5 kW from about
+ * 30 km/h and held there up to 100 km/h. It stays within the physical (Betz) limit at
+ * every speed. Replace it with the real turbine's independently measured curve.
  */
 export function exampleCurve() {
   const area = circleArea(EXAMPLE_ROTOR_M);
-  const pts = [[0, 0], [10.9, 0]];
-  for (let v = 11; v <= 41; v += 3) {
-    const cp = Math.min(0.33, 0.2 + (v - 11) * 0.02);
+  const pts = [[0, 0], [5.9, 0]];
+  for (let v = 6; v <= 30; v += 2) {
+    const cp = Math.min(0.36, 0.12 + (v - 6) * 0.024);
     const w = 0.5 * STD_RHO * area * (v / 3.6) ** 3 * cp;
     pts.push([v, Math.min(3500, Math.round(w / 10) * 10)]);
   }
-  pts.push([90, 3500]);
+  pts.push([100, 3500]);
   return pts;
 }
 

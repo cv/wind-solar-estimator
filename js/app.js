@@ -16,17 +16,27 @@ const ELEVATION_NOTE_M = 150; // a station this much higher or lower than the si
 const ELEVATION_SAY_M = 50; // below this, the picker doesn't mention the height difference
 
 const DEFAULTS = {
-  place: "Amarillo, Texas, United States",
-  lat: "35.2220", lon: "-101.8313", windSource: "auto", years: "20", endYear: String(new Date().getFullYear() - 1),
-  nTurbines: "1", hubHeight: "18", curve: formatCurve(exampleCurve()), captureShape: "round", captureM: String(EXAMPLE_ROTOR_M), captureW: "", captureH: "", augmentation: "1",
+  place: "Lethbridge, Alberta, Canada",
+  lat: "49.6935", lon: "-112.8418", windSource: "auto", years: "20", endYear: String(new Date().getFullYear() - 1),
+  nTurbines: "1", hubHeight: "16", curve: formatCurve(exampleCurve()), captureShape: "round", captureM: String(EXAMPLE_ROTOR_M), captureW: "", captureH: "", augmentation: "1",
   clampPhysics: false, densityCorrection: true, windLossPct: "5",
   siteMeanKmh: "", windScale: "1",
-  pvKwp: "10", pvLossPct: "14", tilt: "", azimuth: "", tempCoeffPct: "-0.4",
-  loadKwh: "15000", loadProfile: "residential",
+  pvKwp: "3", pvLossPct: "14", tilt: "", azimuth: "", tempCoeffPct: "-0.4",
+  loadKwh: "11800", loadProfile: "residential",
   loadHourly: LOAD_PRESETS.residential.hourly.join(", "),
   loadMonthly: LOAD_PRESETS.residential.monthly.join(", "),
-  battKwh: "20", battKw: "5", battMinSoc: "20", battRte: "90", inverterKw: "",
-  currency: "$", price: "0.20", exportCredit: "0.08", turbineCost: "25000", omPerTurbine: "250",
+  battKwh: "48", battKw: "6", battMinSoc: "50", battRte: "82", inverterKw: "6",
+  currency: "$", price: "0.20", exportCredit: "0.08", turbineCost: "20000", omPerTurbine: "200",
+};
+
+// Share links leave out values equal to the defaults, so they carry a version: a link
+// without one was made with these earlier defaults, and keeps meaning what it meant.
+const HASH_VERSION = "2";
+const DEFAULTS_V1 = {
+  place: "Amarillo, Texas, United States", hubHeight: "18",
+  curve: "0, 0\n10.9, 0\n11, 40\n14, 120\n17, 260\n20, 440\n23, 660\n26, 960\n29, 1330\n32, 1780\n35, 2330\n38, 2990\n41, 3500\n90, 3500",
+  captureM: "4", pvKwp: "10", loadKwh: "15000",
+  battKwh: "20", battKw: "5", battMinSoc: "20", battRte: "90", inverterKw: "", turbineCost: "25000", omPerTurbine: "250",
 };
 
 const state = { loading: false, wx: null, wxKey: null, req: null, source: null, stations: { key: null }, stationLayer: null, params: null, result: null, capped: null, charts: {}, map: null, marker: null, cell: null };
@@ -67,6 +77,7 @@ function writeHash(v) {
     if ((k === "loadHourly" || k === "loadMonthly") && v.loadProfile in LOAD_PRESETS) continue; // implied by the profile
     if (k === "lat" || k === "lon" || asParam(v[k]) !== asParam(DEFAULTS[k])) q.set(k, asParam(v[k]));
   }
+  q.set("v", HASH_VERSION);
   history.replaceState(null, "", `#${q}`);
 }
 
@@ -152,8 +163,11 @@ function resolveStation(choice, list, req) {
     const picked = list.find((s) => s.id === choice.slice(5));
     if (picked) return { ...picked, explicit: true };
   }
-  return pickStation(list, autoEligible(req));
+  return pickStation(list, autoEligible(req), missingYears(req));
 }
+
+/** Years of the period a station's record doesn't cover. */
+const missingYears = (req) => (s) => req.endYear - req.startYear + 1 - Math.max(0, yearsOverlap(s, req));
 
 /** Stations "auto" may use: close enough, with enough years of records in the period. */
 const autoEligible = (req) => (s) => s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= Math.min(5, req.endYear - req.startYear + 1);
@@ -191,7 +205,13 @@ function renderStationPicker() {
   else if (active) {
     text = `Hourly wind measured at ${active.name}, ${fromSite(active)}${riseText(active, " and ")}. Hours the station missed are filled from the weather model.`;
     const nearest = active.explicit ? null : list.find(autoEligible(req));
-    if (nearest && nearest.id !== active.id) text += ` Chosen over ${nearest.name}, which is closer but ${fmt(Math.abs(nearest.rise))} m ${nearest.rise > 0 ? "higher" : "lower"}.`;
+    if (nearest && nearest.id !== active.id) {
+      const gap = missingYears(req)(nearest) - missingYears(req)(active);
+      const why = Math.abs(nearest.rise) - Math.abs(active.rise) >= ELEVATION_SAY_M
+        ? `${fmt(Math.abs(nearest.rise))} m ${nearest.rise > 0 ? "higher" : "lower"}`
+        : gap > 0 ? `its records cover ${gap} fewer year${gap === 1 ? "" : "s"} of the period` : "a weaker match";
+      text += ` Chosen over ${nearest.name}, which is ${nearest.distanceKm < active.distanceKm - 0.5 ? "closer" : "as close"} but ${why}.`;
+    }
   }
   else text = "Pick a station to use its measured wind instead of the weather model's.";
   hint.textContent = text;
@@ -722,7 +742,7 @@ function stationChecks(station, st, siteElevationM) {
   if (Math.abs(rise) >= ELEVATION_NOTE_M) {
     const req = state.req;
     const better = state.stations.list && req
-      ? pickStation(state.stations.list.filter((s) => s.id !== station.id && Math.abs(s.rise) < ELEVATION_NOTE_M), autoEligible(req))
+      ? pickStation(state.stations.list.filter((s) => s.id !== station.id && Math.abs(s.rise) < ELEVATION_NOTE_M), autoEligible(req), missingYears(req))
       : null;
     out.push(["warn", `<strong>Station elevation:</strong> ${name} is ${fmt(Math.abs(rise))} m ${rise > 0 ? "higher" : "lower"} than the site ` +
       `(${fmt(station.elevation)} m against ${fmt(siteElevationM)} m). Stations on hills and ridges usually measure stronger wind than lower ground nearby, and stations in valleys weaker, ` +
@@ -879,6 +899,10 @@ function init() {
   MONTHS.forEach((m, i) => $("#socMonth").add(new Option(m, String(i))));
 
   const fromHash = readHash();
+  const hashKeys = [...new URLSearchParams(location.hash.slice(1)).keys()];
+  if (hashKeys.length && !hashKeys.includes("v")) {
+    for (const [k, v] of Object.entries(DEFAULTS_V1)) if (!(k in fromHash)) fromHash[k] = v; // a link from before HASH_VERSION
+  }
   if (("lat" in fromHash || "lon" in fromHash) && !("place" in fromHash)) fromHash.place = "";
   const preset = LOAD_PRESETS[fromHash.loadProfile];
   if (preset) Object.assign(fromHash, { loadHourly: preset.hourly.join(", "), loadMonthly: preset.monthly.join(", ") });

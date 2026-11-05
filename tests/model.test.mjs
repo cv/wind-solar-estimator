@@ -20,13 +20,14 @@ const base = {
   battKwh: 0, battMinSoc: 0, battRte: 1, battKw: 0, price: 0.2, exportCredit: 0, turbineCost: 25000, omPerTurbine: 0,
 };
 
-test("example curve is plausible: zero below cut-in, rated 3.5 kW, within the Betz limit", () => {
+test("example curve is plausible: starts at 6 km/h, rated 3.5 kW from 30 km/h, within the Betz limit", () => {
   const f = makeCurveFn(exampleCurve());
-  assert.equal(f(10), 0);
-  assert.ok(f(20) > 0 && f(20) < f(30));
-  assert.equal(f(50), 3500);
-  assert.equal(f(91), 0);
-  assert.ok(checkCurve(exampleCurve(), circleArea(EXAMPLE_ROTOR_M), 1).worstRatio < 1);
+  assert.equal(f(5), 0);
+  assert.ok(f(6) > 0 && f(10) < f(15) && f(15) < f(20));
+  assert.equal(f(30), 3500);
+  assert.equal(f(90), 3500);
+  assert.equal(f(101), 0);
+  assert.ok(checkCurve(exampleCurve(), circleArea(EXAMPLE_ROTOR_M), 1).worstRatio < 0.65);
 });
 
 test("parseCurve accepts common separators and rejects junk", () => {

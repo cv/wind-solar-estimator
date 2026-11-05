@@ -48,7 +48,7 @@ _Inferred from the current build; confirm or correct._
 
 ## Evidence on Hand
 
-- No independently measured power curve exists yet. The default curve is illustrative (3.5 kW, 4 m rotor) and is labelled as such.
+- No independently measured power curve exists yet. The default curve is illustrative (3.5 kW, 6 m rotor, within the Betz limit) and is labelled as such.
 - No customers, testimonials, case studies, field measurements or benchmarks. Future work must not invent any.
 - `deck.pdf` is the startup's private pitch deck: gitignored, confidential, never to be quoted, published or used as a source of claims.
 

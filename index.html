@@ -28,7 +28,7 @@
       <section class="group location">
         <h2>Site</h2>
         <div class="search">
-          <input id="placeSearch" type="search" placeholder="Search a place, e.g. Amarillo" aria-label="Search a place">
+          <input id="placeSearch" type="search" placeholder="Search a place, e.g. Lethbridge" aria-label="Search a place">
           <button type="button" id="placeGo">Find</button>
         </div>
         <ul id="placeResults" class="place-results" hidden></ul>
@@ -57,7 +57,7 @@
         <label>Power curve: wind km/h, watts per turbine
           <textarea name="curve" rows="7" spellcheck="false"></textarea>
         </label>
-        <p class="hint">The default is an illustrative 3.5&nbsp;kW turbine with a 4&nbsp;m rotor. Paste the real turbine's independently measured curve. <button type="button" class="link" id="resetCurve">Restore default</button></p>
+        <p class="hint">The default is an illustrative 3.5&nbsp;kW turbine with a 6&nbsp;m rotor. Paste the real turbine's independently measured curve. <button type="button" class="link" id="resetCurve">Restore default</button></p>
         <label>Capture opening
           <select name="captureShape">
             <option value="round">Round: rotor or duct diameter</option>
@@ -160,7 +160,7 @@
     <div id="intro" class="intro">
       <h2>See how wind and solar would perform at any site</h2>
       <p>Pick a place: search for it, click the map or type its coordinates. The estimator replays every hour of the last 20 years of weather there through the turbines, the solar panels, the site's electricity use and a battery, then tells you what the turbines add. Adjust the assumptions to match the customer and the report updates as you type.</p>
-      <button type="button" id="tryExample" class="primary inline">Try the example: Amarillo, Texas</button>
+      <button type="button" id="tryExample" class="primary inline">Try the example: Lethbridge, Alberta</button>
       <p class="hint">Estimates are indicative, not a bankable energy assessment. They're only as good as the power curve and the wind data.</p>
     </div>
 
