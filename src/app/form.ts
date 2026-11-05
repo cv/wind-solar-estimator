@@ -39,8 +39,7 @@ export function readForm(): FormInput {
     const el: FormField = form.elements[k];
     out[k] = isCheckbox(el) ? el.checked : el.value.trim();
   }
-  out.apiKey = form.elements.apiKey.value.trim();
-  return out as unknown as FormInput;
+  return { ...out, apiKey: form.elements.apiKey.value.trim() } as unknown as FormInput;
 }
 
 export const asParam = (v: string | boolean): string => (typeof v === "boolean" ? (v ? "1" : "0") : String(v));

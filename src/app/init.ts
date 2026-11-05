@@ -79,8 +79,8 @@ export function init(): void {
   // "Use 2008–2025 only" in a station-record note: narrow the period to after the step.
   $("#notes").addEventListener("click", (e) => {
     const b = (e.target as Element).closest<HTMLButtonElement>("button[data-years]");
-    const years = b?.dataset.years,
-      end = b?.dataset.end;
+    const years = b?.dataset["years"],
+      end = b?.dataset["end"];
     if (years === undefined || end === undefined) return;
     form.elements.years.value = years;
     form.elements.endYear.value = end;

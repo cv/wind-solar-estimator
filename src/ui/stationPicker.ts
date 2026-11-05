@@ -32,7 +32,7 @@ export function loadStations(): Promise<RankedStation[] | null> {
       console.warn(e);
       return null;
     });
-  state.stations = { key, promise, list: undefined };
+  state.stations = { key, promise };
   renderStationPicker();
   promise.then((list): void => {
     if (state.stations.key !== key) return;

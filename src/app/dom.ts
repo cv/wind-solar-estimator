@@ -42,12 +42,12 @@ const flashTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
 // Brief confirmation on the button that was pressed.
 export function flash(btn: HTMLElement, text: string, ms: number = 2000): void {
   clearTimeout(flashTimers.get(btn));
-  btn.dataset.label ??= btn.textContent;
+  btn.dataset["label"] ??= btn.textContent;
   btn.textContent = text;
   flashTimers.set(
     btn,
     setTimeout(() => {
-      btn.textContent = btn.dataset.label ?? null;
+      btn.textContent = btn.dataset["label"] ?? null;
     }, ms),
   );
 }

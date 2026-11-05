@@ -240,8 +240,10 @@ interface YearRequest {
   year: number;
   tilt: number;
   azimuth: number;
-  apiKey?: string;
-  signal?: AbortSignal;
+  /** Passed through from fetchWeather: undefined uses the free API. */
+  apiKey: string | undefined;
+  /** Passed through from fetchWeather: undefined means not abortable. */
+  signal: AbortSignal | undefined;
 }
 
 async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: YearRequest): Promise<ArchiveData> {
@@ -267,7 +269,7 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: Year
     let res: Response, text: string;
     try {
       // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-      res = await fetch(url, { signal });
+      res = await fetch(url, signal ? { signal } : {});
       // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
       text = await res.text();
     } catch (e) {

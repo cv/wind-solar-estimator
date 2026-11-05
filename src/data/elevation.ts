@@ -16,7 +16,10 @@ export async function siteElevation(lat: number, lon: number, signal?: AbortSign
   let elevation = await dbGet<number>(key);
   if (!Number.isFinite(elevation)) {
     try {
-      const res = await fetch(`${ELEVATION_API}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`, { signal });
+      const res = await fetch(
+        `${ELEVATION_API}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`,
+        signal ? { signal } : {},
+      );
       elevation = res.ok ? Number(((await res.json()) as ElevationResponse).elevation?.[0]) : NaN;
     } catch {
       elevation = NaN;

@@ -24,7 +24,10 @@ interface GeocodeResponse {
 }
 
 export async function searchPlaces(name: string, signal?: AbortSignal): Promise<Place[]> {
-  const res = await fetch(`${GEOCODE}?${new URLSearchParams({ name, count: "6", language: "en" })}`, { signal });
+  const res = await fetch(
+    `${GEOCODE}?${new URLSearchParams({ name, count: "6", language: "en" })}`,
+    signal ? { signal } : {},
+  );
   if (!res.ok) throw new Error(`Place search failed (${res.status})`);
   const json = (await res.json()) as GeocodeResponse;
   return (json.results || []).map((r) => ({

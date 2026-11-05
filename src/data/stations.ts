@@ -249,7 +249,7 @@ async function getText(url: string, signal: AbortSignal | undefined, what: strin
     let res: Response | undefined;
     try {
       // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-      res = await fetch(url, { signal });
+      res = await fetch(url, signal ? { signal } : {});
       // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
       if (res.ok) return await res.text();
     } catch (e) {
