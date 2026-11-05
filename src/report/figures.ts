@@ -1,8 +1,7 @@
 // Headline figures and supporting statistics.
 import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, money } from "../app/format.ts";
-import type { DataRequest } from "../app/state.ts";
-import { state } from "../app/state.ts";
+import type { DataRequest, WindSource } from "../app/state.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 
 /** One figure: label, value (with optional unit) and a supporting line. */
@@ -13,7 +12,8 @@ export const figure = (label: string, value: string, unit: string, sub: string, 
 const stat = (label: string, value: string, unit: string, sub: string): string =>
   `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
 
-export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest): void {
+export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest, source: WindSource | null): void {
+  const measured = source?.kind === "measured" ? source.stats : null;
   const A = r.pvOnly,
     B = r.withWind,
     e = r.econ;
@@ -35,24 +35,19 @@ export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest): v
       "Mean wind at hub",
       fmt(r.meanHub, 1),
       "km/h",
-      state.source?.stats
+      measured
         ? `${fmt(r.meanW10, 1)} at 10 m, measured with gaps filled`
         : `Weather data: ${fmt(r.meanW10, 1)} at 10 m, ${fmt(r.meanW100, 1)} at 100 m`,
     ),
-    ...(state.source?.stats
+    ...(measured
       ? [
           stat(
             "Station vs weather model",
-            `${fmt(state.source.stats.meanStation, 1)} vs ${fmt(state.source.stats.meanModel, 1)}`,
+            `${fmt(measured.meanStation, 1)} vs ${fmt(measured.meanModel, 1)}`,
             "km/h",
-            `at 10 m, same hours; ${fmt(state.source.stats.energyRatio, 1)}× the wind energy`,
+            `at 10 m, same hours; ${fmt(measured.energyRatio, 1)}× the wind energy`,
           ),
-          stat(
-            "Measured hours",
-            pct(state.source.stats.coverage, 1),
-            "",
-            `${fmt(state.source.stats.filled)} hours filled from the model`,
-          ),
+          stat("Measured hours", pct(measured.coverage, 1), "", `${fmt(measured.filled)} hours filled from the model`),
         ]
       : []),
     stat("Turbines producing", pct(r.generatingShare), "", "of all hours"),

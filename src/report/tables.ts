@@ -2,8 +2,7 @@
 import { MONTHS } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, money } from "../app/format.ts";
-import type { DataRequest } from "../app/state.ts";
-import { state } from "../app/state.ts";
+import type { DataRequest, WindSource } from "../app/state.ts";
 import { fromSite } from "../app/stationText.ts";
 import type { Station } from "../data/stations.ts";
 import type { Weather } from "../data/weather.ts";
@@ -55,9 +54,14 @@ export function renderMonthly(r: SimResult): void {
 /** Load presets by any profile name: a hand-entered profile has none. */
 const presetByName: Readonly<Partial<Record<string, LoadPreset>>> = LOAD_PRESETS;
 
-export function assumptionRows(r: SimResult, p: ModelParams, req: DataRequest, wx: Weather): AssumptionRow[] {
+export function assumptionRows(
+  r: SimResult,
+  p: ModelParams,
+  req: DataRequest,
+  wx: Weather,
+  src: WindSource | null,
+): AssumptionRow[] {
   const ratedKw = r.ratedKw / p.nTurbines;
-  const src = state.source;
   return [
     [
       "Site",
@@ -67,12 +71,12 @@ export function assumptionRows(r: SimResult, p: ModelParams, req: DataRequest, w
       "Weather data",
       `ERA5 reanalysis via Open-Meteo, hourly, ${wx.startYear}–${wx.endYear} (${fmt(wx.n)} hours, ${fmt(wx.missing)} missing)`,
     ],
-    ...(src?.stats
+    ...(src?.kind === "measured"
       ? [["Wind data", windDataText({ station: src.station, stats: src.stats })] satisfies AssumptionRow]
       : []),
     [
       "Wind at hub",
-      `${p.hubHeight} m, from ${state.source?.stats ? "the 10 m wind with the weather model's" : "10 m and 100 m winds with an"} hourly shear exponent (mean ${fmt(r.meanAlpha, 2)}); scaled ×${fmt(r.scale, 2)}; air density correction ${p.densityCorrection ? "on" : "off"}; ${p.windLossPct}% losses`,
+      `${p.hubHeight} m, from ${src?.kind === "measured" ? "the 10 m wind with the weather model's" : "10 m and 100 m winds with an"} hourly shear exponent (mean ${fmt(r.meanAlpha, 2)}); scaled ×${fmt(r.scale, 2)}; air density correction ${p.densityCorrection ? "on" : "off"}; ${p.windLossPct}% losses`,
     ],
     [
       "Turbines",
@@ -108,8 +112,14 @@ export function windDataText({ station: s, stats: st }: { station: Station; stat
   );
 }
 
-export function renderAssumptions(r: SimResult, p: ModelParams, req: DataRequest, wx: Weather): void {
-  $("#assumptions").innerHTML = assumptionRows(r, p, req, wx)
+export function renderAssumptions(
+  r: SimResult,
+  p: ModelParams,
+  req: DataRequest,
+  wx: Weather,
+  src: WindSource | null,
+): void {
+  $("#assumptions").innerHTML = assumptionRows(r, p, req, wx, src)
     .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`)
     .join("");
 }

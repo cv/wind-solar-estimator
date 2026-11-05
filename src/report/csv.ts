@@ -1,6 +1,6 @@
 // CSV download of the report.
 import { readForm } from "../app/form.ts";
-import { analysis, state } from "../app/state.ts";
+import { state } from "../app/state.ts";
 import { assumptionRows, monthlyRows } from "./tables.ts";
 
 /** One CSV cell: numbers rounded to 2 decimals, everything else quoted. */
@@ -8,14 +8,14 @@ const q = (c: string | number): string =>
   typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${c.replaceAll('"', '""')}"`;
 
 export function downloadCsv(): void {
-  if (!state.result) return; // nothing analysed yet
-  const { result: r, params: p, req, wx } = analysis();
+  if (!state.analysis) return; // nothing analysed yet
+  const { result: r, params: p, req, wx, source } = state.analysis;
   const { head, rows, total } = monthlyRows(r);
   const lines: Array<Array<string | number>> = [
     ["Wind + solar site estimate", readForm().place || ""],
     ["Latitude", req.lat],
     ["Longitude", req.lon],
-    ...assumptionRows(r, p, req, wx),
+    ...assumptionRows(r, p, req, wx, source),
     [],
     ["Wind kWh/yr", r.windKwh],
     ["Capacity factor", r.capacityFactor],

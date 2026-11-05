@@ -179,8 +179,8 @@ async function shareLink(): Promise<void> {
 async function clearCache(): Promise<void> {
   await clearWeatherCache();
   clearStationMemory();
-  state.wxKey = null;
-  state.stations = { key: null };
+  state.loaded = null;
+  state.stations = { key: null, status: "loading" };
   void loadStations(); // never rejects: a failed search resolves to null
   flash($("#clearCache"), "Cache cleared");
   status("Cached weather data cleared.");

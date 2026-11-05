@@ -1,8 +1,7 @@
 // The headline verdict and the physical-limit (Betz cap) status line.
 import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, capitalize } from "../app/format.ts";
-import type { Analysis } from "../app/state.ts";
-import type { CurveCheck } from "../model/powerCurve.ts";
+import type { Analysis, PhysicsLimit } from "../app/state.ts";
 import type { SimResult } from "../model/simulate.ts";
 
 /** How a verdict or note is styled. */
@@ -48,16 +47,14 @@ export function renderVerdict(r: SimResult, capped: SimResult | null): void {
 }
 
 /** Says what the Betz cap does for the current curve, next to the checkbox, so toggling it never looks inert. */
-export function renderClampStatus(a: Analysis, check: CurveCheck): void {
-  const { result: r, params: p, capped, uncapped } = a;
-  let text = `This curve stays within the limit at every wind speed (at most ${pct(check.worstRatio)} of it), so capping changes nothing.`;
-  if (check.exceeds) {
-    // analyse.ts makes the comparison run whenever the curve exceeds the limit: uncapped with the cap on, capped with it off.
-    const other = p.clampPhysics ? uncapped : capped;
-    if (!other) throw new Error("renderClampStatus: the curve exceeds the limit but the comparison run is missing");
-    text = p.clampPhysics
-      ? `Capped, wind makes ${fmt(r.windKwh)} kWh a year instead of the ${fmt(other.windKwh)} the curve as entered would give.`
-      : `This curve is ${fmt(check.worstRatio)}× the limit at ${fmt(check.atKmh)} km/h. Capped, wind would make ${fmt(other.windKwh)} kWh a year instead of ${fmt(r.windKwh)}.`;
-  }
-  $("#clampStatus").textContent = text;
+export function renderClampStatus({ result: r, limit }: Analysis): void {
+  $("#clampStatus").textContent = clampStatusText(r, limit);
+}
+
+function clampStatusText(r: SimResult, limit: PhysicsLimit): string {
+  if (limit.kind === "within")
+    return `This curve stays within the limit at every wind speed (at most ${pct(limit.check.worstRatio)} of it), so capping changes nothing.`;
+  if (limit.kind === "capped")
+    return `Capped, wind makes ${fmt(r.windKwh)} kWh a year instead of the ${fmt(limit.uncapped.windKwh)} the curve as entered would give.`;
+  return `This curve is ${fmt(limit.check.worstRatio)}× the limit at ${fmt(limit.check.atKmh)} km/h. Capped, wind would make ${fmt(limit.capped.windKwh)} kWh a year instead of ${fmt(r.windKwh)}.`;
 }

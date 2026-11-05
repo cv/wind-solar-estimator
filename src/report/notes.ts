@@ -3,10 +3,9 @@ import { ELEVATION_NOTE_M } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, span } from "../app/format.ts";
 import { state } from "../app/state.ts";
-import type { Analysis } from "../app/state.ts";
+import type { Analysis, DataRequest, WindSource } from "../app/state.ts";
 import { autoEligible, fromSite, missingYears } from "../app/stationText.ts";
 import type { Station } from "../data/stations.ts";
-import type { CurveCheck } from "../model/powerCurve.ts";
 import type { BlendStats } from "../wind/blend.ts";
 import type { Homogeneity } from "../wind/homogeneity.ts";
 import { renderClampStatus } from "./verdict.ts";
@@ -16,19 +15,18 @@ import { pickStation } from "../wind/stationChoice.ts";
 /** One report note: its style (info, caution or problem) and its HTML. */
 export type Note = [cls: "info" | "warn" | "bad", html: string];
 
-export function renderNotes(a: Analysis, check: CurveCheck): void {
-  const { result: r, params: p, wx, source: src } = a;
-  renderClampStatus(a, check);
+export function renderNotes(a: Analysis): void {
+  const { result: r, params: p, wx, source: src, limit } = a;
+  renderClampStatus(a);
   const items: Note[] = [];
-  if (check.exceeds) {
+  if (limit.kind !== "within") {
+    const { check } = limit;
     const area = `${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m² of capture area (${p.captureDesc})`;
     const aug = p.augmentation > 1 ? `, even with ${fmt(p.augmentation, 1)}× duct augmentation` : "";
-    if (p.clampPhysics) {
-      // analyse.ts makes the uncapped run whenever the curve exceeds the limit with the cap on.
-      if (!a.uncapped) throw new Error("renderNotes: the curve exceeds the limit but the uncapped run is missing");
+    if (limit.kind === "capped") {
       items.push([
         "warn",
-        `<strong>Power curve:</strong> output is capped at the physical limit for ${area}, which takes wind energy from ${fmt(a.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`,
+        `<strong>Power curve:</strong> output is capped at the physical limit for ${area}, which takes wind energy from ${fmt(limit.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`,
       ]);
     } else {
       items.push([
@@ -39,28 +37,7 @@ export function renderNotes(a: Analysis, check: CurveCheck): void {
       ]);
     }
   }
-  if (src?.stats) {
-    const st = src.stats;
-    items.push(
-      [
-        "info",
-        `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${fromSite(src.station)}, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
-          `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
-          `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`,
-      ],
-      ...stationChecks(src.station, st, wx.elevation),
-    );
-  } else if (src?.error) {
-    items.push([
-      "warn",
-      `<strong>Station data:</strong> couldn't load readings from ${esc(src.station.name)} (${esc(src.error)}), so this report uses the weather model. Press <em>Analyse this site</em> to try again.`,
-    ]);
-  } else if (src?.unused !== undefined) {
-    items.push([
-      "warn",
-      `<strong>Station data:</strong> ${esc(src.station.name)} has wind readings for only ${pct(src.unused)} of these hours, so this report uses the weather model${src.station.explicit ? "" : ". Pick the station under <em>Wind data</em> to use it anyway"}.`,
-    ]);
-  }
+  if (src) items.push(...sourceNotes(src, wx.elevation, a.req));
   if (p.siteMeanKmh > 0) {
     items.push([
       "warn",
@@ -68,7 +45,7 @@ export function renderNotes(a: Analysis, check: CurveCheck): void {
     ]);
   } else if (p.windScale !== 1) {
     items.push(["warn", `<strong>Wind data:</strong> scaled ×${fmt(p.windScale, 2)} by hand.`]);
-  } else if (!src?.stats) {
+  } else if (src?.kind !== "measured") {
     items.push([
       "warn",
       `<strong>Wind data:</strong> not calibrated. It's averaged over a ~28 km grid cell, and terrain, trees and buildings can change the wind at the turbine a lot; energy rises with the cube of wind speed. Enter a measured mean under <em>Site wind calibration</em> if one exists.`,
@@ -84,17 +61,48 @@ export function renderNotes(a: Analysis, check: CurveCheck): void {
   $("#notes").innerHTML = items.map(([cls, html]) => `<li class="${cls}">${html}</li>`).join("");
 }
 
+/** Notes on where the wind came from when a station was chosen, with the station's caveats when its readings were used. */
+function sourceNotes(src: WindSource, siteElevationM: number, req: DataRequest): Note[] {
+  const name = esc(src.station.name);
+  if (src.kind === "measured") {
+    const st = src.stats;
+    return [
+      [
+        "info",
+        `<strong>Wind data:</strong> measured hourly at ${name}, ${fromSite(src.station)}, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
+          `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
+          `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`,
+      ],
+      ...stationChecks(src.station, st, siteElevationM, req),
+    ];
+  }
+  if (src.kind === "failed")
+    return [
+      [
+        "warn",
+        `<strong>Station data:</strong> couldn't load readings from ${name} (${esc(src.error)}), so this report uses the weather model. Press <em>Analyse this site</em> to try again.`,
+      ],
+    ];
+  // "sparse": too few hours measured.
+  return [
+    [
+      "warn",
+      `<strong>Station data:</strong> ${name} has wind readings for only ${pct(src.coverage)} of these hours, so this report uses the weather model${src.station.explicit ? "" : ". Pick the station under <em>Wind data</em> to use it anyway"}.`,
+    ],
+  ];
+}
+
 /** Notes on how far the station can be trusted: hour-by-hour agreement, and breaks in its record. */
-export function stationChecks(station: Station, st: BlendStats, siteElevationM: number): Note[] {
+export function stationChecks(station: Station, st: BlendStats, siteElevationM: number, req: DataRequest): Note[] {
   const out: Note[] = [];
   const name = esc(station.name);
   const rise = station.elevation - siteElevationM;
   if (Math.abs(rise) >= ELEVATION_NOTE_M) {
-    const req = state.req;
+    const stations = state.stations;
     const better =
-      state.stations.list && req
+      stations.status === "ready"
         ? pickStation(
-            state.stations.list.filter((s) => s.id !== station.id && Math.abs(s.rise) < ELEVATION_NOTE_M),
+            stations.list.filter((s) => s.id !== station.id && Math.abs(s.rise) < ELEVATION_NOTE_M),
             autoEligible(req),
             missingYears(req),
           )

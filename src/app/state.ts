@@ -3,6 +3,7 @@ import type { Chart } from "chart.js";
 import type * as Leaflet from "leaflet";
 import type { Station } from "../data/stations.ts";
 import type { Weather } from "../data/weather.ts";
+import type { CurveExceedsLimit, CurveWithinLimit } from "../model/powerCurve.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 import type { BlendStats } from "../wind/blend.ts";
 
@@ -30,42 +31,44 @@ export interface DataRequest {
 }
 
 /**
- * Where the wind came from when a station was chosen: its readings (stats), or the model
- * because they failed to load (error) or covered too few hours (unused = coverage).
- * The absent fields are typed `undefined` so `source?.stats` and the like narrow the union.
+ * Where the wind came from when a station was chosen: its readings ("measured"), or the model
+ * because they failed to load ("failed") or covered too few hours ("sparse", with their coverage).
  */
 export type WindSource =
-  | { station: ChosenStation; stats: BlendStats; error?: undefined; unused?: undefined }
-  | { station: ChosenStation; error: string; stats?: undefined; unused?: undefined }
-  | { station: ChosenStation; unused: number; stats?: undefined; error?: undefined };
+  | { kind: "measured"; station: ChosenStation; stats: BlendStats }
+  | { kind: "failed"; station: ChosenStation; error: string }
+  | { kind: "sparse"; station: ChosenStation; coverage: number };
 
-/**
- * The station search for the current pin (key = "lat|lon" to 3 decimals): list is undefined
- * while loading, null if the search failed.
- */
-export interface StationListState {
+/** The station search for the current pin: key = "lat|lon" to 3 decimals (null before any), and its promise. */
+interface StationSearch {
   key: string | null;
   promise?: Promise<RankedStation[] | null>;
-  list?: RankedStation[] | null;
+}
+
+/** The station search and where it stands: still loading, failed, or ready with its list. */
+export type StationListState =
+  | (StationSearch & { status: "loading" })
+  | (StationSearch & { status: "failed" })
+  | (StationSearch & { status: "ready"; list: readonly RankedStation[] });
+
+/** Weather downloaded for a request: key = its requestKey, wx with any station wind blended in. */
+export interface LoadedWeather {
+  key: string;
+  req: DataRequest;
+  wx: Weather;
+  /** null when the run used the weather model alone. */
+  source: WindSource | null;
 }
 
 export interface AppState {
   /** A weather download is in progress. */
   loading: boolean;
-  wx: Weather | null;
-  /** requestKey of the request wx was loaded for. */
-  wxKey: string | null;
-  req: DataRequest | null;
-  /** null when the run used the weather model alone. */
-  source: WindSource | null;
+  /** The latest weather download (null before one, or after the cache is cleared). */
+  loaded: LoadedWeather | null;
+  /** The latest completed analysis (null before one): read it through analysis(). */
+  analysis: Analysis | null;
   stations: StationListState;
   stationLayer: Leaflet.LayerGroup | null;
-  params: ModelParams | null;
-  result: SimResult | null;
-  /** The run with output capped at the physical limit, when the curve exceeds it and the cap is off. */
-  capped: SimResult | null;
-  /** The run without the cap, when the curve exceeds the limit and the cap is on. */
-  uncapped?: SimResult | null;
   /** Chart.js charts by canvas id. */
   charts: Record<string, Chart>;
   map: Leaflet.Map | null;
@@ -76,20 +79,25 @@ export interface AppState {
 
 export const state: AppState = {
   loading: false,
-  wx: null,
-  wxKey: null,
-  req: null,
-  source: null,
-  stations: { key: null },
+  loaded: null,
+  analysis: null,
+  stations: { key: null, status: "loading" },
   stationLayer: null,
-  params: null,
-  result: null,
-  capped: null,
   charts: {},
   map: null,
   marker: null,
   cell: null,
 };
+
+/**
+ * How the power curve compares with the physical limit, with the comparison run that calls for:
+ * none when it stays within; when it exceeds, the run without the cap if the result is capped
+ * ("capped"), or the run with the cap if the result takes the curve at face value ("faceValue").
+ */
+export type PhysicsLimit =
+  | { kind: "within"; check: CurveWithinLimit }
+  | { kind: "capped"; check: CurveExceedsLimit; uncapped: SimResult }
+  | { kind: "faceValue"; check: CurveExceedsLimit; capped: SimResult };
 
 /** Everything one completed analysis produced: what the report renders. */
 export interface Analysis {
@@ -97,20 +105,18 @@ export interface Analysis {
   req: DataRequest;
   params: ModelParams;
   result: SimResult;
-  capped: SimResult | null;
-  uncapped: SimResult | null;
+  limit: PhysicsLimit;
   /** null when the run used the weather model alone. */
   source: WindSource | null;
 }
 
 /**
- * The latest completed analysis. Rendering only happens after one, so a missing piece is a
+ * The latest completed analysis. Rendering only happens after one, so a missing one is a
  * programming error: this throws rather than letting every renderer handle null.
  */
 export function analysis(): Analysis {
-  const { wx, req, params, result } = state;
-  if (!wx || !req || !params || !result) throw new Error("analysis(): nothing has been analysed yet");
-  return { wx, req, params, result, capped: state.capped, uncapped: state.uncapped ?? null, source: state.source };
+  if (!state.analysis) throw new Error("analysis(): nothing has been analysed yet");
+  return state.analysis;
 }
 
 /** Values several modules reassign (ES module bindings can't be assigned from outside). */

@@ -4,7 +4,7 @@ import { $, form } from "../app/dom.ts";
 import { fmt } from "../app/format.ts";
 import { hooks } from "../app/hooks.ts";
 import { state } from "../app/state.ts";
-import type { ChosenStation, RankedStation } from "../app/state.ts";
+import type { ChosenStation, RankedStation, StationListState } from "../app/state.ts";
 import { autoEligible, fromSite, missingYears, riseText, stationPlace, yearsOverlap } from "../app/stationText.ts";
 import type { Period } from "../app/stationText.ts";
 import { siteElevation } from "../data/elevation.ts";
@@ -33,12 +33,12 @@ export async function loadStations(): Promise<RankedStation[] | null> {
       console.warn(e);
       return null;
     });
-  state.stations = { key, promise };
+  state.stations = { key, promise, status: "loading" };
   renderStationPicker();
   promise
     .then((list): void => {
       if (state.stations.key !== key) return;
-      state.stations.list = list;
+      state.stations = list ? { key, promise, status: "ready", list } : { key, promise, status: "failed" };
       renderStationPicker();
     })
     .catch((e: unknown) => {
@@ -66,12 +66,13 @@ export function resolveStation(
 export function renderStationPicker(): void {
   const lat = Number(form.elements.lat.value),
     lon = Number(form.elements.lon.value);
-  const { list } = state.stations;
+  const stations = state.stations;
+  const list = stations.status === "ready" ? stations.list : [];
   const req = pickerPeriod();
-  const active = list && req ? resolveStation(form.elements.windSource.value, list, req) : null;
-  fillStationOptions($("#stationSelect", HTMLSelectElement), list ?? [], req, active);
-  $("#stationHint").textContent = stationHint(nearCanada(lat, lon), list, req, active);
-  renderStationPins(list ?? [], active);
+  const active = stations.status === "ready" && req ? resolveStation(form.elements.windSource.value, list, req) : null;
+  fillStationOptions($("#stationSelect", HTMLSelectElement), list, req, active);
+  $("#stationHint").textContent = stationHint(nearCanada(lat, lon), stations, req, active);
+  renderStationPins(list, active);
 }
 
 /** The period, read leniently: validation messages belong to Analyse, not to this picker. */
@@ -103,14 +104,15 @@ function fillStationOptions(
 /** The hint under the picker: where the wind comes from, or why there is no station to use. */
 function stationHint(
   inCanada: boolean,
-  list: readonly RankedStation[] | null | undefined,
+  stations: StationListState,
   req: Period | null,
   active: ChosenStation | null,
 ): string {
   if (!inCanada)
     return "Measured station data is available for sites in Canada. Elsewhere the tool uses the weather model.";
-  if (list === undefined) return "Looking for nearby weather stations…";
-  if (list === null) return "Couldn't load the list of weather stations, so the weather model is used.";
+  if (stations.status === "loading") return "Looking for nearby weather stations…";
+  if (stations.status === "failed") return "Couldn't load the list of weather stations, so the weather model is used.";
+  const { list } = stations;
   if (list.length === 0)
     return `No Environment Canada station with hourly records within ${SEARCH_RADIUS_KM} km, so the weather model is used.`;
   // active implies req (it is resolved from it above).

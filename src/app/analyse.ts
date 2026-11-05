@@ -5,14 +5,14 @@ import { $, form, formError, status } from "./dom.ts";
 import { setForm, readForm, writeHash, InputError, dataRequest, modelParams, loadPreset } from "./form.ts";
 import { esc } from "./format.ts";
 import { state, runCtl } from "./state.ts";
-import type { ChosenStation, DataRequest, WindSource } from "./state.ts";
+import type { ChosenStation, DataRequest, LoadedWeather, PhysicsLimit, WindSource } from "./state.ts";
 import { fetchStationHours } from "../data/stations.ts";
 import type { StationHours } from "../data/stations.ts";
 import { fetchWeather } from "../data/weather.ts";
 import type { Weather } from "../data/weather.ts";
 import { checkCurve } from "../model/powerCurve.ts";
 import { simulate } from "../model/simulate.ts";
-import type { ModelParams } from "../model/simulate.ts";
+import type { ModelParams, SimResult } from "../model/simulate.ts";
 import { render } from "../report/render.ts";
 import { loadStations, resolveStation, renderStationPicker } from "../ui/stationPicker.ts";
 import { blendStation } from "../wind/blend.ts";
@@ -37,18 +37,17 @@ export async function analyse({ fetchIfNeeded = true }: { fetchIfNeeded?: boolea
   const { req, params } = inputs;
 
   req.station = resolveStation(v.windSource, await loadStations(), req);
-  if (requestKey(req) !== state.wxKey) {
+  let loaded = state.loaded;
+  if (requestKey(req) !== loaded?.key) {
     if (!fetchIfNeeded) {
       reportStale();
       return;
     }
-    if (!(await loadWeather(req))) return;
+    loaded = await loadWeather(req);
+    if (!loaded) return;
   }
 
-  // Past the block above, wx was loaded for this request (wxKey matches), so this never returns.
-  const { wx } = state;
-  if (!wx) return;
-  simulateAndRender(wx, v, params);
+  simulateAndRender(loaded, v, params);
   if (fetchIfNeeded) revealReport();
 }
 
@@ -81,7 +80,7 @@ function readInputs(v: FormInput, focus: boolean): { req: DataRequest; params: M
 
 /** Says the shown report no longer matches the form (when there is one and nothing is loading). */
 function reportStale(): void {
-  if (state.result && !state.loading)
+  if (state.analysis && !state.loading)
     status(
       "The location, period, panel orientation or wind data changed. Press <strong>Analyse this site</strong> to load weather data for it.",
       "stale",
@@ -90,9 +89,9 @@ function reportStale(): void {
 
 /**
  * Downloads the weather (and station readings) for req into state, cancelling any earlier download.
- * Resolves to whether this run is still current and its data loaded.
+ * Resolves to what was loaded, or null if this run was superseded or its download failed.
  */
-async function loadWeather(req: DataRequest): Promise<boolean> {
+async function loadWeather(req: DataRequest): Promise<LoadedWeather | null> {
   const token = ++runCtl.token;
   runCtl.abortCtl?.abort();
   const abortCtl = new AbortController();
@@ -104,13 +103,14 @@ async function loadWeather(req: DataRequest): Promise<boolean> {
   const showProgress = progressReporter(req, () => token === runCtl.token, runBtn);
   try {
     const [wx, obs] = await downloadAll(req, abortCtl.signal, showProgress);
-    if (token !== runCtl.token) return false;
-    Object.assign(state, { ...combineWind(wx, obs, req.station), wxKey: requestKey(req), req });
-    return true;
+    if (token !== runCtl.token) return null;
+    const loaded: LoadedWeather = { ...combineWind(wx, obs, req.station), key: requestKey(req), req };
+    state.loaded = loaded;
+    return loaded;
   } catch (e: unknown) {
-    if (token !== runCtl.token || (e instanceof Error && e.name === "AbortError")) return false;
+    if (token !== runCtl.token || (e instanceof Error && e.name === "AbortError")) return null;
     status(esc((e instanceof Error && e.message) || String(e)), "error");
-    return false;
+    return null;
   } finally {
     if (token === runCtl.token) {
       runBtn.disabled = false;
@@ -180,15 +180,22 @@ async function fetchStationObs(
 }
 
 /** Simulates with these parameters (and the capped or uncapped variant the power-curve check calls for), then renders. */
-function simulateAndRender(wx: Weather, v: FormInput, params: ModelParams): void {
-  state.params = params;
-  state.result = simulate(wx, params);
-  const check = checkCurve(params.curvePts, params.captureAreaM2, params.augmentation);
-  state.capped = check.exceeds && !params.clampPhysics ? simulate(wx, { ...params, clampPhysics: true }) : null;
-  // With the cap on, the uncapped run says what the cap took away (after losses, so it matches the figures).
-  state.uncapped = check.exceeds && params.clampPhysics ? simulate(wx, { ...params, clampPhysics: false }) : null;
+function simulateAndRender({ wx, req, source }: LoadedWeather, v: FormInput, params: ModelParams): void {
+  const result = simulate(wx, params);
+  state.analysis = { wx, req, source, params, result, limit: physicsLimit(wx, params) };
   status("");
-  render(v, check);
+  render(v);
+}
+
+/** The power curve's check against the physical limit, with the comparison run it calls for. */
+function physicsLimit(wx: Weather, params: ModelParams): PhysicsLimit {
+  const check = checkCurve(params.curvePts, params.captureAreaM2, params.augmentation);
+  if (!check.exceeds) return { kind: "within", check };
+  const rerun = (clampPhysics: boolean): SimResult => simulate(wx, { ...params, clampPhysics });
+  // With the cap on, the uncapped run says what the cap took away (after losses, so it matches the figures).
+  return params.clampPhysics
+    ? { kind: "capped", check, uncapped: rerun(false) }
+    : { kind: "faceValue", check, capped: rerun(true) };
 }
 
 /** In the single-column layout the report sits below the form, so bring it into view. */
@@ -222,12 +229,12 @@ export function combineWind(
 ): CombinedWind {
   // obs is null only when there was no station to read.
   if (!station || !obs) return { wx, source: null };
-  if ("error" in obs) return { wx, source: { station, error: obs.error } };
+  if ("error" in obs) return { wx, source: { kind: "failed", station, error: obs.error } };
   const blended = blendStation(wx, obs);
   if (!blended || (!station.explicit && blended.stats.coverage < MIN_AUTO_COVERAGE)) {
-    return { wx, source: { station, unused: blended ? blended.stats.coverage : 0 } };
+    return { wx, source: { kind: "sparse", station, coverage: blended ? blended.stats.coverage : 0 } };
   }
-  return { wx: blended.wx, source: { station, stats: blended.stats } };
+  return { wx: blended.wx, source: { kind: "measured", station, stats: blended.stats } };
 }
 
 export function onChange(name: string): void {

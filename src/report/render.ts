@@ -5,14 +5,13 @@ import { $ } from "../app/dom.ts";
 import { esc } from "../app/format.ts";
 import { analysis, state } from "../app/state.ts";
 import { stationPlace } from "../app/stationText.ts";
-import type { CurveCheck } from "../model/powerCurve.ts";
 import { renderCharts } from "./charts.ts";
 import { renderFigures } from "./figures.ts";
 import { renderNotes } from "./notes.ts";
 import { renderMonthly, renderAssumptions } from "./tables.ts";
 import { renderVerdict } from "./verdict.ts";
 
-export function render(v: FormValues, check: CurveCheck): void {
+export function render(v: FormValues): void {
   const a = analysis();
   const { result: r, params: p, req, wx, source } = a;
   $("#intro").hidden = true;
@@ -21,19 +20,21 @@ export function render(v: FormValues, check: CurveCheck): void {
   $("#print", HTMLButtonElement).disabled = false;
 
   const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
-  const measured = source?.stats
-    ? `, wind measured at ${esc(source.station.name)} (${stationPlace(source.station)})`
-    : "";
+  const measured =
+    source?.kind === "measured"
+      ? `, wind measured at ${esc(source.station.name)} (${stationPlace(source.station)})`
+      : "";
   $("#reportHead").innerHTML =
     `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} year${wx.years === 1 ? "" : "s"} of hourly weather (${wx.startYear === wx.endYear ? wx.endYear : `${wx.startYear}–${wx.endYear}`})${measured} · ${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString(undefined, { dateStyle: "medium" })}</p>`;
 
-  renderVerdict(r, a.capped);
-  if (a.capped) $("#more", HTMLDetailsElement).open = true; // the power-curve chart is the evidence
-  renderNotes(a, check);
-  renderFigures(r, p, req);
+  const capped = a.limit.kind === "faceValue" ? a.limit.capped : null;
+  renderVerdict(r, capped);
+  if (capped) $("#more", HTMLDetailsElement).open = true; // the power-curve chart is the evidence
+  renderNotes(a);
+  renderFigures(r, p, req, source);
   renderCharts(r, p);
   renderMonthly(r);
-  renderAssumptions(r, p, req, wx);
+  renderAssumptions(r, p, req, wx, source);
   if (state.map) {
     state.cell?.remove();
     const h = ERA5_CELL_DEG / 2;

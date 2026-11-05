@@ -3,7 +3,7 @@ import { at } from "../util/checked.ts";
 import { MONTHS, COLORS } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { fmt } from "../app/format.ts";
-import { analysis, state } from "../app/state.ts";
+import { state } from "../app/state.ts";
 import { betzLimitW } from "../model/physics.ts";
 import { makeCurveFn } from "../model/powerCurve.ts";
 import { kmh } from "../model/units.ts";
@@ -173,8 +173,8 @@ function drawCurve(p: ModelParams): void {
 
 /** Redraws the battery-charge chart for the month picked in #socMonth (its change handler). */
 export function renderSoc(): void {
-  if (!state.result) return; // nothing analysed yet
-  const { result, params } = analysis();
+  if (!state.analysis) return; // nothing analysed yet
+  const { result, params } = state.analysis;
   drawSoc(result, params);
 }
 
