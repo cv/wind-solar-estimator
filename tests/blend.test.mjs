@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { alignStation, fitQuantileMap, applyQuantileMap, blendStation, shearAlpha, MIN_PAIRS } from "../js/blend.js";
+import { alignStation, fitQuantileMap, applyQuantileMap, blendStation, shearAlpha, checkHomogeneity, MIN_PAIRS } from "../js/blend.js";
 import { parseStationCsv, stationLabel, distanceKm, direction } from "../js/stations.js";
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
@@ -8,7 +8,7 @@ const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""
 /** A year of model weather with a repeating daily wind pattern; t counts UTC hours from 2020. */
 function modelYear() {
   const n = 8760, t0 = Date.UTC(2020, 0, 1) / 3.6e6;
-  const wx = { n, years: 1, t: new Int32Array(n), month: new Uint8Array(n), hour: new Uint8Array(n), w10: new Float32Array(n), w100: new Float32Array(n) };
+  const wx = { n, years: 1, t: new Int32Array(n), year: new Uint16Array(n).fill(2020), month: new Uint8Array(n), hour: new Uint8Array(n), w10: new Float32Array(n), w100: new Float32Array(n) };
   for (let i = 0; i < n; i++) {
     wx.t[i] = t0 + i;
     wx.month[i] = Math.min(11, Math.floor(i / 730));
@@ -74,4 +74,50 @@ test("station names, distance and direction read naturally", () => {
   assert.equal(stationLabel("PINCHER CREEK (AUT)"), "Pincher Creek (AUT)");
   close(distanceKm(50.1668, -113.6353, 50.0036, -113.6386), 18.1, 0.3); // Stavely to Claresholm
   assert.equal(direction(50.1668, -113.6353, 50.0036, -113.6386), "S");
+});
+
+/** Annual means for 2006–2025: the model wobbles from year to year, the station follows it times ratio(year). */
+function yearlyRecord(ratio, noise = 0.03) {
+  const out = [];
+  for (let y = 2006; y <= 2025; y++) {
+    const model = 9 + Math.sin(y * 1.7); // windy and calm years
+    const wobble = 1 + noise * Math.sin(y * 2.3 + 1); // year-to-year scatter in the ratio
+    out.push({ year: y, coverage: 0.99, model, station: model * ratio(y) * wobble });
+  }
+  return out;
+}
+
+test("checkHomogeneity leaves a steady record alone, even when it differs from the model", () => {
+  const h = checkHomogeneity(yearlyRecord(() => 1.35));
+  assert.equal(h.issue, null);
+  assert.equal(h.years, 20);
+});
+
+test("checkHomogeneity finds a step (an instrument moved or replaced)", () => {
+  const h = checkHomogeneity(yearlyRecord((y) => (y < 2008 ? 0.85 : 1.4)));
+  assert.equal(h.issue, "step");
+  assert.equal(h.step.year, 2008);
+  close(h.step.change, 0.65, 0.05);
+});
+
+test("checkHomogeneity finds a steady drift (trees growing around the mast)", () => {
+  const h = checkHomogeneity(yearlyRecord((y) => 1.4 - 0.02 * (y - 2006)));
+  assert.equal(h.issue, "trend");
+  close(h.trend.change, -0.27, 0.05);
+});
+
+test("checkHomogeneity ignores small changes, short records and thin years", () => {
+  assert.equal(checkHomogeneity(yearlyRecord((y) => (y < 2016 ? 1.1 : 1.0), 0.01)).issue, null); // 9% step
+  assert.equal(checkHomogeneity(yearlyRecord((y) => (y < 2008 ? 0.85 : 1.4)).slice(0, 4)).issue, null);
+  const thin = yearlyRecord((y) => (y < 2008 ? 0.85 : 1.4)).map((r) => (r.year < 2008 ? { ...r, coverage: 0.2 } : r));
+  assert.equal(checkHomogeneity(thin).issue, null);
+});
+
+test("blendStation reports yearly means and the homogeneity check", () => {
+  const wx = modelYear();
+  const { stats } = blendStation(wx, stationFrom(wx, (v) => v * 1.2));
+  assert.equal(stats.yearly.length, 1);
+  assert.equal(stats.yearly[0].year, 2020);
+  close(stats.yearly[0].station / stats.yearly[0].model, 1.2, 0.02);
+  assert.equal(stats.homogeneity.issue, null); // one year can't show a break
 });

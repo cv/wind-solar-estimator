@@ -2,7 +2,7 @@
 import { EXAMPLE_ROTOR_M, circleArea, exampleCurve, parseCurve, formatCurve, checkCurve, betzLimitW, makeCurveFn, LOAD_PRESETS, simulate } from "./model.js";
 import { fetchWeather, searchPlaces, clearWeatherCache } from "./weather.js";
 import { findStations, fetchStationHours, nearCanada, clearStationMemory, SEARCH_RADIUS_KM } from "./stations.js";
-import { blendStation } from "./blend.js";
+import { blendStation, POOR_CORRELATION } from "./blend.js";
 
 const $ = (sel) => document.querySelector(sel);
 const form = $("#form");
@@ -474,6 +474,7 @@ function renderNotes(r, p, check) {
     items.push(["info", `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${stationPlace(src.station)} of the site, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
       `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
       `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`]);
+    items.push(...stationChecks(src.station, st));
   } else if (src?.error) {
     items.push(["warn", `<strong>Station data:</strong> couldn't load readings from ${esc(src.station.name)} (${esc(src.error)}), so this report uses the weather model. Press <em>Analyse this site</em> to try again.`]);
   } else if (src) {
@@ -692,10 +693,48 @@ function assumptionRows(r, p, req, wx) {
   ];
 }
 
+const span = (a, b) => (a === b ? String(a) : `${a}–${b}`);
+
+/** Notes on how far the station can be trusted: hour-by-hour agreement, and breaks in its record. */
+function stationChecks(station, st) {
+  const out = [];
+  const name = esc(station.name);
+  if (st.correlation < POOR_CORRELATION) {
+    out.push(["warn", `<strong>Station match:</strong> the station and the weather model agree poorly hour by hour (correlation ${fmt(st.correlation, 2)}). ` +
+      `Wind at ${name} follows its own local pattern, such as a valley or lake breeze, so it may not represent the site either. Use a closer or more similar station if there is one.`]);
+  }
+  const h = st.homogeneity;
+  if (h?.issue === "step") {
+    const s = h.step;
+    const recent = s.to - s.year + 1;
+    const fix = recent >= 5
+      ? ` <button type="button" class="link" data-years="${recent}" data-end="${s.to}">Use ${span(s.year, s.to)} only</button>`
+      : ` Consider another station under <em>Wind data</em>.`;
+    out.push(["warn", `<strong>Station record:</strong> from ${s.year} the wind measured at ${name} is ${pct(Math.abs(s.change))} ${s.change > 0 ? "higher" : "lower"} ` +
+      `relative to the weather model than in ${span(s.from, s.year - 1)}. A jump like this usually means the instrument was moved, raised or replaced, not that the climate changed, ` +
+      `so the years before and after don't measure the same thing.${fix}`]);
+  } else if (h?.issue === "trend") {
+    const t = h.trend;
+    out.push(["warn", `<strong>Station record:</strong> relative to the weather model, the wind measured at ${name} ${t.change < 0 ? "fell" : "rose"} about ${pct(Math.abs(t.change))} from ${t.from} to ${t.to}. ` +
+      `A steady drift like this usually comes from changes around the instrument, such as trees growing or new buildings, rather than the climate. ` +
+      `This report averages all years, so treat its wind figures as uncertain by about that much.`]);
+  }
+  return out;
+}
+
+/** One line on the station record's consistency, for the assumptions table. */
+function homogeneityText(h) {
+  if (!h || h.years < 5) return "";
+  const signed = (x) => `${x > 0 ? "+" : "−"}${pct(Math.abs(x))}`;
+  if (h.issue === "step") return `; record steps ${signed(h.step.change)} relative to the model in ${h.step.year}`;
+  if (h.issue === "trend") return `; record drifts ${signed(h.trend.change)} relative to the model over ${span(h.trend.from, h.trend.to)}`;
+  return `; no step or drift relative to the model across ${h.years} years`;
+}
+
 function windDataText({ station: s, stats: st }) {
   return `measured hourly at ${s.name} (Environment and Climate Change Canada, climate ID ${s.id}), ${stationPlace(s)} of the site, ` +
     `elevation ${fmt(s.elevation)} m, 10 m mast; ${pct(st.coverage, 1)} of hours measured, the rest filled from ERA5 at the site ` +
-    `through a seasonal quantile mapping fitted on ${fmt(st.measured)} shared hours (correlation ${fmt(st.correlation, 2)})`;
+    `through a seasonal quantile mapping fitted on ${fmt(st.measured)} shared hours (correlation ${fmt(st.correlation, 2)})${homogeneityText(st.homogeneity)}`;
 }
 
 function renderAssumptions(r, p, req, wx) {
@@ -837,6 +876,15 @@ function init() {
     analyse();
   });
   $("#csv").addEventListener("click", downloadCsv);
+  // "Use 2008–2025 only" in a station-record note: narrow the period to after the step.
+  $("#notes").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-years]");
+    if (!b) return;
+    form.elements.years.value = b.dataset.years;
+    form.elements.endYear.value = b.dataset.end;
+    writeHash(readForm());
+    loadStations().then(renderStationPicker).then(() => analyse());
+  });
   $("#print").addEventListener("click", () => window.print());
   $("#share").addEventListener("click", async () => {
     writeHash(readForm());

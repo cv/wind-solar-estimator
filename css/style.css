@@ -270,7 +270,7 @@ table.kv td:first-child { color: var(--muted); width: 28%; font-size: var(--t-sm
   @page { margin: 12mm; }
   :root { background: #fff; font-size: 90%; }
   .top .actions, .panel, .intro, .status, #csv { display: none !important; }
-  details.more > summary::before { display: none; }
+  details.more > summary::before, .notes button { display: none; }
   .foot { padding: var(--s4) 0 0; text-align: left; }
   .top { background: none; color: var(--text); padding: 0 0 var(--s2); border-bottom: 2px solid var(--blue); }
   .logo { color: var(--blue); }

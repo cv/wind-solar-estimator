@@ -53,6 +53,19 @@ under *Wind data*, or on the map.
 - **Hub height** comes from the station's 10 m wind with ERA5's hour-by-hour 10–100 m
   shear exponent.
 
+Two checks say how far a station can be trusted:
+
+- **Station match:** if the station and ERA5 correlate below 0.5 hour by hour, the
+  station follows its own local winds (valley or lake breezes) and may not represent
+  the site either.
+- **Station record:** the ratio of the station's annual mean to ERA5's over the same
+  hours cancels windy and calm years, so a step or steady drift in it points to a change
+  at the instrument (moved, raised, replaced, or sheltered by growing trees). A change of
+  15% or more that stands clear of the year-to-year scatter (t ≥ 3) is flagged; for a
+  step the report offers to use only the years after it. On real records this flags
+  Claresholm (+63% in 2008) and Salmon Arm (−31% over 2006–2025), but not Calgary,
+  Lethbridge, Revelstoke or Vernon.
+
 Stations usually sit in open, flat places such as airports, so a farm with trees or
 buildings may see less wind. Elsewhere, enter a measured long-term mean under *Site wind
 calibration* where one exists, or compare with the
