@@ -5,7 +5,7 @@ import { $, form } from "./dom.ts";
 import type { FormField } from "./dom.ts";
 import { fmt } from "./format.ts";
 import type { DataRequest } from "./state.ts";
-import { LOAD_PRESETS } from "../model/load.ts";
+import { LOAD_PRESETS, isLoadProfileKey } from "../model/load.ts";
 import type { LoadPreset } from "../model/load.ts";
 import { circleArea } from "../model/physics.ts";
 import { parseCurve } from "../model/powerCurve.ts";
@@ -18,10 +18,7 @@ const FORM_KEYS = Object.keys(DEFAULTS).filter((k) => isFormKey(k));
 
 /** The load preset named key (any string, e.g. from a share link), if there is one. */
 export function loadPreset(key: string | undefined): LoadPreset | undefined {
-  if (key === undefined) return undefined;
-  // Bug (kept as is): a key inherited from Object.prototype, such as "constructor" in a share link, returns that
-  // property rather than undefined, and callers then fail reading its hourly shape. Object.hasOwn would fix it.
-  return (LOAD_PRESETS as Readonly<Record<string, LoadPreset | undefined>>)[key];
+  return key !== undefined && isLoadProfileKey(key) ? LOAD_PRESETS[key] : undefined;
 }
 
 /** A checkbox field, as opposed to a text-like one. */
@@ -57,7 +54,7 @@ export const asParam = (v: string | boolean): string => (typeof v === "boolean" 
 export function writeHash(v: FormValues): void {
   const q = new URLSearchParams();
   for (const k of FORM_KEYS) {
-    if ((k === "loadHourly" || k === "loadMonthly") && v.loadProfile in LOAD_PRESETS) continue; // implied by the profile
+    if ((k === "loadHourly" || k === "loadMonthly") && isLoadProfileKey(v.loadProfile)) continue; // implied by the profile
     if (k === "lat" || k === "lon" || asParam(v[k]) !== asParam(DEFAULTS[k])) q.set(k, asParam(v[k]));
   }
   q.set("v", HASH_VERSION);

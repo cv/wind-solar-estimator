@@ -39,3 +39,8 @@ export const LOAD_PRESETS: Readonly<Record<LoadProfileKey, LoadPreset>> = {
     monthly: Array.from({ length: 12 }, () => 1),
   },
 };
+
+/** Whether key names one of LOAD_PRESETS' own presets (not an inherited property such as "constructor"). */
+export function isLoadProfileKey(key: string): key is LoadProfileKey {
+  return Object.hasOwn(LOAD_PRESETS, key);
+}
