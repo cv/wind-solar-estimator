@@ -1,9 +1,10 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // Renders the whole report for the latest results.
 import { COLORS, ERA5_CELL_DEG } from "../app/constants.ts";
+import type { FormValues } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { esc } from "../app/format.ts";
 import { state } from "../app/state.ts";
+import type { CurveCheck } from "../model/powerCurve.ts";
 import { renderCharts } from "./charts.ts";
 import { renderFigures } from "./figures.ts";
 import { renderNotes } from "./notes.ts";
@@ -11,12 +12,12 @@ import { renderMonthly, renderAssumptions } from "./tables.ts";
 import { renderVerdict } from "./verdict.ts";
 import { stationPlace } from "../ui/stationPicker.ts";
 
-export function render(v, check) {
+export function render(v: FormValues, check: CurveCheck): void {
   const { result: r, params: p, req, wx } = state;
   $("#intro").hidden = true;
   $("#results").hidden = false;
-  $("#share").disabled = false;
-  $("#print").disabled = false;
+  $<HTMLButtonElement>("#share").disabled = false;
+  $<HTMLButtonElement>("#print").disabled = false;
 
   const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
   $("#reportHead").innerHTML =
@@ -27,8 +28,8 @@ export function render(v, check) {
     ` · ` +
     `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString(undefined, { dateStyle: "medium" })}</p>`;
 
-  renderVerdict(r, p);
-  if (state.capped) $("#more").open = true; // the power-curve chart is the evidence
+  renderVerdict(r);
+  if (state.capped) $<HTMLDetailsElement>("#more").open = true; // the power-curve chart is the evidence
   renderNotes(r, p, check);
   renderFigures(r, p, req);
   renderCharts(r, p);

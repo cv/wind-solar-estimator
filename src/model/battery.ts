@@ -1,6 +1,16 @@
 // Hour-by-hour battery: charges from surplus, covers deficits, counts grid import and export.
 
-export function battery(capKwh, minFrac, roundTrip, maxKw) {
+export interface Battery {
+  /** State of charge, kWh. */
+  soc: number;
+  /** Grid import and export so far, kWh. */
+  imported: number;
+  exported: number;
+  /** One hour with net kW (generation − load); returns grid kWh (+ import, − export). */
+  step(net: number): number;
+}
+
+export function battery(capKwh: number, minFrac: number, roundTrip: number, maxKw: number): Battery {
   const eff = Math.sqrt(roundTrip); // split losses between charging and discharging
   const floor = capKwh * minFrac;
   return {

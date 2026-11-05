@@ -1,23 +1,34 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // Running an analysis: download weather (and station) data when needed, simulate, render; re-run on change.
 import { API_KEY_STORAGE, MIN_AUTO_COVERAGE } from "./constants.ts";
 import { $, form, formError, status } from "./dom.ts";
-import { setForm, readForm, writeHash, InputError, dataRequest, modelParams } from "./form.ts";
+import { setForm, readForm, writeHash, InputError, dataRequest, modelParams, loadPreset } from "./form.ts";
 import { esc } from "./format.ts";
 import { state, runCtl } from "./state.ts";
+import type { ChosenStation, DataRequest, WindSource } from "./state.ts";
 import { fetchStationHours } from "../data/stations.ts";
+import type { StationHours } from "../data/stations.ts";
 import { fetchWeather } from "../data/weather.ts";
-import { LOAD_PRESETS } from "../model/load.ts";
+import type { Weather } from "../data/weather.ts";
 import { checkCurve } from "../model/powerCurve.ts";
 import { simulate } from "../model/simulate.ts";
+import type { ModelParams } from "../model/simulate.ts";
 import { render } from "../report/render.ts";
 import { loadStations, resolveStation, renderStationPicker } from "../ui/stationPicker.ts";
 import { blendStation } from "../wind/blend.ts";
 
-export const requestKey = (r) =>
+/** A station's hourly readings, or why they failed to load. */
+export type StationObs = StationHours | { error: string };
+
+/** The weather a run uses and where its wind came from (null: the weather model alone). */
+export interface CombinedWind {
+  wx: Weather;
+  source: WindSource | null;
+}
+
+export const requestKey = (r: DataRequest): string =>
   [r.lat.toFixed(4), r.lon.toFixed(4), r.startYear, r.endYear, r.tilt, r.azimuth, r.station?.id ?? "model"].join("|");
 
-export async function analyse({ fetchIfNeeded = true } = {}) {
+export async function analyse({ fetchIfNeeded = true }: { fetchIfNeeded?: boolean } = {}): Promise<void> {
   form.querySelectorAll(".invalid").forEach((el) => {
     el.classList.remove("invalid");
     el.removeAttribute("aria-invalid");
@@ -25,7 +36,7 @@ export async function analyse({ fetchIfNeeded = true } = {}) {
   });
   formError("");
   const v = readForm();
-  let req, params;
+  let req: DataRequest, params: ModelParams;
   try {
     req = dataRequest(v);
     params = modelParams(v);
@@ -53,18 +64,18 @@ export async function analyse({ fetchIfNeeded = true } = {}) {
     const token = ++runCtl.token;
     runCtl.abortCtl?.abort();
     runCtl.abortCtl = new AbortController();
-    const runBtn = $("#run");
+    const runBtn = $<HTMLButtonElement>("#run");
     runBtn.disabled = true;
     runBtn.textContent = "Loading weather…";
     const period = req.startYear === req.endYear ? String(req.endYear) : `${req.startYear}–${req.endYear}`;
     state.loading = true;
     // Weather model and station years download side by side; progress counts both.
-    const progress = {
+    const progress: Record<"model" | "station", [done: number, total: number]> = {
       model: [0, req.endYear - req.startYear + 1],
       station: [0, req.station ? req.endYear - req.startYear + 1 : 0],
     };
     const what = req.station ? `hourly weather and ${esc(req.station.name)} station readings` : "hourly weather";
-    const showProgress = (part) => (done, total) => {
+    const showProgress = (part: "model" | "station") => (done: number, total: number) => {
       if (token !== runCtl.token) return;
       progress[part] = [done, total];
       const d = progress.model[0] + progress.station[0],
@@ -77,7 +88,7 @@ export async function analyse({ fetchIfNeeded = true } = {}) {
     };
     try {
       const signal = runCtl.abortCtl.signal;
-      const [wx, obs] = await Promise.all([
+      const [wx, obs] = await Promise.all<[Promise<Weather>, Promise<StationObs> | null]>([
         fetchWeather({ ...req, signal, onProgress: showProgress("model") }),
         req.station
           ? fetchStationHours({
@@ -86,17 +97,18 @@ export async function analyse({ fetchIfNeeded = true } = {}) {
               endYear: req.endYear,
               signal,
               onProgress: showProgress("station"),
-            }).catch((e) => {
+            }).catch((e: unknown): StationObs => {
               if (signal.aborted) throw e;
-              return { error: e.message || String(e) };
+              return { error: (e as Error).message || String(e) };
             })
           : null,
       ]);
       if (token !== runCtl.token) return;
       Object.assign(state, { ...combineWind(wx, obs, req.station), wxKey: requestKey(req), req });
-    } catch (e) {
-      if (token !== runCtl.token || e?.name === "AbortError") return;
-      status(esc(e.message || e), "error");
+    } catch (e: unknown) {
+      const err = e as Error | null;
+      if (token !== runCtl.token || err?.name === "AbortError") return;
+      status(esc(err.message || String(e)), "error");
       return;
     } finally {
       if (token === runCtl.token) {
@@ -129,9 +141,13 @@ export async function analyse({ fetchIfNeeded = true } = {}) {
  * Uses the station's readings when it has enough of them (any amount above the minimum
  * when picked by hand); otherwise the weather model, with a note saying why.
  */
-export function combineWind(wx, obs, station) {
+export function combineWind(
+  wx: Weather,
+  obs: StationObs | null,
+  station: ChosenStation | null | undefined,
+): CombinedWind {
   if (!station) return { wx, source: null };
-  if (obs.error) return { wx, source: { station, error: obs.error } };
+  if ("error" in obs) return { wx, source: { station, error: obs.error } };
   const blended = blendStation(wx, obs);
   if (!blended || (!station.explicit && blended.stats.coverage < MIN_AUTO_COVERAGE)) {
     return { wx, source: { station, unused: blended ? blended.stats.coverage : 0 } };
@@ -139,13 +155,13 @@ export function combineWind(wx, obs, station) {
   return { wx: blended.wx, source: { station, stats: blended.stats } };
 }
 
-export function onChange(name) {
+export function onChange(name: string): void {
   if (name === "apiKey") {
     localStorage.setItem(API_KEY_STORAGE, form.elements.apiKey.value.trim());
     return;
   }
   if (name === "loadProfile") {
-    const preset = LOAD_PRESETS[form.elements.loadProfile.value];
+    const preset = loadPreset(form.elements.loadProfile.value);
     if (preset) setForm({ loadHourly: preset.hourly.join(", "), loadMonthly: preset.monthly.join(", ") });
   }
   if (name === "loadHourly" || name === "loadMonthly") form.elements.loadProfile.value = "custom";

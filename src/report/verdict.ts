@@ -1,10 +1,21 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // The headline verdict and the physical-limit (Betz cap) status line.
 import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, capitalize } from "../app/format.ts";
 import { state } from "../app/state.ts";
+import type { CurveCheck } from "../model/powerCurve.ts";
+import type { ModelParams, SimResult } from "../model/simulate.ts";
 
-export function verdictFor(r) {
+/** How a verdict or note is styled. */
+export type VerdictClass = "good" | "warn" | "bad";
+
+/** The headline judgement of a run: style, short label and the sentence behind it. */
+export interface Verdict {
+  cls: VerdictClass;
+  label: string;
+  text: string;
+}
+
+export function verdictFor(r: SimResult): Verdict {
   const pb = r.econ.payback;
   if (pb <= 10)
     return {
@@ -18,11 +29,11 @@ export function verdictFor(r) {
   return { cls: "bad", label: "Not viable", text: "the turbines' savings don't cover their maintenance" };
 }
 
-export function renderVerdict(r) {
+export function renderVerdict(r: SimResult): void {
   const v = verdictFor(r);
-  let tag = v;
+  let tag: Pick<Verdict, "cls" | "label"> = v;
   let head = capitalize(v.text);
-  let lines = []; // the figures under the headline carry the numbers
+  let lines: string[] = []; // the figures under the headline carry the numbers
   if (state.capped) {
     const c = verdictFor(state.capped);
     tag = { cls: "bad", label: "Unverified" };
@@ -37,8 +48,8 @@ export function renderVerdict(r) {
 }
 
 /** Says what the Betz cap does for the current curve, next to the checkbox, so toggling it never looks inert. */
-export function renderClampStatus(r, p, check) {
-  let text;
+export function renderClampStatus(r: SimResult, p: ModelParams, check: CurveCheck): void {
+  let text: string;
   if (check.worstRatio <= 1) {
     text = `This curve stays within the limit at every wind speed (at most ${pct(check.worstRatio)} of it), so capping changes nothing.`;
   } else if (p.clampPhysics) {

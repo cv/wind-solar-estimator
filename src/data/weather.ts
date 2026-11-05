@@ -10,9 +10,97 @@ const ARCHIVE_COMMERCIAL = "https://customer-archive-api.open-meteo.com/v1/archi
 const CONCURRENCY = 4;
 const MAX_RETRIES = 4;
 
-const memory = new Map();
-const sleep = (ms, signal) =>
-  new Promise((resolve, reject) => {
+/** What fetchWeather loads: a site, whole calendar years and the PV panel orientation. */
+export interface WeatherRequest {
+  lat: number;
+  lon: number;
+  startYear: number;
+  endYear: number;
+  /** Panel tilt from horizontal, degrees. */
+  tilt: number;
+  /** Panel azimuth, Open-Meteo's convention: 0 = south, −90 = east, 90 = west, 180 = north. */
+  azimuth: number;
+  /** Open-Meteo commercial API key; empty or absent uses the free API. */
+  apiKey?: string;
+  onProgress?: (done: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
+/**
+ * Hourly weather for a site, as dense parallel arrays (hours with any missing value are
+ * dropped). Calendar fields are local standard time; t is the UTC hour number.
+ */
+export interface Weather {
+  /** Number of hours (length of every array). */
+  n: number;
+  /** Hours dropped because a value was missing. */
+  missing: number;
+  /** Number of calendar years covered. */
+  years: number;
+  startYear: number;
+  endYear: number;
+  /** Centre of the model grid cell used. */
+  gridLat: number;
+  gridLon: number;
+  /** Model grid cell elevation (m). */
+  elevation: number;
+  /** IANA time zone of the site, e.g. "America/Edmonton". */
+  timezone: string;
+  /** UTC hour number (hours since 1970), to line up with station records. */
+  t: Int32Array;
+  year: Uint16Array;
+  /** 0–11. */
+  month: Uint8Array;
+  /** 0–23. */
+  hour: Uint8Array;
+  /** Wind speed at 10 m and 100 m, km/h. */
+  w10: Float32Array;
+  w100: Float32Array;
+  /** Air temperature at 2 m, °C. */
+  temp: Float32Array;
+  /** Global tilted irradiance on the panel plane, W/m². */
+  gti: Float32Array;
+}
+
+/** Open-Meteo archive API response (JSON, timeformat=unixtime); reason is set on errors. */
+interface ArchiveResponse {
+  latitude: number;
+  longitude: number;
+  elevation?: number;
+  timezone: string;
+  utc_offset_seconds?: number;
+  hourly?: {
+    time: number[];
+    wind_speed_10m: (number | null)[];
+    wind_speed_100m: (number | null)[];
+    temperature_2m: (number | null)[];
+    global_tilted_irradiance: (number | null)[];
+  };
+  error?: boolean;
+  reason?: string;
+}
+
+/** One year of weather as cached in IndexedDB; missing values are NaN. */
+interface YearPart {
+  latitude: number;
+  longitude: number;
+  elevation: number;
+  timezone: string;
+  /** Seconds to add to UTC for local standard time. */
+  offset: number;
+  /** Unix seconds (UTC). */
+  time: Float64Array;
+  w10: Float32Array;
+  w100: Float32Array;
+  temp: Float32Array;
+  gti: Float32Array;
+}
+
+type Column = "t" | "year" | "month" | "hour" | "w10" | "w100" | "temp" | "gti";
+
+const memory = new Map<string, Weather>();
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
     const t = setTimeout(resolve, ms);
     signal?.addEventListener(
       "abort",
@@ -30,25 +118,35 @@ const sleep = (ms, signal) =>
  * IndexedDB. Returns dense typed arrays in local standard time.
  * azimuth uses Open-Meteo's convention: 0 = south, −90 = east, 90 = west, 180 = north.
  */
-export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth, apiKey, onProgress, signal }) {
+export async function fetchWeather({
+  lat,
+  lon,
+  startYear,
+  endYear,
+  tilt,
+  azimuth,
+  apiKey,
+  onProgress,
+  signal,
+}: WeatherRequest): Promise<Weather> {
   lat = Math.round(lat * 1e4) / 1e4;
   lon = Math.round(lon * 1e4) / 1e4;
   const key = [lat, lon, startYear, endYear, tilt, azimuth].join("|");
   if (memory.has(key)) return memory.get(key);
 
   // Each year is cached on its own, so a failed or interrupted download resumes where it stopped.
-  const years = [];
+  const years: number[] = [];
   for (let y = startYear; y <= endYear; y++) years.push(y);
-  const parts: any[] = Array.from({ length: years.length });
+  const parts: YearPart[] = Array.from({ length: years.length });
   let done = 0;
   onProgress?.(0, years.length);
 
   let next = 0;
-  const worker = async () => {
+  const worker = async (): Promise<void> => {
     while (next < years.length) {
       const idx = next++;
       const yearKey = ["y", lat, lon, years[idx], tilt, azimuth].join("|");
-      let part = await dbGet(yearKey);
+      let part = await dbGet<YearPart>(yearKey);
       if (!part) {
         part = compactYear(await fetchYear({ lat, lon, year: years[idx], tilt, azimuth, apiKey, signal }));
         dbPut(yearKey, part); // best effort, not awaited
@@ -60,7 +158,7 @@ export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, years.length) }, worker));
 
   const offset = parts[0].offset;
-  const cols = { t: [], year: [], month: [], hour: [], w10: [], w100: [], temp: [], gti: [] };
+  const cols: Record<Column, number[]> = { t: [], year: [], month: [], hour: [], w10: [], w100: [], temp: [], gti: [] };
   let missing = 0;
   for (const part of parts) {
     for (let i = 0; i < part.time.length; i++) {
@@ -85,7 +183,7 @@ export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth
   }
   if (!cols.w10.length) throw new Error("No weather data returned for this location and period");
 
-  const wx = {
+  const wx: Weather = {
     n: cols.w10.length,
     missing,
     years: years.length,
@@ -109,7 +207,7 @@ export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth
 }
 
 /** Typed arrays keep the IndexedDB cache small; missing values become NaN. */
-function compactYear(json) {
+function compactYear(json: ArchiveResponse): YearPart {
   const h = json.hourly;
   const col = (a: (number | null)[]) => Float32Array.from(a, (x) => (x == null ? NaN : x));
   return {
@@ -126,7 +224,17 @@ function compactYear(json) {
   };
 }
 
-async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }) {
+interface YearRequest {
+  lat: number;
+  lon: number;
+  year: number;
+  tilt: number;
+  azimuth: number;
+  apiKey?: string;
+  signal?: AbortSignal;
+}
+
+async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: YearRequest): Promise<ArchiveResponse> {
   const q = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
@@ -146,7 +254,7 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }) {
   for (let attempt = 0; ; attempt++) {
     const retry = attempt < MAX_RETRIES;
     const wait = () => sleep(10000 * (attempt + 1), signal);
-    let res, text;
+    let res: Response, text: string;
     try {
       res = await fetch(url, { signal });
       text = await res.text();
@@ -158,9 +266,9 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }) {
       } // network hiccup
       throw new Error(`Couldn't reach the weather service for ${year}: ${e.message}`);
     }
-    let json = null;
+    let json: ArchiveResponse | null = null;
     try {
-      json = JSON.parse(text);
+      json = JSON.parse(text) as ArchiveResponse;
     } catch {
       /* not JSON, e.g. a proxy error page */
     }
@@ -180,7 +288,7 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }) {
   }
 }
 
-export async function clearWeatherCache() {
+export async function clearWeatherCache(): Promise<void> {
   memory.clear();
   await dbClear();
 }

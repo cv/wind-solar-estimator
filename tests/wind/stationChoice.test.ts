@@ -20,7 +20,8 @@ test("auto station choice prefers the record that covers the period", () => {
   const old = { id: "aut", distanceKm: 5, rise: 53, first: 1994, last: 2012 };
   const climate = { id: "climate", distanceKm: 5.6, rise: 53, first: 2010, last: 2026 };
   const town = { id: "town", distanceKm: 5, rise: 53, first: 2011, last: 2026 };
-  const missing = (s) => 20 - (Math.min(s.last, 2025) - Math.max(s.first, 2006) + 1);
+  const missing = (s: { first: number; last: number }): number =>
+    20 - (Math.min(s.last, 2025) - Math.max(s.first, 2006) + 1);
   assert.equal(pickStation([old, climate, town], () => true, missing).id, "climate");
   assert.equal(pickStation([old, climate, town], () => true).id, "aut"); // distance and height alone
 });

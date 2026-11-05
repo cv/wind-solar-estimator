@@ -1,18 +1,19 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // The Leaflet map: site marker, station pins and place search.
 import { analyse, onChange } from "../app/analyse.ts";
 import { COLORS } from "../app/constants.ts";
 import { $, form } from "../app/dom.ts";
 import { esc } from "../app/format.ts";
 import { state } from "../app/state.ts";
+import type { ChosenStation, RankedStation } from "../app/state.ts";
+import type * as Leaflet from "leaflet";
 import { searchPlaces } from "../data/places.ts";
 import { stationPlace, riseText, chooseWindSource } from "./stationPicker.ts";
 
-export function renderStationPins(list, active) {
+export function renderStationPins(list: readonly RankedStation[], active: ChosenStation | null): void {
   if (!state.map) return;
   state.stationLayer?.remove();
   state.stationLayer = L.layerGroup(
-    list.map((s) => {
+    list.map((s): Leaflet.CircleMarker => {
       const on = active?.id === s.id;
       const m = L.circleMarker([s.lat, s.lon], {
         radius: on ? 7 : 5,
@@ -29,10 +30,10 @@ export function renderStationPins(list, active) {
     }),
   ).addTo(state.map);
   // The picker is the keyboard route to the same choice, so the pins aren't tab stops.
-  state.stationLayer.eachLayer((m) => m.getElement()?.setAttribute("tabindex", "-1"));
+  state.stationLayer.eachLayer((m) => (m as Leaflet.CircleMarker).getElement()?.setAttribute("tabindex", "-1"));
 }
 
-export function initMap() {
+export function initMap(): void {
   if (typeof L === "undefined") {
     $("#map").hidden = true;
     return;
@@ -51,11 +52,11 @@ export function initMap() {
     const ll = marker.getLatLng();
     setLocation(ll.lat, ll.lng, "");
   });
-  map.on("click", (e) => setLocation(e.latlng.lat, e.latlng.lng, ""));
+  map.on("click", (e: Leaflet.LeafletMouseEvent) => setLocation(e.latlng.lat, e.latlng.lng, ""));
   Object.assign(state, { map, marker });
 }
 
-export function setLocation(lat, lon, name, { pan = false } = {}) {
+export function setLocation(lat: number, lon: number, name: string, { pan = false }: { pan?: boolean } = {}): void {
   lon = ((((lon + 180) % 360) + 360) % 360) - 180;
   form.elements.lat.value = lat.toFixed(4);
   form.elements.lon.value = lon.toFixed(4);
@@ -66,9 +67,9 @@ export function setLocation(lat, lon, name, { pan = false } = {}) {
   onChange("lat");
 }
 
-export async function placeSearch() {
-  const q = $("#placeSearch").value.trim();
-  const ul = $("#placeResults");
+export async function placeSearch(): Promise<void> {
+  const q = $<HTMLInputElement>("#placeSearch").value.trim();
+  const ul = $<HTMLUListElement>("#placeResults");
   if (!q) {
     ul.hidden = true;
     return;
@@ -96,6 +97,6 @@ export async function placeSearch() {
       ul.append(li);
     }
   } catch (e) {
-    ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">${esc(e.message)}</li>`;
+    ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">${esc((e as Error).message)}</li>`;
   }
 }

@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkHomogeneity } from "../../src/wind/homogeneity.ts";
+import { checkHomogeneity, type YearlyMeans } from "../../src/wind/homogeneity.ts";
 import { close } from "../helpers.ts";
 
 /** Annual means for 2006–2025: the model wobbles from year to year, the station follows it times ratio(year). */
-function yearlyRecord(ratio, noise = 0.03) {
-  const out = [];
+function yearlyRecord(ratio: (year: number) => number, noise = 0.03): YearlyMeans[] {
+  const out: YearlyMeans[] = [];
   for (let y = 2006; y <= 2025; y++) {
     const model = 9 + Math.sin(y * 1.7); // windy and calm years
     const wobble = 1 + noise * Math.sin(y * 2.3 + 1); // year-to-year scatter in the ratio

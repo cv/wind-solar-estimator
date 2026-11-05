@@ -1,6 +1,15 @@
 // Typical load shapes (hourly and monthly multipliers) for the yearly consumption.
 
-export const LOAD_PRESETS = {
+/** A named load shape: 24 hourly and 12 monthly multipliers. */
+export interface LoadPreset {
+  label: string;
+  hourly: readonly number[];
+  monthly: readonly number[];
+}
+
+export type LoadProfileKey = "residential" | "farm" | "greenhouse" | "flat";
+
+export const LOAD_PRESETS: Readonly<Record<LoadProfileKey, LoadPreset>> = {
   residential: {
     label: "Farm house / residential",
     hourly: [
@@ -27,7 +36,7 @@ export const LOAD_PRESETS = {
   },
   flat: {
     label: "Flat (constant load)",
-    hourly: Array(24).fill(1),
-    monthly: Array(12).fill(1),
+    hourly: Array<number>(24).fill(1),
+    monthly: Array<number>(12).fill(1),
   },
 };

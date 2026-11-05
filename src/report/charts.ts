@@ -1,31 +1,44 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // Chart.js charts: wind distribution, monthly energy, imports, battery charge, yearly wind and power curve.
+import type {
+  Chart as ChartJs,
+  ChartConfiguration,
+  ChartConfigurationCustomTypesPerDataset,
+  ChartType,
+  Color,
+  LegendItem,
+  LegendOptions,
+} from "chart.js";
 import { MONTHS, COLORS } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { fmt } from "../app/format.ts";
 import { state } from "../app/state.ts";
 import { betzLimitW } from "../model/physics.ts";
 import { makeCurveFn } from "../model/powerCurve.ts";
+import type { ModelParams, SimResult } from "../model/simulate.ts";
+
+/** A chart for drawChart: the type may be left to the datasets (mixed bar and line charts). */
+export type ChartSpec = ChartConfiguration | ChartConfigurationCustomTypesPerDataset;
 
 // Legend keys match the marks: a swatch for bars, a short line (dashed if the series is) for lines.
-export const legendLabels = {
+export const legendLabels: Partial<LegendOptions<ChartType>["labels"]> = {
   usePointStyle: true,
   boxHeight: 8,
   pointStyleWidth: 16,
-  generateLabels(chart) {
-    return Chart.defaults.plugins.legend.labels.generateLabels(chart).map((item) => {
+  generateLabels(chart: ChartJs): LegendItem[] {
+    return Chart.defaults.plugins.legend.labels.generateLabels(chart).map((item): LegendItem => {
       const ds = chart.data.datasets[item.datasetIndex];
-      return (ds.type || chart.config.type) === "line"
-        ? { ...item, pointStyle: "line", strokeStyle: ds.borderColor, lineWidth: 2.5 }
+      // A live chart's config always has its type (mixed charts get the default one); these charts use plain colours.
+      return (ds.type || (chart.config as ChartConfiguration).type) === "line"
+        ? { ...item, pointStyle: "line", strokeStyle: ds.borderColor as Color, lineWidth: 2.5 }
         : { ...item, pointStyle: "rect", lineWidth: 0 };
     });
   },
 };
 
-export function drawChart(id, config) {
+export function drawChart(id: string, config: ChartSpec): void {
   if (typeof Chart === "undefined") return;
   state.charts[id]?.destroy();
-  state.charts[id] = new Chart(document.getElementById(id), {
+  state.charts[id] = new Chart(document.getElementById(id) as HTMLCanvasElement, {
     ...config,
     options: {
       responsive: true,
@@ -38,9 +51,13 @@ export function drawChart(id, config) {
   });
 }
 
-export const axis = (title, extra = {}) => ({ title: { display: true, text: title }, ...extra });
+/** A scale with a title, plus any other scale options. */
+export const axis = <T extends object = Record<never, never>>(
+  title: string,
+  extra: T = {} as T,
+): { title: { display: boolean; text: string } } & T => ({ title: { display: true, text: title }, ...extra });
 
-export function renderCharts(r, p) {
+export function renderCharts(r: SimResult, p: ModelParams): void {
   // Wind speed distribution and energy by speed
   let last = r.hist.hours.length - 1;
   while (last > 0 && r.hist.hours[last] < 1 && r.hist.energy[last] < 1) last--;
@@ -77,10 +94,10 @@ export function renderCharts(r, p) {
     },
   });
 
-  const round = (a) => a.map((x) => Math.round(x));
+  const round = (a: readonly number[]): number[] => a.map((x) => Math.round(x));
   drawChart("chMonthly", {
     data: {
-      labels: MONTHS,
+      labels: [...MONTHS],
       datasets: [
         { type: "bar", label: "Wind", data: round(r.monthly.wind), backgroundColor: COLORS.wind, stack: "gen" },
         { type: "bar", label: "Solar", data: round(r.monthly.pv), backgroundColor: COLORS.solar, stack: "gen" },
@@ -100,7 +117,7 @@ export function renderCharts(r, p) {
   drawChart("chImport", {
     type: "bar",
     data: {
-      labels: MONTHS,
+      labels: [...MONTHS],
       datasets: [
         { label: "Solar + battery only", data: round(r.monthly.importPv), backgroundColor: COLORS.grey },
         { label: "With wind", data: round(r.monthly.importBoth), backgroundColor: COLORS.wind },
@@ -137,7 +154,7 @@ export function renderCharts(r, p) {
 
   const curve = makeCurveFn(p.curvePts);
   const speeds = Array.from({ length: 61 }, (_, i) => i);
-  const positive = (x) => (x > 0 ? x : null);
+  const positive = (x: number): number | null => (x > 0 ? x : null);
   drawChart("chCurve", {
     type: "line",
     data: {
@@ -167,8 +184,12 @@ export function renderCharts(r, p) {
           type: "logarithmic",
           min: 0.1,
           ticks: {
-            callback: (v) =>
-              [0.1, 1, 10, 100, 1000, 10000, 100000].includes(v) ? (v >= 1000 ? `${v / 1000}k` : String(v)) : "",
+            callback: (v: string | number): string =>
+              typeof v === "number" && [0.1, 1, 10, 100, 1000, 10000, 100000].includes(v)
+                ? v >= 1000
+                  ? `${v / 1000}k`
+                  : String(v)
+                : "",
           },
         }),
       },
@@ -176,12 +197,13 @@ export function renderCharts(r, p) {
   });
 }
 
-export function renderSoc() {
+export function renderSoc(): void {
   const r = state.result;
   if (!r) return;
-  const mo = Number($("#socMonth").value) || 0;
+  const mo = Number($<HTMLSelectElement>("#socMonth").value) || 0;
   const hours = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
-  const asPct = (a) => a.map((x) => (x == null ? null : Math.round(x * 1000) / 10));
+  const asPct = (a: readonly (number | null)[]): (number | null)[] =>
+    a.map((x) => (x == null ? null : Math.round(x * 1000) / 10));
   drawChart("chSoc", {
     type: "line",
     data: {

@@ -7,16 +7,26 @@
  * on the same plain 18 km away, and of several stations in one town the one whose record
  * spans the period wins.
  */
+/** What stationScore needs from a station: distance from the site and elevation difference (m, NaN or absent if unknown). */
+export interface Candidate {
+  distanceKm: number;
+  rise?: number;
+}
+
 export const KM_PER_METRE_RISE = 0.1;
 export const KM_PER_MISSING_YEAR = 2;
-export const stationScore = (s, missingYears = 0) =>
+export const stationScore = (s: Candidate, missingYears: number = 0): number =>
   s.distanceKm +
   (Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0) +
   Math.max(0, missingYears) * KM_PER_MISSING_YEAR;
 
 /** The station "auto" picks: lowest score among those that pass ok(s); missing(s) = years of the period it lacks. */
-export function pickStation(list, ok, missing: (s: any) => number = () => 0) {
-  let best = null,
+export function pickStation<T extends Candidate>(
+  list: readonly T[],
+  ok: (s: NoInfer<T>) => boolean,
+  missing: (s: NoInfer<T>) => number = () => 0,
+): T | null {
+  let best: T | null = null,
     bestScore = Infinity;
   for (const s of list) {
     if (!ok(s)) continue;

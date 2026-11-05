@@ -1,16 +1,17 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // Headline figures and supporting statistics.
 import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, money } from "../app/format.ts";
+import type { DataRequest } from "../app/state.ts";
 import { state } from "../app/state.ts";
+import type { ModelParams, SimResult } from "../model/simulate.ts";
 
 /** One figure: label, value (with optional unit) and a supporting line. */
-export const figure = (label, value, unit, sub, cls = "") =>
+export const figure = (label: string, value: string, unit: string, sub: string, cls: string = ""): string =>
   `<div><dt>${esc(label)}</dt><dd class="value ${cls}">${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>` +
   (sub ? `<dd class="sub">${esc(sub)}</dd>` : "") +
   `</div>`;
 
-export function renderFigures(r, p, req) {
+export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest): void {
   const A = r.pvOnly,
     B = r.withWind,
     e = r.econ;
@@ -26,7 +27,7 @@ export function renderFigures(r, p, req) {
       : figure("Simple payback", "Never", "", `on ${money(e.capex)} installed`),
   ].join("");
 
-  const stat = (label, value, unit, sub) =>
+  const stat = (label: string, value: string, unit: string, sub: string): string =>
     `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
   // Supporting figures only: anything already in the summary or the assumptions isn't repeated here.
   $("#stats").innerHTML = [

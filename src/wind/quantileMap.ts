@@ -2,7 +2,13 @@
 
 const QUANTILES = 200;
 
-function quantiles(sorted, q) {
+/** A fitted mapping: matching quantiles of the source (qx) and target (qy) distributions. */
+export interface QuantileMap {
+  qx: Float64Array;
+  qy: Float64Array;
+}
+
+function quantiles(sorted: Float64Array, q: number): Float64Array {
   const out = new Float64Array(q);
   const last = sorted.length - 1;
   for (let k = 0; k < q; k++) {
@@ -15,14 +21,14 @@ function quantiles(sorted, q) {
 }
 
 /** Fits a monotone mapping that turns the distribution of x into that of y (paired samples). */
-export function fitQuantileMap(x, y, q = QUANTILES) {
+export function fitQuantileMap(x: ArrayLike<number>, y: ArrayLike<number>, q: number = QUANTILES): QuantileMap {
   const xs = Float64Array.from(x).sort();
   const ys = Float64Array.from(y).sort();
   return { qx: quantiles(xs, q), qy: quantiles(ys, q) };
 }
 
 /** Applies a fitted mapping; beyond the fitted range it scales in proportion. */
-export function applyQuantileMap({ qx, qy }, v) {
+export function applyQuantileMap({ qx, qy }: QuantileMap, v: number): number {
   const n = qx.length;
   if (v <= qx[0]) return qx[0] > 0 ? (qy[0] * v) / qx[0] : qy[0];
   if (v >= qx[n - 1]) return qx[n - 1] > 0 ? (qy[n - 1] * v) / qx[n - 1] : qy[n - 1];

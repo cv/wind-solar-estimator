@@ -4,7 +4,7 @@
 // Licence – Canada. Everything downloaded is cached in IndexedDB, so a site is fetched once.
 
 import { dbGet, dbPut, memory } from "./cache.ts";
-import { rad, distanceKm, direction } from "./geo.ts";
+import { rad, distanceKm, direction, type CompassPoint } from "./geo.ts";
 
 const API = "https://api.weather.gc.ca/collections";
 const LIST_TTL_MS = 30 * 86400e3; // station lists change rarely
@@ -12,8 +12,65 @@ const CONCURRENCY = 3; // a shared public service: a few requests at a time is p
 const MAX_RETRIES = 3;
 export const SEARCH_RADIUS_KM = 100;
 
-const sleep = (ms, signal) =>
-  new Promise((resolve, reject) => {
+/** A station as listed (and cached): no site-dependent fields. */
+export interface StationRecord {
+  id: string;
+  rawName: string;
+  lat: number;
+  lon: number;
+  /** Metres above sea level; NaN when the list has none. */
+  elevation: number;
+  /** First and last year of its hourly record. */
+  first: number;
+  last: number;
+}
+
+/** A station near the site, as findStations returns it. */
+export interface Station extends StationRecord {
+  name: string;
+  distanceKm: number;
+  /** Direction from the site to the station. */
+  direction: CompassPoint;
+}
+
+/** Hourly readings: UTC hour numbers (hours since 1970) and wind speeds (km/h at 10 m), parallel arrays. */
+export interface StationHours {
+  hours: Int32Array;
+  wind: Uint8Array;
+}
+
+export interface StationHoursRequest {
+  id: string;
+  startYear: number;
+  endYear: number;
+  onProgress?: (done: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
+/** A station list as stored in IndexedDB. */
+interface CachedStationList {
+  fetchedAt: number;
+  list: StationRecord[];
+}
+
+/** One feature of the climate-stations collection (GeoJSON), with the requested properties. */
+interface ClimateStationFeature {
+  geometry?: { coordinates?: [lon: number, lat: number] } | null;
+  properties: {
+    STATION_NAME?: string | null;
+    CLIMATE_IDENTIFIER: string | number;
+    ELEVATION?: string | number | null;
+    HLY_FIRST_DATE?: string | null;
+    HLY_LAST_DATE?: string | null;
+  };
+}
+
+interface ClimateStationsResponse {
+  features?: ClimateStationFeature[];
+}
+
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
     const t = setTimeout(resolve, ms);
     signal?.addEventListener(
       "abort",
@@ -26,11 +83,12 @@ const sleep = (ms, signal) =>
   });
 
 /** Rough box around Canada: outside it there are no stations to look for. */
-export const nearCanada = (lat, lon) => lat >= 41.5 && lat <= 84 && lon >= -141.5 && lon <= -52;
+export const nearCanada = (lat: number, lon: number): boolean =>
+  lat >= 41.5 && lat <= 84 && lon >= -141.5 && lon <= -52;
 
 const KEEP_UPPER = new Set(["AAFC", "CDA", "AUT", "AWOS", "RCS", "CS", "MCS", "EPF", "UA"]);
 /** "PINCHER CREEK A" -> "Pincher Creek A" (station codes and suffixes stay as they are). */
-export const stationLabel = (name) =>
+export const stationLabel = (name: string): string =>
   name
     .split(/\s+/)
     .map((w) => {
@@ -46,18 +104,18 @@ export const stationLabel = (name) =>
  * distance, direction from the site and the years its hourly record covers.
  */
 export async function findStations(
-  lat,
-  lon,
+  lat: number,
+  lon: number,
   { radiusKm = SEARCH_RADIUS_KM, signal }: { radiusKm?: number; signal?: AbortSignal } = {},
-) {
+): Promise<Station[]> {
   if (!nearCanada(lat, lon)) return [];
   // Lists are fetched and cached per 0.1° tile, so small moves of the pin reuse them.
   const cLat = Math.round(lat * 10) / 10,
     cLon = Math.round(lon * 10) / 10;
   const key = `stations3|${cLat}|${cLon}|${radiusKm}`; // v2: no longer trusts HAS_HOURLY_DATA; v3: raw names
-  let list = memory.get(key);
+  let list = memory.get(key) as StationRecord[] | undefined;
   if (!list) {
-    const cached = await dbGet(key);
+    const cached = await dbGet<CachedStationList>(key);
     if (cached && Date.now() - cached.fetchedAt < LIST_TTL_MS) list = cached.list;
   }
   if (!list) {
@@ -72,10 +130,12 @@ export async function findStations(
       bbox: [cLon - dLon, cLat - dLat, cLon + dLon, cLat + dLat].map((x) => x.toFixed(3)).join(","),
       properties: "STATION_NAME,CLIMATE_IDENTIFIER,ELEVATION,HLY_FIRST_DATE,HLY_LAST_DATE",
     });
-    const json = JSON.parse(await getText(`${API}/climate-stations/items?${q}`, signal, "the station list"));
+    const json = JSON.parse(
+      await getText(`${API}/climate-stations/items?${q}`, signal, "the station list"),
+    ) as ClimateStationsResponse;
     list = (json.features || [])
       .filter((f) => f.geometry?.coordinates && f.properties.HLY_FIRST_DATE)
-      .map((f) => ({
+      .map((f): StationRecord => ({
         id: String(f.properties.CLIMATE_IDENTIFIER),
         rawName: String(f.properties.STATION_NAME || f.properties.CLIMATE_IDENTIFIER), // labelled on use, so label fixes apply to cached lists
         lat: f.geometry.coordinates[1],
@@ -84,11 +144,11 @@ export async function findStations(
         first: Number(String(f.properties.HLY_FIRST_DATE).slice(0, 4)),
         last: Number(String(f.properties.HLY_LAST_DATE).slice(0, 4)),
       }));
-    dbPut(key, { fetchedAt: Date.now(), list });
+    dbPut(key, { fetchedAt: Date.now(), list } satisfies CachedStationList);
   }
   memory.set(key, list);
   return list
-    .map((s) => ({
+    .map((s): Station => ({
       ...s,
       name: stationLabel(s.rawName),
       distanceKm: distanceKm(lat, lon, s.lat, s.lon),
@@ -102,18 +162,24 @@ export async function findStations(
  * Hourly wind speed (km/h at 10 m) for whole years, as parallel arrays of UTC hour
  * numbers (hours since 1970) and speeds. Hours with no reading are simply absent.
  */
-export async function fetchStationHours({ id, startYear, endYear, onProgress, signal }) {
-  const years = [];
+export async function fetchStationHours({
+  id,
+  startYear,
+  endYear,
+  onProgress,
+  signal,
+}: StationHoursRequest): Promise<StationHours> {
+  const years: number[] = [];
   for (let y = startYear; y <= endYear; y++) years.push(y);
-  const parts: any[] = Array.from({ length: years.length });
+  const parts: StationHours[] = Array.from({ length: years.length });
   let done = 0,
     next = 0;
   onProgress?.(0, years.length);
-  const worker = async () => {
+  const worker = async (): Promise<void> => {
     while (next < years.length) {
       const idx = next++;
       const key = `eccc|${id}|${years[idx]}`;
-      let part = memory.get(key) || (await dbGet(key));
+      let part = (memory.get(key) as StationHours | undefined) || (await dbGet<StationHours>(key));
       if (!part) {
         part = await fetchStationYear(id, years[idx], signal);
         dbPut(key, part); // past years never change, so they're kept for good
@@ -136,7 +202,7 @@ export async function fetchStationHours({ id, startYear, endYear, onProgress, si
   return { hours, wind };
 }
 
-async function fetchStationYear(id, year, signal) {
+async function fetchStationYear(id: string, year: number, signal?: AbortSignal): Promise<StationHours> {
   const q = new URLSearchParams({
     f: "csv",
     CLIMATE_IDENTIFIER: id,
@@ -148,13 +214,13 @@ async function fetchStationYear(id, year, signal) {
 }
 
 /** Parses the API's CSV (x, y, UTC_DATE, WIND_SPEED); rows without a wind reading are skipped. */
-export function parseStationCsv(text) {
+export function parseStationCsv(text: string): StationHours {
   const lines = text.split(/\r?\n/).filter(Boolean);
   const head = (lines[0] || "").split(",").map((s) => s.trim());
   const iT = head.indexOf("UTC_DATE"),
     iW = head.indexOf("WIND_SPEED");
-  const hours = [],
-    wind = [];
+  const hours: number[] = [],
+    wind: number[] = [];
   if (iT >= 0 && iW >= 0) {
     for (let k = 1; k < lines.length; k++) {
       const c = lines[k].split(",");
@@ -170,10 +236,10 @@ export function parseStationCsv(text) {
   return { hours: Int32Array.from(hours), wind: Uint8Array.from(wind) };
 }
 
-async function getText(url, signal, what) {
+async function getText(url: string, signal: AbortSignal | undefined, what: string): Promise<string> {
   for (let attempt = 0; ; attempt++) {
     const retry = attempt < MAX_RETRIES;
-    let res;
+    let res: Response | undefined;
     try {
       res = await fetch(url, { signal });
       if (res.ok) return await res.text();
@@ -190,6 +256,6 @@ async function getText(url, signal, what) {
   }
 }
 
-export function clearStationMemory() {
+export function clearStationMemory(): void {
   memory.clear();
 }

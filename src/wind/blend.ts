@@ -8,7 +8,36 @@
 // hour-by-hour 10 m -> 100 m shear, so the simulation itself needs no changes.
 
 import { fitQuantileMap, applyQuantileMap } from "./quantileMap.ts";
-import { checkHomogeneity } from "./homogeneity.ts";
+import { checkHomogeneity, type Homogeneity, type YearlyMeans } from "./homogeneity.ts";
+import type { Weather } from "../data/weather.ts";
+import type { StationHours } from "../data/stations.ts";
+
+/** The weather fields blendStation reads. */
+export type BlendWeather = Pick<Weather, "n" | "t" | "year" | "month" | "w10" | "w100">;
+
+/** Station against model over the hours both have (speeds km/h at 10 m). */
+export interface BlendStats {
+  hours: number;
+  /** Hours with a station reading. */
+  measured: number;
+  /** Hours filled from the model. */
+  filled: number;
+  /** measured / hours. */
+  coverage: number;
+  meanStation: number;
+  meanModel: number;
+  /** Mean of station speed³ over mean of model speed³. */
+  energyRatio: number;
+  correlation: number;
+  yearly: YearlyMeans[];
+  homogeneity: Homogeneity;
+}
+
+/** blendStation's result: the weather with blended w10 and w100, and the comparison stats. */
+export interface Blend<W extends BlendWeather = Weather> {
+  wx: W;
+  stats: BlendStats;
+}
 
 const SEASON = [0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 0]; // Dec–Feb, Mar–May, Jun–Aug, Sep–Nov
 const MIN_PAIRS_SEASON = 1000; // fewer than this and a season uses the all-year mapping
@@ -16,9 +45,9 @@ export const MIN_PAIRS = 500; // fewer than this (about three weeks) and the sta
 export const POOR_CORRELATION = 0.5; // below this, station and model follow different local winds
 
 /** Station speeds lined up with the model's hours (NaN where the station has no reading). */
-export function alignStation(t, obs) {
+export function alignStation(t: ArrayLike<number>, obs: StationHours): Float32Array {
   const out = new Float32Array(t.length).fill(NaN);
-  const index = new Map();
+  const index = new Map<number, number>();
   for (let i = 0; i < t.length; i++) index.set(t[i], i);
   for (let k = 0; k < obs.hours.length; k++) {
     const i = index.get(obs.hours[k]);
@@ -28,7 +57,7 @@ export function alignStation(t, obs) {
 }
 
 /** The model's shear exponent for one hour, as the simulation computes it. */
-export const shearAlpha = (w10, w100) =>
+export const shearAlpha = (w10: number, w100: number): number =>
   w10 > 1 && w100 > 0 ? Math.min(0.6, Math.max(0, Math.log10(w100 / w10))) : 1 / 7;
 
 /**
@@ -37,11 +66,11 @@ export const shearAlpha = (w10, w100) =>
  * { wx, stats }: wx is a copy of the weather with new w10 and w100 series; stats compare
  * station and model over the hours both have.
  */
-export function blendStation(wx, obs) {
+export function blendStation<W extends BlendWeather = Weather>(wx: W, obs: StationHours): Blend<W> | null {
   const st = alignStation(wx.t, obs);
   const n = wx.n;
-  const px = [[], [], [], []],
-    py = [[], [], [], []];
+  const px: number[][] = [[], [], [], []],
+    py: number[][] = [[], [], [], []];
   let pairs = 0,
     sx = 0,
     sy = 0,
@@ -50,7 +79,7 @@ export function blendStation(wx, obs) {
     sxy = 0,
     cx = 0,
     cy = 0;
-  const years = new Map(); // year -> [hours, shared hours, station sum, model sum]
+  const years = new Map<number, [number, number, number, number]>(); // year -> [hours, shared hours, station sum, model sum]
   for (let i = 0; i < n; i++) {
     const yr = years.get(wx.year[i]) ?? years.set(wx.year[i], [0, 0, 0, 0]).get(wx.year[i]);
     yr[0]++;
@@ -91,7 +120,12 @@ export function blendStation(wx, obs) {
 
   const yearly = [...years]
     .sort((a, b) => a[0] - b[0])
-    .map(([year, [h, k, s, m]]) => ({ year, coverage: k / h, station: k ? s / k : NaN, model: k ? m / k : NaN }));
+    .map(([year, [h, k, s, m]]): YearlyMeans => ({
+      year,
+      coverage: k / h,
+      station: k ? s / k : NaN,
+      model: k ? m / k : NaN,
+    }));
   const mx = sx / pairs,
     my = sy / pairs;
   const cov = sxy / pairs - mx * my;

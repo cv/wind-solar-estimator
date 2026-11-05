@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { alignStation, blendStation, shearAlpha, MIN_PAIRS } from "../../src/wind/blend.ts";
+import { alignStation, blendStation, shearAlpha, MIN_PAIRS, type BlendWeather } from "../../src/wind/blend.ts";
+import type { StationHours } from "../../src/data/stations.ts";
 import { close } from "../helpers.ts";
 
 /** A year of model weather with a repeating daily wind pattern; t counts UTC hours from 2020. */
@@ -28,9 +29,13 @@ function modelYear() {
 }
 
 /** Station readings derived from the model hours by f, skipping hours where skip(i) is true. */
-function stationFrom(wx, f, skip: (i: number) => boolean = () => false) {
-  const hours = [],
-    wind = [];
+function stationFrom(
+  wx: BlendWeather,
+  f: (v: number) => number,
+  skip: (i: number) => boolean = () => false,
+): StationHours {
+  const hours: number[] = [],
+    wind: number[] = [];
   for (let i = 0; i < wx.n; i++)
     if (!skip(i)) {
       hours.push(wx.t[i]);

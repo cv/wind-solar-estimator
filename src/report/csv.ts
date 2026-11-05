@@ -1,15 +1,15 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // CSV download of the report.
 import { readForm } from "../app/form.ts";
 import { state } from "../app/state.ts";
 import { assumptionRows, monthlyRows } from "./tables.ts";
 
-export function downloadCsv() {
+export function downloadCsv(): void {
   const { result: r, params: p, req, wx } = state;
   if (!r) return;
-  const q = (c) => (typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${String(c).replace(/"/g, '""')}"`);
+  const q = (c: string | number): string =>
+    typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${String(c).replace(/"/g, '""')}"`;
   const { head, rows, total } = monthlyRows(r);
-  const lines = [
+  const lines: (string | number)[][] = [
     ["Wind + solar site estimate", readForm().place || ""],
     ["Latitude", req.lat],
     ["Longitude", req.lon],

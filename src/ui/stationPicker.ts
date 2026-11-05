@@ -1,37 +1,41 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // Measured wind: finding nearby stations, choosing one, and the "Wind data" picker.
 import { onChange } from "../app/analyse.ts";
 import { AUTO_STATION_KM, ELEVATION_SAY_M } from "../app/constants.ts";
 import { $, form } from "../app/dom.ts";
 import { fmt } from "../app/format.ts";
 import { state } from "../app/state.ts";
+import type { ChosenStation, DataRequest, RankedStation } from "../app/state.ts";
 import { siteElevation } from "../data/elevation.ts";
 import { SEARCH_RADIUS_KM, nearCanada, findStations } from "../data/stations.ts";
+import type { Station } from "../data/stations.ts";
 import { renderStationPins } from "./map.ts";
 import { pickStation } from "../wind/stationChoice.ts";
 
+/** The years a run covers (inclusive), as resolveStation and its helpers read them. */
+export type Period = Pick<DataRequest, "startYear" | "endYear">;
+
 /** Starts (or reuses) the search for stations around the pin; resolves to a list, or null if the search failed. */
-export function loadStations() {
+export function loadStations(): Promise<RankedStation[] | null> {
   const lat = Number(form.elements.lat.value),
     lon = Number(form.elements.lon.value);
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90) return Promise.resolve([]);
   const key = `${lat.toFixed(3)}|${lon.toFixed(3)}`;
   if (state.stations.key === key) return state.stations.promise;
   // Each station's height above (+) or below (−) the site; "auto" weighs it against distance.
-  const promise = Promise.all([findStations(lat, lon), siteElevation(lat, lon)])
+  const promise: Promise<RankedStation[] | null> = Promise.all([findStations(lat, lon), siteElevation(lat, lon)])
     .then(([list, elevation]) =>
-      list.map((s) => ({
+      list.map((s): RankedStation => ({
         ...s,
         rise: elevation === null || !Number.isFinite(s.elevation) ? NaN : s.elevation - elevation,
       })),
     )
-    .catch((e) => {
+    .catch((e: unknown): null => {
       console.warn(e);
       return null;
     });
   state.stations = { key, promise, list: undefined };
   renderStationPicker();
-  promise.then((list) => {
+  promise.then((list): void => {
     if (state.stations.key !== key) return;
     state.stations.list = list;
     renderStationPicker();
@@ -39,10 +43,15 @@ export function loadStations() {
   return promise;
 }
 
-export const yearsOverlap = (s, req) => Math.min(s.last, req.endYear) - Math.max(s.first, req.startYear) + 1;
+export const yearsOverlap = (s: Station, req: Period): number =>
+  Math.min(s.last, req.endYear) - Math.max(s.first, req.startYear) + 1;
 
 /** The station whose wind to use, or null for the weather model alone. */
-export function resolveStation(choice, list, req) {
+export function resolveStation(
+  choice: string,
+  list: readonly RankedStation[] | null | undefined,
+  req: Period,
+): ChosenStation | null {
   if (choice === "model" || !list?.length) return null;
   if (choice.startsWith("eccc:")) {
     const picked = list.find((s) => s.id === choice.slice(5));
@@ -52,21 +61,27 @@ export function resolveStation(choice, list, req) {
 }
 
 /** Years of the period a station's record doesn't cover. */
-export const missingYears = (req) => (s) => req.endYear - req.startYear + 1 - Math.max(0, yearsOverlap(s, req));
+export const missingYears =
+  (req: Period) =>
+  (s: Station): number =>
+    req.endYear - req.startYear + 1 - Math.max(0, yearsOverlap(s, req));
 
 /** Stations "auto" may use: close enough, with enough years of records in the period. */
-export const autoEligible = (req) => (s) =>
-  s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= Math.min(5, req.endYear - req.startYear + 1);
+export const autoEligible =
+  (req: Period) =>
+  (s: Station): boolean =>
+    s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= Math.min(5, req.endYear - req.startYear + 1);
 
-export const stationPlace = (s) => (s.distanceKm < 1 ? "at the site" : `${fmt(s.distanceKm)} km ${s.direction}`);
-export const fromSite = (s) => (s.distanceKm < 1 ? "at the site" : `${stationPlace(s)} of the site`);
+export const stationPlace = (s: Station): string =>
+  s.distanceKm < 1 ? "at the site" : `${fmt(s.distanceKm)} km ${s.direction}`;
+export const fromSite = (s: Station): string => (s.distanceKm < 1 ? "at the site" : `${stationPlace(s)} of the site`);
 /** ", 330 m higher" when the height difference is worth mentioning. */
-export const riseText = (s, joiner = ", ") =>
+export const riseText = (s: RankedStation, joiner: string = ", "): string =>
   Math.abs(s.rise) >= ELEVATION_SAY_M ? `${joiner}${fmt(Math.abs(s.rise))} m ${s.rise > 0 ? "higher" : "lower"}` : "";
 
 /** The "Wind data" picker, its hint and the station pins on the map. */
-export function renderStationPicker() {
-  const sel = $("#stationSelect");
+export function renderStationPicker(): void {
+  const sel = $<HTMLSelectElement>("#stationSelect");
   const hint = $("#stationHint");
   const lat = Number(form.elements.lat.value),
     lon = Number(form.elements.lon.value);
@@ -75,7 +90,8 @@ export function renderStationPicker() {
   // The period, read leniently: validation messages belong to Analyse, not to this picker.
   const years = Number(form.elements.years.value),
     endYear = Number(form.elements.endYear.value);
-  const req = years >= 1 && endYear > 1900 ? { startYear: endYear - Math.round(years) + 1, endYear } : null;
+  const req: Period | null =
+    years >= 1 && endYear > 1900 ? { startYear: endYear - Math.round(years) + 1, endYear } : null;
   const active = list && req ? resolveStation(choice, list, req) : null;
 
   sel.replaceChildren(new Option("Weather model only (ERA5)", "model"));
@@ -89,7 +105,7 @@ export function renderStationPicker() {
   }
   sel.value = active ? `eccc:${active.id}` : "model";
 
-  let text;
+  let text: string;
   if (!nearCanada(lat, lon))
     text = "Measured station data is available for sites in Canada. Elsewhere the tool uses the weather model.";
   else if (list === undefined) text = "Looking for nearby weather stations…";
@@ -114,7 +130,7 @@ export function renderStationPicker() {
   renderStationPins(list || [], active);
 }
 
-export function chooseWindSource(value) {
+export function chooseWindSource(value: string): void {
   form.elements.windSource.value = value;
   renderStationPicker();
   onChange("windSource");

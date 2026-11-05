@@ -1,36 +1,52 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // Form <-> URL hash, input validation, and turning form values into a data request and model parameters.
 import { DEFAULTS, HASH_VERSION } from "./constants.ts";
+import type { FormInput, FormKey, FormOverrides, FormValues, StringFormKey } from "./constants.ts";
 import { $, form } from "./dom.ts";
+import type { FormField } from "./dom.ts";
 import { fmt } from "./format.ts";
+import type { DataRequest } from "./state.ts";
 import { LOAD_PRESETS } from "../model/load.ts";
+import type { LoadPreset } from "../model/load.ts";
 import { circleArea } from "../model/physics.ts";
 import { parseCurve } from "../model/powerCurve.ts";
+import type { CurvePoint } from "../model/powerCurve.ts";
+import type { ModelParams } from "../model/simulate.ts";
 
-export function setForm(values) {
-  for (const [k, v] of Object.entries(values)) {
-    const el = form.elements[k];
+/** The form's field names (DEFAULTS' keys). */
+const FORM_KEYS = Object.keys(DEFAULTS) as FormKey[];
+
+/** The load preset named key (any string, e.g. from a share link), if there is one. */
+export function loadPreset(key: string | undefined): LoadPreset | undefined {
+  return (LOAD_PRESETS as Readonly<Record<string, LoadPreset | undefined>>)[key];
+}
+
+/** A checkbox field, as opposed to a text-like one. */
+const isCheckbox = (el: FormField): el is HTMLInputElement => el.type === "checkbox";
+
+export function setForm(values: FormOverrides): void {
+  for (const [k, v] of Object.entries(values) as [string, string | boolean][]) {
+    const el: FormField | undefined = form.elements[k as FormKey];
     if (!el) continue;
-    if (el.type === "checkbox") el.checked = v === true || v === "1";
-    else el.value = v;
+    if (isCheckbox(el)) el.checked = v === true || v === "1";
+    else el.value = String(v);
   }
 }
 
-export function readForm() {
-  const out = {};
-  for (const k of Object.keys(DEFAULTS)) {
-    const el = form.elements[k];
-    out[k] = el.type === "checkbox" ? el.checked : el.value.trim();
+export function readForm(): FormInput {
+  const out: Record<string, string | boolean> = {};
+  for (const k of FORM_KEYS) {
+    const el: FormField = form.elements[k];
+    out[k] = isCheckbox(el) ? el.checked : el.value.trim();
   }
   out.apiKey = form.elements.apiKey.value.trim();
-  return out;
+  return out as unknown as FormInput;
 }
 
-export const asParam = (v) => (typeof v === "boolean" ? (v ? "1" : "0") : String(v));
+export const asParam = (v: string | boolean): string => (typeof v === "boolean" ? (v ? "1" : "0") : String(v));
 
-export function writeHash(v) {
+export function writeHash(v: FormValues): void {
   const q = new URLSearchParams();
-  for (const k of Object.keys(DEFAULTS)) {
+  for (const k of FORM_KEYS) {
     if ((k === "loadHourly" || k === "loadMonthly") && v.loadProfile in LOAD_PRESETS) continue; // implied by the profile
     if (k === "lat" || k === "lon" || asParam(v[k]) !== asParam(DEFAULTS[k])) q.set(k, asParam(v[k]));
   }
@@ -38,17 +54,27 @@ export function writeHash(v) {
   history.replaceState(null, "", `#${q}`);
 }
 
-export function readHash() {
-  const out: Record<string, any> = {};
+export function readHash(): FormOverrides {
+  const out: Record<string, string | boolean> = {};
   for (const [k, v] of new URLSearchParams(location.hash.slice(1))) {
-    if (k in DEFAULTS) out[k] = typeof DEFAULTS[k] === "boolean" ? v === "1" : v;
+    if (k in DEFAULTS) out[k] = typeof DEFAULTS[k as FormKey] === "boolean" ? v === "1" : v;
   }
-  return out;
+  return out as FormOverrides;
 }
 
-export class InputError extends Error {}
+/** A form value that failed validation; field is the offending input. */
+export class InputError extends Error {
+  field?: FormField;
+}
 
-export function invalid(key, message) {
+/** Bounds for num; an optional field may be left empty (num then returns null). */
+export interface NumOptions {
+  min?: number;
+  max?: number;
+  optional?: boolean;
+}
+
+export function invalid(key: FormKey, message: string): InputError {
   const el = form.elements[key];
   el?.classList.add("invalid");
   el?.setAttribute("aria-invalid", "true");
@@ -57,7 +83,14 @@ export function invalid(key, message) {
   return err;
 }
 
-export function num(v, key, label, { min = -Infinity, max = Infinity, optional = false } = {}) {
+export function num(v: FormInput, key: StringFormKey, label: string, opts?: NumOptions & { optional?: false }): number;
+export function num(v: FormInput, key: StringFormKey, label: string, opts: NumOptions): number | null;
+export function num(
+  v: FormInput,
+  key: StringFormKey,
+  label: string,
+  { min = -Infinity, max = Infinity, optional = false }: NumOptions = {},
+): number | null {
   if (v[key] === "" && optional) return null;
   const x = Number(v[key]);
   if (v[key] === "" || !Number.isFinite(x) || x < min || x > max) {
@@ -72,7 +105,7 @@ export function num(v, key, label, { min = -Infinity, max = Infinity, optional =
   return x;
 }
 
-export function list(v, key, label, n) {
+export function list(v: FormInput, key: StringFormKey, label: string, n: number): number[] {
   const xs = v[key]
     .split(/[\s,;]+/)
     .filter(Boolean)
@@ -83,7 +116,7 @@ export function list(v, key, label, n) {
 }
 
 /** What has to be downloaded: location, period and panel orientation. */
-export function dataRequest(v) {
+export function dataRequest(v: FormInput): DataRequest {
   const lat = num(v, "lat", "Latitude", { min: -90, max: 90 });
   const lon = num(v, "lon", "Longitude", { min: -180, max: 180 });
   const lastYear = new Date().getFullYear() - 1;
@@ -97,7 +130,7 @@ export function dataRequest(v) {
 }
 
 /** Frontal capture area (m²) and a short description of how it was entered. */
-export function captureParams(v) {
+export function captureParams(v: FormInput): Pick<ModelParams, "captureAreaM2" | "captureDesc"> {
   if (v.captureShape === "rect") {
     const w = num(v, "captureW", "Capture width", { min: 0.01, max: 500 });
     const h = num(v, "captureH", "Capture height", { min: 0.01, max: 500 });
@@ -108,7 +141,7 @@ export function captureParams(v) {
 }
 
 /** Shows the diameter or width × height fields to match the opening shape, and the area they give. */
-export function syncCapture() {
+export function syncCapture(): void {
   const el = form.elements;
   const rect = el.captureShape.value === "rect";
   // Switching to a rectangle for the first time: start from a square as wide as the diameter.
@@ -119,12 +152,12 @@ export function syncCapture() {
   $("#captureArea").textContent = area > 0 ? `Capture area ${fmt(area, area < 10 ? 2 : 1)} m².` : "";
 }
 
-export function modelParams(v) {
-  let curvePts;
+export function modelParams(v: FormInput): ModelParams {
+  let curvePts: CurvePoint[];
   try {
     curvePts = parseCurve(v.curve);
-  } catch (e) {
-    throw invalid("curve", e.message);
+  } catch (e: unknown) {
+    throw invalid("curve", (e as Error).message);
   }
   return {
     nTurbines: Math.round(num(v, "nTurbines", "Number of turbines", { min: 1, max: 100000 })),

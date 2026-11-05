@@ -2,6 +2,16 @@
 
 import { STD_RHO, circleArea, betzLimitW } from "./physics.ts";
 
+/** One point of a power curve: wind speed (km/h) and output (W). */
+export type CurvePoint = readonly [kmh: number, watts: number];
+
+/** checkCurve's result: the highest ratio of the curve to the physical limit, and the speed where it occurs. */
+export interface CurveCheck {
+  worstRatio: number;
+  /** Speed (km/h) of the worst point, or null when no point has power. */
+  atKmh: number | null;
+}
+
 export const EXAMPLE_ROTOR_M = 6;
 
 /**
@@ -10,9 +20,9 @@ export const EXAMPLE_ROTOR_M = 6;
  * 30 km/h and held there up to 100 km/h. It stays within the physical (Betz) limit at
  * every speed. Replace it with the real turbine's independently measured curve.
  */
-export function exampleCurve() {
+export function exampleCurve(): CurvePoint[] {
   const area = circleArea(EXAMPLE_ROTOR_M);
-  const pts = [
+  const pts: CurvePoint[] = [
     [0, 0],
     [5.9, 0],
   ];
@@ -26,8 +36,8 @@ export function exampleCurve() {
 }
 
 /** Parses "km/h, W" lines (commas, spaces, tabs or semicolons; # starts a comment). */
-export function parseCurve(text) {
-  const pts = [];
+export function parseCurve(text: string): CurvePoint[] {
+  const pts: CurvePoint[] = [];
   for (const line of String(text).split(/\r?\n/)) {
     const s = line.replace(/#.*/, "").trim();
     if (!s) continue;
@@ -41,12 +51,12 @@ export function parseCurve(text) {
   return pts.sort((a, b) => a[0] - b[0]);
 }
 
-export const formatCurve = (pts) => pts.map(([v, w]) => `${v}, ${w}`).join("\n");
+export const formatCurve = (pts: readonly CurvePoint[]): string => pts.map(([v, w]) => `${v}, ${w}`).join("\n");
 
 /** Linear interpolation of the curve; 0 above its last point (cut-out). */
-export function makeCurveFn(pts) {
+export function makeCurveFn(pts: readonly CurvePoint[]): (v: number) => number {
   const maxV = pts[pts.length - 1][0];
-  return (v) => {
+  return (v: number): number => {
     if (!(v >= 0) || v > maxV) return 0;
     if (v <= pts[0][0]) return pts[0][1];
     for (let i = 1; i < pts.length; i++) {
@@ -61,9 +71,9 @@ export function makeCurveFn(pts) {
 }
 
 /** How far the curve exceeds the physical limit for a capture area (ratio > 1 is impossible). */
-export function checkCurve(pts, areaM2, augmentation) {
+export function checkCurve(pts: readonly CurvePoint[], areaM2: number, augmentation: number): CurveCheck {
   let worst = 0;
-  let atKmh = null;
+  let atKmh: number | null = null;
   for (const [v, w] of pts) {
     if (v <= 0 || w <= 0) continue;
     const ratio = w / (betzLimitW(v, areaM2) * augmentation);

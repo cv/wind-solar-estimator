@@ -1,17 +1,24 @@
-// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // Report notes: power-curve, wind data and station-quality caveats.
 import { ELEVATION_NOTE_M } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, span } from "../app/format.ts";
 import { state } from "../app/state.ts";
+import type { Station } from "../data/stations.ts";
+import type { CurveCheck } from "../model/powerCurve.ts";
+import type { ModelParams, SimResult } from "../model/simulate.ts";
+import type { BlendStats } from "../wind/blend.ts";
+import type { Homogeneity } from "../wind/homogeneity.ts";
 import { renderClampStatus } from "./verdict.ts";
 import { missingYears, autoEligible, fromSite } from "../ui/stationPicker.ts";
 import { POOR_CORRELATION } from "../wind/blend.ts";
 import { pickStation } from "../wind/stationChoice.ts";
 
-export function renderNotes(r, p, check) {
+/** One report note: its style (info, caution or problem) and its HTML. */
+export type Note = [cls: "info" | "warn" | "bad", html: string];
+
+export function renderNotes(r: SimResult, p: ModelParams, check: CurveCheck): void {
   renderClampStatus(r, p, check);
-  const items = [];
+  const items: Note[] = [];
   if (check.worstRatio > 1) {
     const area = `${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m² of capture area (${p.captureDesc})`;
     const aug = p.augmentation > 1 ? `, even with ${fmt(p.augmentation, 1)}× duct augmentation` : "";
@@ -74,8 +81,8 @@ export function renderNotes(r, p, check) {
 }
 
 /** Notes on how far the station can be trusted: hour-by-hour agreement, and breaks in its record. */
-export function stationChecks(station, st, siteElevationM) {
-  const out = [];
+export function stationChecks(station: Station, st: BlendStats, siteElevationM: number): Note[] {
+  const out: Note[] = [];
   const name = esc(station.name);
   const rise = station.elevation - siteElevationM;
   if (Math.abs(rise) >= ELEVATION_NOTE_M) {
@@ -132,9 +139,9 @@ export function stationChecks(station, st, siteElevationM) {
 }
 
 /** One line on the station record's consistency, for the assumptions table. */
-export function homogeneityText(h) {
+export function homogeneityText(h: Homogeneity | null | undefined): string {
   if (!h || h.years < 5) return "";
-  const signed = (x) => `${x > 0 ? "+" : "−"}${pct(Math.abs(x))}`;
+  const signed = (x: number): string => `${x > 0 ? "+" : "−"}${pct(Math.abs(x))}`;
   if (h.issue === "step") return `; record steps ${signed(h.step.change)} relative to the model in ${h.step.year}`;
   if (h.issue === "trend")
     return `; record drifts ${signed(h.trend.change)} relative to the model over ${span(h.trend.from, h.trend.to)}`;
