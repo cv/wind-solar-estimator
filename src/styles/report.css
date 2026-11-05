@@ -387,3 +387,14 @@ html.scrubbing * {
   height: 320px;
   margin-top: var(--s3);
 }
+
+/* Savings by weather year beside the headline (report/figures.ts). */
+.spark {
+  display: block;
+  margin-top: var(--s1);
+  font-variant-numeric: tabular-nums;
+}
+.spark svg {
+  display: block;
+  margin-bottom: 2px;
+}

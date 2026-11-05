@@ -97,7 +97,8 @@ export interface SimResult {
   withWind: Scenario;
   /** kWh per calendar month (12 values each), per year. */
   monthly: Record<MonthlySeries, Kwh[]>;
-  yearly: Array<{ year: number; kwh: Kwh }>;
+  /** Per calendar year: wind energy, and what the turbines saved that year before maintenance. */
+  yearly: Array<{ year: number; kwh: Kwh; savings: number }>;
   /** Hours and wind energy per year by hub wind speed bin. */
   hist: { binKmh: Kmh; hours: number[]; energy: Kwh[] };
   socDay: { pvOnly: SocDay; withWind: SocDay };

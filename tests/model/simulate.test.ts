@@ -7,6 +7,7 @@ import { fraction, kmh, kw, kwh, metres, percent } from "../../src/model/units.t
 import type { Weather } from "../../src/data/weather.ts";
 import { at } from "../../src/util/checked.ts";
 import { close } from "../helpers.ts";
+import { savingsByYear, type YearMark } from "../../src/model/economics.ts";
 
 /** One year of identical hours, so results are easy to check by hand. */
 function syntheticYear({ w10 = 50, w100 = 50, temp = 15, gti = 0 } = {}): SimWeather & Pick<Weather, "missing"> {
@@ -123,4 +124,25 @@ test("a tower priced by the metre adds to each turbine's cost, so taller costs m
   assert.equal(turbineCapex({ turbineCost: 20_000, towerCostPerM: 300, hubHeight: metres(16) }), 24_800);
   const r = simulate(syntheticYear(), { ...base, nTurbines: 2, towerCostPerM: 300, hubHeight: metres(20) });
   assert.equal(r.econ.capex, 2 * (25_000 + 300 * 20));
+});
+
+test("each year's savings add up to the whole run's", () => {
+  const r = simulate(syntheticYear({ w10: 20, w100: 25, gti: 300 }), {
+    ...base,
+    loadKwh: kwh(10_000),
+    pvKwp: kw(3),
+    exportCredit: 0.05,
+  });
+  assert.equal(r.yearly.length, 1);
+  close(at(r.yearly, 0).savings, r.econ.savings, 1e-6);
+});
+
+test("savingsByYear splits the grid totals at each year's first hour", () => {
+  const marks = new Map<number, YearMark>([
+    [2020, [0, 0, 0, 0]],
+    [2021, [100, 10, 40, 30]],
+  ]);
+  const s = savingsByYear(marks, [250, 20, 100, 70], { price: 0.2, exportCredit: 0.05 });
+  close(s.get(2020) ?? Number.NaN, (100 - 40) * 0.2 + (30 - 10) * 0.05, 1e-9);
+  close(s.get(2021) ?? Number.NaN, (150 - 60) * 0.2 + (40 - 10) * 0.05, 1e-9);
 });

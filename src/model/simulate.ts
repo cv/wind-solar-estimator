@@ -7,8 +7,9 @@ import { battery, type Battery } from "./battery.ts";
 import { f32, f64, num, u16, u8 } from "./checkedArrays.ts";
 import { fraction, kmh, kw, kwh, metres } from "./units.ts";
 import type { Celsius, Kmh, Kwh } from "./units.ts";
-import { economics } from "./economics.ts";
-import type { HourRecord, ModelParams, MonthlySeries, Scenario, SimResult, SimWeather, SocDay } from "./simTypes.ts";
+import { economics, markOf, savingsByYear, scenarioOf } from "./economics.ts";
+import type { YearMark } from "./economics.ts";
+import type { HourRecord, ModelParams, MonthlySeries, SimResult, SimWeather, SocDay } from "./simTypes.ts";
 
 export { turbineCapex } from "./economics.ts";
 
@@ -55,6 +56,8 @@ interface Tallies {
   soc: { pvOnly: Float64Array; withWind: Float64Array; count: Float64Array };
   /** Where to write every hour, when asked for. */
   rec: HourRecord | null;
+  /** The grid totals at each year's first hour, for each year's savings. */
+  marks: Map<number, YearMark>;
 }
 
 /** Whole-period sums from the hourly loop (kWh, except sumV and genHours). */
@@ -123,6 +126,7 @@ function newTallies(rec: HourRecord | null): Tallies {
     byYear: new Map<number, number>(),
     soc: { pvOnly: zeros(288), withWind: zeros(288), count: zeros(288) },
     rec,
+    marks: new Map<number, YearMark>(),
   };
 }
 
@@ -130,7 +134,7 @@ function newTallies(rec: HourRecord | null): Tallies {
 function runHours(wx: SimWeather, p: ModelParams, inp: HourlyInputs, bat: Batteries, t: Tallies): Totals {
   const { hub, scale, load, loadScale } = inp;
   const { pvOnly, withWind } = bat;
-  const { m, histHours, histEnergy, byYear, soc, rec } = t;
+  const { m, histHours, histEnergy, byYear, soc, rec, marks } = t;
   const curve = makeCurveFn(p.curvePts);
   let wind = 0,
     pv = 0,
@@ -173,6 +177,8 @@ function runHours(wx: SimWeather, p: ModelParams, inp: HourlyInputs, bat: Batter
     const outBoth = Math.min(pvKw + windKw, inverter);
     invLostPv += pvKw - outPv;
     invLostBoth += pvKw + windKw - outBoth;
+    const year = u16(wx.year, i);
+    if (!marks.has(year)) marks.set(year, markOf(pvOnly, withWind));
     const gridPv = pvOnly.step(outPv - L);
     const gridBoth = withWind.step(outBoth - L);
     if (rec) {
@@ -202,7 +208,6 @@ function runHours(wx: SimWeather, p: ModelParams, inp: HourlyInputs, bat: Batter
       histHours[bin] = f64(histHours, bin) + 1;
       histEnergy[bin] = f64(histEnergy, bin) + windKw;
     }
-    const year = u16(wx.year, i);
     // A year's first hour starts from 0; as before, a NaN running total also restarts from 0.
     const sofar = byYear.get(year) ?? 0;
     byYear.set(year, (Number.isNaN(sofar) ? 0 : sofar) + windKw);
@@ -225,7 +230,10 @@ const socDayOf = (arr: Float64Array, count: Float64Array): SocDay =>
   );
 
 /** The tallies as per-year series. */
-function perYearSeries(t: Tallies, nYears: number): Pick<SimResult, "monthly" | "yearly" | "hist" | "socDay"> {
+function perYearSeries(
+  t: Tallies,
+  nYears: number,
+): Pick<SimResult, "monthly" | "hist" | "socDay"> & { windByYear: Array<{ year: number; kwh: Kwh }> } {
   const perYear = (x: number): Kwh => kwh(x / nYears);
   const { m, soc } = t;
   return {
@@ -236,7 +244,9 @@ function perYearSeries(t: Tallies, nYears: number): Pick<SimResult, "monthly" | 
       importPv: Array.from(m.importPv, perYear),
       importBoth: Array.from(m.importBoth, perYear),
     },
-    yearly: [...t.byYear.entries()].toSorted((a, b) => a[0] - b[0]).map(([year, total]) => ({ year, kwh: kwh(total) })),
+    windByYear: [...t.byYear.entries()]
+      .toSorted((a, b) => a[0] - b[0])
+      .map(([year, total]) => ({ year, kwh: kwh(total) })),
     hist: {
       binKmh: kmh(BIN),
       hours: Array.from(t.histHours, (x) => x / nYears),
@@ -245,12 +255,6 @@ function perYearSeries(t: Tallies, nYears: number): Pick<SimResult, "monthly" | 
     socDay: { pvOnly: socDayOf(soc.pvOnly, soc.count), withWind: socDayOf(soc.withWind, soc.count) },
   };
 }
-
-const scenarioOf = (b: Battery, nYears: number, loadTot: number): Scenario => ({
-  importKwh: kwh(b.imported / nYears),
-  exportKwh: kwh(b.exported / nYears),
-  selfSufficiency: fraction(loadTot > 0 ? 1 - b.imported / loadTot : 0),
-});
 
 /**
  * Hour-by-hour simulation of PV + battery, with and without the turbines.
@@ -275,6 +279,7 @@ export function simulate(wx: SimWeather, p: ModelParams, rec: HourRecord | null 
   const windKwh = perYear(tot.wind);
   const ratedKw = kw((ratedW * p.nTurbines) / 1000);
   const series = perYearSeries(tallies, nYears);
+  const yearSavings = savingsByYear(tallies.marks, markOf(bat.pvOnly, bat.withWind), p);
   return {
     hours: n,
     years: nYears,
@@ -297,7 +302,7 @@ export function simulate(wx: SimWeather, p: ModelParams, rec: HourRecord | null 
     pvOnly: A,
     withWind: B,
     monthly: series.monthly,
-    yearly: series.yearly,
+    yearly: series.windByYear.map((y) => ({ ...y, savings: yearSavings.get(y.year) ?? 0 })),
     hist: series.hist,
     socDay: series.socDay,
     econ: economics(p, A, B, windKwh),

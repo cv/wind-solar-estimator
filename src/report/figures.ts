@@ -1,5 +1,6 @@
 // Headline figures and supporting statistics.
 import { $ } from "../app/dom.ts";
+import { COLORS } from "../app/constants.ts";
 import { esc, fmt, pct, money } from "../app/format.ts";
 import type { DataRequest, WindSource } from "../app/state.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
@@ -36,6 +37,36 @@ function installed(p: ModelParams, capex: number): Sub {
   return { html: p.nTurbines === 1 ? `on ${each} installed` : `on ${esc(money(capex))} installed (${each} each)` };
 }
 
+/**
+ * Savings after maintenance by weather year as a word-sized line over its own range, the mean
+ * dashed and the worst and best years dotted and named: the average above hides how much one
+ * year differs from the next.
+ */
+function yearSpread(r: SimResult): string {
+  const ys = r.yearly.map((y) => ({ year: y.year, net: y.savings - r.econ.om }));
+  const first = ys[0];
+  if (!first || ys.length < 3) return "";
+  const lo = ys.reduce((a, b) => (b.net < a.net ? b : a), first);
+  const hi = ys.reduce((a, b) => (b.net > a.net ? b : a), first);
+  const H = 20,
+    STEP = 6,
+    PAD = 3;
+  const span = hi.net - lo.net > 0 ? hi.net - lo.net : 1;
+  const x = (k: number): number => PAD + k * STEP;
+  const y = (v: number): number => PAD + (H - 2 * PAD) * (1 - (v - lo.net) / span);
+  const mean = ys.reduce((s, v) => s + v.net, 0) / ys.length;
+  const width = x(ys.length - 1) + PAD;
+  const points = ys.map((v, k) => `${x(k).toFixed(1)},${y(v.net).toFixed(1)}`).join(" ");
+  const dot = (v: (typeof ys)[number]): string =>
+    `<circle cx="${x(ys.indexOf(v)).toFixed(1)}" cy="${y(v.net).toFixed(1)}" r="2.2" fill="#172033"/>`;
+  const label = `${money(lo.net)} (${lo.year}) to ${money(hi.net)} (${hi.year}) by weather year`;
+  return (
+    `<span class="spark"><svg width="${width}" height="${H}" viewBox="0 0 ${width} ${H}" role="img" aria-label="After maintenance: ${esc(label)}">` +
+    `<line x1="0" x2="${width}" y1="${y(mean).toFixed(1)}" y2="${y(mean).toFixed(1)}" stroke="${COLORS.grey}" stroke-dasharray="2 2"/>` +
+    `<polyline points="${points}" fill="none" stroke="${COLORS.wind}" stroke-width="1.5"/>${dot(lo)}${dot(hi)}</svg>${esc(label)}</span>`
+  );
+}
+
 export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest, source: WindSource | null): void {
   const measured = source?.kind === "measured" ? source.stats : null;
   const A = r.pvOnly,
@@ -47,7 +78,9 @@ export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest, so
   $("#figures").innerHTML = [
     figure("Wind energy", fmt(r.windKwh), "kWh/yr", `${pct(r.capacityFactor, 1)} capacity factor`, "wind"),
     figure("Grid purchases cut by", fmt(cut), "kWh/yr", cutShare),
-    figure("Savings from wind", money(e.savings), "/yr", `${money(e.netSavings)}/yr after maintenance`),
+    figure("Savings from wind", money(e.savings), "/yr", {
+      html: `${esc(`${money(e.netSavings)}/yr after maintenance`)}${yearSpread(r)}`,
+    }),
     Number.isFinite(e.payback)
       ? figure("Simple payback", fmt(e.payback, e.payback < 10 ? 1 : 0), "years", installed(p, e.capex))
       : figure("Simple payback", "Never", "", installed(p, e.capex)),

@@ -241,7 +241,7 @@ Each state has a solid tone, a wash for backgrounds, a line for borders and an i
 
 ### Hierarchy
 - **Display** (700, 1.75rem, 1.15): report title (site name) and the empty-state headline.
-- **Figure** (700, 1.75rem, 1.2, tabular): the four key figures under the verdict. Units sit beside them at label size in Muted Ink.
+- **Figure** (700, 1.75rem, 1.2, tabular): the four key figures under the verdict. Units sit beside them at label size in Muted Ink. Under the savings figure, a word-sized line of savings after maintenance by weather year (Wind Blue over its own range, the mean dashed in grey, the worst and best years dotted in ink) and its range in words ("$909 (2010) to $1,237 (2011) by weather year"), so the average never stands alone.
 - **Headline** (700, 1.375rem, 1.25): the verdict sentence, led by its status tag.
 - **Title** (700, 1.25rem, 1.25): report section headings ("Through the year", "Behind the numbers").
 - **Stat** (650, 1.125rem, tabular): secondary statistics in section stat rows.
