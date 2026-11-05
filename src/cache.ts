@@ -18,7 +18,7 @@ function openDb() {
   return dbPromise;
 }
 
-export async function dbGet(key) {
+export async function dbGet(key): Promise<any> {
   const db = await openDb();
   if (!db) return null;
   return new Promise((resolve) => {
@@ -34,7 +34,9 @@ export async function dbPut(key, value) {
   if (!db) return;
   try {
     db.transaction(STORE, "readwrite").objectStore(STORE).put(value, key);
-  } catch { /* skip caching */ }
+  } catch {
+    /* skip caching */
+  }
 }
 
 export async function dbClear() {

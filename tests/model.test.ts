@@ -1,23 +1,69 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EXAMPLE_ROTOR_M, circleArea, exampleCurve, parseCurve, makeCurveFn, betzLimitW, checkCurve, airDensity, simulate } from "../js/model.js";
+import {
+  EXAMPLE_ROTOR_M,
+  circleArea,
+  exampleCurve,
+  parseCurve,
+  makeCurveFn,
+  betzLimitW,
+  checkCurve,
+  airDensity,
+  simulate,
+} from "../src/model.ts";
 
-const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
+const close = (a, b, tol, msg?: string) =>
+  assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
 
 /** One year of identical hours, so results are easy to check by hand. */
 function syntheticYear({ w10 = 50, w100 = 50, temp = 15, gti = 0 } = {}) {
   const n = 8760;
-  const wx = { n, years: 1, elevation: 0, missing: 0, year: new Uint16Array(n).fill(2020), month: new Uint8Array(n), hour: new Uint8Array(n),
-    w10: new Float32Array(n).fill(w10), w100: new Float32Array(n).fill(w100), temp: new Float32Array(n).fill(temp), gti: new Float32Array(n).fill(gti) };
-  for (let i = 0; i < n; i++) { wx.hour[i] = i % 24; wx.month[i] = Math.min(11, Math.floor(i / 730)); }
+  const wx = {
+    n,
+    years: 1,
+    elevation: 0,
+    missing: 0,
+    year: new Uint16Array(n).fill(2020),
+    month: new Uint8Array(n),
+    hour: new Uint8Array(n),
+    w10: new Float32Array(n).fill(w10),
+    w100: new Float32Array(n).fill(w100),
+    temp: new Float32Array(n).fill(temp),
+    gti: new Float32Array(n).fill(gti),
+  };
+  for (let i = 0; i < n; i++) {
+    wx.hour[i] = i % 24;
+    wx.month[i] = Math.min(11, Math.floor(i / 730));
+  }
   return wx;
 }
 
 const base = {
-  hubHeight: 10, siteMeanKmh: 0, windScale: 1, curvePts: exampleCurve(), nTurbines: 1, densityCorrection: false, clampPhysics: false,
-  captureAreaM2: circleArea(0.3048), augmentation: 1, windLossPct: 0, pvKwp: 0, pvLossPct: 0, tempCoeffPct: 0,
-  loadKwh: 0, loadProfile: "flat", loadHourly: Array(24).fill(1), loadMonthly: Array(12).fill(1),
-  battKwh: 0, battMinSoc: 0, battRte: 1, battKw: 0, price: 0.2, exportCredit: 0, turbineCost: 25000, omPerTurbine: 0,
+  hubHeight: 10,
+  siteMeanKmh: 0,
+  windScale: 1,
+  curvePts: exampleCurve(),
+  nTurbines: 1,
+  densityCorrection: false,
+  clampPhysics: false,
+  captureAreaM2: circleArea(0.3048),
+  augmentation: 1,
+  windLossPct: 0,
+  pvKwp: 0,
+  pvLossPct: 0,
+  tempCoeffPct: 0,
+  loadKwh: 0,
+  loadProfile: "flat",
+  loadHourly: Array(24).fill(1),
+  loadMonthly: Array(12).fill(1),
+  battKwh: 0,
+  battMinSoc: 0,
+  battRte: 1,
+  battKw: 0,
+  price: 0.2,
+  exportCredit: 0,
+  turbineCost: 25000,
+  omPerTurbine: 0,
 };
 
 test("example curve is plausible: starts at 6 km/h, rated 3.5 kW from 30 km/h, within the Betz limit", () => {
@@ -31,7 +77,11 @@ test("example curve is plausible: starts at 6 km/h, rated 3.5 kW from 30 km/h, w
 });
 
 test("parseCurve accepts common separators and rejects junk", () => {
-  assert.deepEqual(parseCurve("10, 100\n0 0 # cut-in\n20;\t400"), [[0, 0], [10, 100], [20, 400]]);
+  assert.deepEqual(parseCurve("10, 100\n0 0 # cut-in\n20;\t400"), [
+    [0, 0],
+    [10, 100],
+    [20, 400],
+  ]);
   assert.throws(() => parseCurve("10, abc\n20, 1"));
   assert.throws(() => parseCurve("10, 100"));
 });
@@ -39,7 +89,14 @@ test("parseCurve accepts common separators and rejects junk", () => {
 test("Betz limit flags a curve that claims too much for its capture area", () => {
   close(betzLimitW(30, circleArea(0.3048)), 15.4, 0.1); // a 12-inch circle at 30 km/h
   close(betzLimitW(30, 1), 210, 1); // per square metre of frontal area
-  const { worstRatio, atKmh } = checkCurve([[0, 0], [30, 3500]], circleArea(0.3048), 1);
+  const { worstRatio, atKmh } = checkCurve(
+    [
+      [0, 0],
+      [30, 3500],
+    ],
+    circleArea(0.3048),
+    1,
+  );
   assert.equal(atKmh, 30);
   close(worstRatio, 228, 1);
 });
@@ -74,7 +131,13 @@ test("shear: hub wind interpolates between 10 m and 100 m", () => {
 
 test("energy balance without a battery: import − export = load − generation", () => {
   const wx = syntheticYear({ w10: 20, w100: 25, gti: 300 });
-  const r = simulate(wx, { ...base, pvKwp: 2, loadKwh: 20000, loadProfile: "x", loadHourly: Array.from({ length: 24 }, (_, h) => 1 + (h % 5)) });
+  const r = simulate(wx, {
+    ...base,
+    pvKwp: 2,
+    loadKwh: 20000,
+    loadProfile: "x",
+    loadHourly: Array.from({ length: 24 }, (_, h) => 1 + (h % 5)),
+  });
   close(r.loadKwh, 20000, 1e-3);
   const b = r.withWind;
   close(b.importKwh - b.exportKwh, r.loadKwh - r.pvKwh - r.windKwh, 1e-3);

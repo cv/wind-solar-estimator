@@ -35,7 +35,7 @@ _Inferred from the current build; confirm or correct._
 
 ## Capabilities and Constraints
 
-- **Today:** static single-page app, browser-only, no build step and no backend, hosted on GitHub Pages. MIT licensed, public repository.
+- **Today:** static single-page app, browser-only and no backend: TypeScript bundled by esbuild, deployed to GitHub Pages by a GitHub Actions workflow. MIT licensed, public repository.
 - **Later:** a backend or paid data sources are acceptable if they earn their place. Not decided yet.
 - Open-Meteo's free tier is for non-commercial use; commercial use needs an API key, which the tool accepts and keeps in the browser only (never in shared links).
 - Results are indicative, not a bankable energy assessment. Reanalysis wind is uncalibrated unless the user enters a measured site mean or a station is used; station wind is measured at an open site, not at the customer's.

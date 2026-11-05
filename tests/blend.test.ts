@@ -1,14 +1,33 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { alignStation, fitQuantileMap, applyQuantileMap, blendStation, shearAlpha, checkHomogeneity, MIN_PAIRS } from "../js/blend.js";
-import { parseStationCsv, stationLabel, distanceKm, direction, pickStation } from "../js/stations.js";
+import {
+  alignStation,
+  fitQuantileMap,
+  applyQuantileMap,
+  blendStation,
+  shearAlpha,
+  checkHomogeneity,
+  MIN_PAIRS,
+} from "../src/blend.ts";
+import { parseStationCsv, stationLabel, distanceKm, direction, pickStation } from "../src/stations.ts";
 
-const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
+const close = (a, b, tol, msg?: string) =>
+  assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
 
 /** A year of model weather with a repeating daily wind pattern; t counts UTC hours from 2020. */
 function modelYear() {
-  const n = 8760, t0 = Date.UTC(2020, 0, 1) / 3.6e6;
-  const wx = { n, years: 1, t: new Int32Array(n), year: new Uint16Array(n).fill(2020), month: new Uint8Array(n), hour: new Uint8Array(n), w10: new Float32Array(n), w100: new Float32Array(n) };
+  const n = 8760,
+    t0 = Date.UTC(2020, 0, 1) / 3.6e6;
+  const wx = {
+    n,
+    years: 1,
+    t: new Int32Array(n),
+    year: new Uint16Array(n).fill(2020),
+    month: new Uint8Array(n),
+    hour: new Uint8Array(n),
+    w10: new Float32Array(n),
+    w100: new Float32Array(n),
+  };
   for (let i = 0; i < n; i++) {
     wx.t[i] = t0 + i;
     wx.month[i] = Math.min(11, Math.floor(i / 730));
@@ -20,14 +39,22 @@ function modelYear() {
 }
 
 /** Station readings derived from the model hours by f, skipping hours where skip(i) is true. */
-function stationFrom(wx, f, skip = () => false) {
-  const hours = [], wind = [];
-  for (let i = 0; i < wx.n; i++) if (!skip(i)) { hours.push(wx.t[i]); wind.push(Math.round(f(wx.w10[i]))); }
+function stationFrom(wx, f, skip: (i: number) => boolean = () => false) {
+  const hours = [],
+    wind = [];
+  for (let i = 0; i < wx.n; i++)
+    if (!skip(i)) {
+      hours.push(wx.t[i]);
+      wind.push(Math.round(f(wx.w10[i])));
+    }
   return { hours: Int32Array.from(hours), wind: Uint8Array.from(wind) };
 }
 
 test("alignStation places readings by UTC hour and leaves gaps as NaN", () => {
-  const out = alignStation(Int32Array.from([10, 11, 12, 13]), { hours: Int32Array.from([11, 13, 99]), wind: Uint8Array.from([5, 7, 9]) });
+  const out = alignStation(Int32Array.from([10, 11, 12, 13]), {
+    hours: Int32Array.from([11, 13, 99]),
+    wind: Uint8Array.from([5, 7, 9]),
+  });
   assert.ok(Number.isNaN(out[0]) && Number.isNaN(out[2]));
   assert.equal(out[1], 5);
   assert.equal(out[3], 7);
@@ -43,7 +70,11 @@ test("quantile mapping reproduces a monotone transform, and scales beyond the fi
 
 test("blendStation keeps readings, fills gaps on the station's scale and keeps the model's shear", () => {
   const wx = modelYear();
-  const obs = stationFrom(wx, (v) => 1.5 * v, (i) => i % 5 === 0); // 20% of hours missing
+  const obs = stationFrom(
+    wx,
+    (v) => 1.5 * v,
+    (i) => i % 5 === 0,
+  ); // 20% of hours missing
   const { wx: out, stats } = blendStation(wx, obs);
   close(stats.coverage, 0.8, 0.001);
   assert.equal(stats.filled, wx.n / 5);
@@ -57,11 +88,22 @@ test("blendStation keeps readings, fills gaps on the station's scale and keeps t
 
 test("blendStation declines a station with too few readings", () => {
   const wx = modelYear();
-  assert.equal(blendStation(wx, stationFrom(wx, (v) => v, (i) => i >= MIN_PAIRS - 1)), null);
+  assert.equal(
+    blendStation(
+      wx,
+      stationFrom(
+        wx,
+        (v) => v,
+        (i) => i >= MIN_PAIRS - 1,
+      ),
+    ),
+    null,
+  );
 });
 
 test("station CSV parsing skips hours without a wind reading", () => {
-  const csv = "x,y,UTC_DATE,WIND_SPEED\r\n-113.6,50.0,2024-01-01T07:00:00,8\r\n-113.6,50.0,2024-01-01T08:00:00,\r\n-113.6,50.0,2024-01-01T09:00:00,17\r\n";
+  const csv =
+    "x,y,UTC_DATE,WIND_SPEED\r\n-113.6,50.0,2024-01-01T07:00:00,8\r\n-113.6,50.0,2024-01-01T08:00:00,\r\n-113.6,50.0,2024-01-01T09:00:00,17\r\n";
   const { hours, wind } = parseStationCsv(csv);
   assert.deepEqual([...wind], [8, 17]);
   assert.equal(hours[0], Date.UTC(2024, 0, 1, 7) / 3.6e6);
@@ -115,7 +157,10 @@ test("checkHomogeneity ignores small changes, short records and thin years", () 
 
 test("blendStation reports yearly means and the homogeneity check", () => {
   const wx = modelYear();
-  const { stats } = blendStation(wx, stationFrom(wx, (v) => v * 1.2));
+  const { stats } = blendStation(
+    wx,
+    stationFrom(wx, (v) => v * 1.2),
+  );
   assert.equal(stats.yearly.length, 1);
   assert.equal(stats.yearly[0].year, 2020);
   close(stats.yearly[0].station / stats.yearly[0].model, 1.2, 0.02);

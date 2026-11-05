@@ -3,7 +3,7 @@
 // Free tier: non-commercial use only, ~10,000 weighted calls per day per IP;
 // 20 years for one site costs about 500 of those. Commercial use needs an API key.
 
-import { dbGet, dbPut, dbClear } from "./cache.js";
+import { dbGet, dbPut, dbClear } from "./cache.ts";
 
 const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 const ARCHIVE_COMMERCIAL = "https://customer-archive-api.open-meteo.com/v1/archive";
@@ -12,10 +12,18 @@ const CONCURRENCY = 4;
 const MAX_RETRIES = 4;
 
 const memory = new Map();
-const sleep = (ms, signal) => new Promise((resolve, reject) => {
-  const t = setTimeout(resolve, ms);
-  signal?.addEventListener("abort", () => { clearTimeout(t); reject(signal.reason); }, { once: true });
-});
+const sleep = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(t);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
 
 /**
  * Loads hourly 10 m and 100 m wind, 2 m temperature and plane-of-array irradiance
@@ -32,7 +40,7 @@ export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth
   // Each year is cached on its own, so a failed or interrupted download resumes where it stopped.
   const years = [];
   for (let y = startYear; y <= endYear; y++) years.push(y);
-  const parts = new Array(years.length);
+  const parts: any[] = Array.from({ length: years.length });
   let done = 0;
   onProgress?.(0, years.length);
 
@@ -57,14 +65,23 @@ export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth
   let missing = 0;
   for (const part of parts) {
     for (let i = 0; i < part.time.length; i++) {
-      const w10 = part.w10[i], w100 = part.w100[i], t = part.temp[i], g = part.gti[i];
-      if (Number.isNaN(w10) || Number.isNaN(w100) || Number.isNaN(t) || Number.isNaN(g)) { missing++; continue; }
+      const w10 = part.w10[i],
+        w100 = part.w100[i],
+        t = part.temp[i],
+        g = part.gti[i];
+      if (Number.isNaN(w10) || Number.isNaN(w100) || Number.isNaN(t) || Number.isNaN(g)) {
+        missing++;
+        continue;
+      }
       const d = new Date((part.time[i] + offset) * 1000);
       cols.t.push(Math.round(part.time[i] / 3600)); // UTC hour number, to line up with station records
       cols.year.push(d.getUTCFullYear());
       cols.month.push(d.getUTCMonth());
       cols.hour.push(d.getUTCHours());
-      cols.w10.push(w10); cols.w100.push(w100); cols.temp.push(t); cols.gti.push(g);
+      cols.w10.push(w10);
+      cols.w100.push(w100);
+      cols.temp.push(t);
+      cols.gti.push(g);
     }
   }
   if (!cols.w10.length) throw new Error("No weather data returned for this location and period");
@@ -95,7 +112,7 @@ export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth
 /** Typed arrays keep the IndexedDB cache small; missing values become NaN. */
 function compactYear(json) {
   const h = json.hourly;
-  const col = (a) => Float32Array.from(a, (x) => (x == null ? NaN : x));
+  const col = (a: (number | null)[]) => Float32Array.from(a, (x) => (x == null ? NaN : x));
   return {
     latitude: json.latitude,
     longitude: json.longitude,
@@ -136,11 +153,18 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }) {
       text = await res.text();
     } catch (e) {
       if (signal?.aborted) throw e;
-      if (retry) { await wait(); continue; } // network hiccup
+      if (retry) {
+        await wait();
+        continue;
+      } // network hiccup
       throw new Error(`Couldn't reach the weather service for ${year}: ${e.message}`);
     }
     let json = null;
-    try { json = JSON.parse(text); } catch { /* not JSON, e.g. a proxy error page */ }
+    try {
+      json = JSON.parse(text);
+    } catch {
+      /* not JSON, e.g. a proxy error page */
+    }
 
     if (res.ok && json?.hourly?.time) return json;
     const reason = json?.reason || text.slice(0, 120).trim() || res.statusText;

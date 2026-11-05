@@ -3,7 +3,7 @@
 // OGC API. It allows browser (CORS) requests and needs no key. Data: Open Government
 // Licence – Canada. Everything downloaded is cached in IndexedDB, so a site is fetched once.
 
-import { dbGet, dbPut } from "./cache.js";
+import { dbGet, dbPut } from "./cache.ts";
 
 const API = "https://api.weather.gc.ca/collections";
 const LIST_TTL_MS = 30 * 86400e3; // station lists change rarely
@@ -22,11 +22,14 @@ const ELEVATION_API = "https://api.open-meteo.com/v1/elevation";
 export const KM_PER_METRE_RISE = 0.1;
 export const KM_PER_MISSING_YEAR = 2;
 export const stationScore = (s, missingYears = 0) =>
-  s.distanceKm + (Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0) + Math.max(0, missingYears) * KM_PER_MISSING_YEAR;
+  s.distanceKm +
+  (Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0) +
+  Math.max(0, missingYears) * KM_PER_MISSING_YEAR;
 
 /** The station "auto" picks: lowest score among those that pass ok(s); missing(s) = years of the period it lacks. */
-export function pickStation(list, ok, missing = () => 0) {
-  let best = null, bestScore = Infinity;
+export function pickStation(list, ok, missing: (s: any) => number = () => 0) {
+  let best = null,
+    bestScore = Infinity;
   for (const s of list) {
     if (!ok(s)) continue;
     const score = stationScore(s, missing(s));
@@ -36,10 +39,18 @@ export function pickStation(list, ok, missing = () => 0) {
 }
 
 const memory = new Map();
-const sleep = (ms, signal) => new Promise((resolve, reject) => {
-  const t = setTimeout(resolve, ms);
-  signal?.addEventListener("abort", () => { clearTimeout(t); reject(signal.reason); }, { once: true });
-});
+const sleep = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(t);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
 
 /** Rough box around Canada: outside it there are no stations to look for. */
 export const nearCanada = (lat, lon) => lat >= 41.5 && lat <= 84 && lon >= -141.5 && lon <= -52;
@@ -47,35 +58,47 @@ export const nearCanada = (lat, lon) => lat >= 41.5 && lat <= 84 && lon >= -141.
 const rad = (d) => (d * Math.PI) / 180;
 
 export function distanceKm(lat1, lon1, lat2, lon2) {
-  const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
+  const a =
+    Math.sin(rad(lat2 - lat1) / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
   return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
 /** Compass direction from the first point to the second, e.g. "SW". */
 export function direction(lat1, lon1, lat2, lon2) {
   const y = Math.sin(rad(lon2 - lon1)) * Math.cos(rad(lat2));
-  const x = Math.cos(rad(lat1)) * Math.sin(rad(lat2)) - Math.sin(rad(lat1)) * Math.cos(rad(lat2)) * Math.cos(rad(lon2 - lon1));
+  const x =
+    Math.cos(rad(lat1)) * Math.sin(rad(lat2)) - Math.sin(rad(lat1)) * Math.cos(rad(lat2)) * Math.cos(rad(lon2 - lon1));
   const deg = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
   return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
 }
 
 const KEEP_UPPER = new Set(["AAFC", "CDA", "AUT", "AWOS", "RCS", "CS", "MCS", "EPF", "UA"]);
 /** "PINCHER CREEK A" -> "Pincher Creek A" (station codes and suffixes stay as they are). */
-export const stationLabel = (name) => name.split(/\s+/).map((w) => {
-  const bare = w.replace(/[^A-Z]/g, "");
-  if (bare.length <= 1 || KEEP_UPPER.has(bare) || !/[AEIOUY]/.test(bare)) return w;
-  const i = w.search(/[A-Z]/); // keep leading punctuation, e.g. "(AUT)"
-  return w.slice(0, i + 1) + w.slice(i + 1).toLowerCase();
-}).join(" ");
+export const stationLabel = (name) =>
+  name
+    .split(/\s+/)
+    .map((w) => {
+      const bare = w.replace(/[^A-Z]/g, "");
+      if (bare.length <= 1 || KEEP_UPPER.has(bare) || !/[AEIOUY]/.test(bare)) return w;
+      const i = w.search(/[A-Z]/); // keep leading punctuation, e.g. "(AUT)"
+      return w.slice(0, i + 1) + w.slice(i + 1).toLowerCase();
+    })
+    .join(" ");
 
 /**
  * Stations with hourly records within radiusKm of the site, nearest first, each with
  * distance, direction from the site and the years its hourly record covers.
  */
-export async function findStations(lat, lon, { radiusKm = SEARCH_RADIUS_KM, signal } = {}) {
+export async function findStations(
+  lat,
+  lon,
+  { radiusKm = SEARCH_RADIUS_KM, signal }: { radiusKm?: number; signal?: AbortSignal } = {},
+) {
   if (!nearCanada(lat, lon)) return [];
   // Lists are fetched and cached per 0.1° tile, so small moves of the pin reuse them.
-  const cLat = Math.round(lat * 10) / 10, cLon = Math.round(lon * 10) / 10;
+  const cLat = Math.round(lat * 10) / 10,
+    cLon = Math.round(lon * 10) / 10;
   const key = `stations3|${cLat}|${cLon}|${radiusKm}`; // v2: no longer trusts HAS_HOURLY_DATA; v3: raw names
   let list = memory.get(key);
   if (!list) {
@@ -84,29 +107,38 @@ export async function findStations(lat, lon, { radiusKm = SEARCH_RADIUS_KM, sign
   }
   if (!list) {
     const r = radiusKm + 10;
-    const dLat = r / 111, dLon = r / (111 * Math.max(0.1, Math.cos(rad(cLat))));
+    const dLat = r / 111,
+      dLon = r / (111 * Math.max(0.1, Math.cos(rad(cLat))));
     const q = new URLSearchParams({
       // Not HAS_HOURLY_DATA=Y: that flag is "N" for some stations with decades of hourly
       // records (e.g. Stavely AAFC), so keep every station that has hourly dates instead.
-      f: "json", limit: "5000",
+      f: "json",
+      limit: "5000",
       bbox: [cLon - dLon, cLat - dLat, cLon + dLon, cLat + dLat].map((x) => x.toFixed(3)).join(","),
       properties: "STATION_NAME,CLIMATE_IDENTIFIER,ELEVATION,HLY_FIRST_DATE,HLY_LAST_DATE",
     });
     const json = JSON.parse(await getText(`${API}/climate-stations/items?${q}`, signal, "the station list"));
-    list = (json.features || []).filter((f) => f.geometry?.coordinates && f.properties.HLY_FIRST_DATE).map((f) => ({
-      id: String(f.properties.CLIMATE_IDENTIFIER),
-      rawName: String(f.properties.STATION_NAME || f.properties.CLIMATE_IDENTIFIER), // labelled on use, so label fixes apply to cached lists
-      lat: f.geometry.coordinates[1],
-      lon: f.geometry.coordinates[0],
-      elevation: Number(f.properties.ELEVATION),
-      first: Number(String(f.properties.HLY_FIRST_DATE).slice(0, 4)),
-      last: Number(String(f.properties.HLY_LAST_DATE).slice(0, 4)),
-    }));
+    list = (json.features || [])
+      .filter((f) => f.geometry?.coordinates && f.properties.HLY_FIRST_DATE)
+      .map((f) => ({
+        id: String(f.properties.CLIMATE_IDENTIFIER),
+        rawName: String(f.properties.STATION_NAME || f.properties.CLIMATE_IDENTIFIER), // labelled on use, so label fixes apply to cached lists
+        lat: f.geometry.coordinates[1],
+        lon: f.geometry.coordinates[0],
+        elevation: Number(f.properties.ELEVATION),
+        first: Number(String(f.properties.HLY_FIRST_DATE).slice(0, 4)),
+        last: Number(String(f.properties.HLY_LAST_DATE).slice(0, 4)),
+      }));
     dbPut(key, { fetchedAt: Date.now(), list });
   }
   memory.set(key, list);
   return list
-    .map((s) => ({ ...s, name: stationLabel(s.rawName), distanceKm: distanceKm(lat, lon, s.lat, s.lon), direction: direction(lat, lon, s.lat, s.lon) }))
+    .map((s) => ({
+      ...s,
+      name: stationLabel(s.rawName),
+      distanceKm: distanceKm(lat, lon, s.lat, s.lon),
+      direction: direction(lat, lon, s.lat, s.lon),
+    }))
     .filter((s) => s.distanceKm <= radiusKm)
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }
@@ -120,7 +152,9 @@ export async function siteElevation(lat, lon, signal) {
     try {
       const res = await fetch(`${ELEVATION_API}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`, { signal });
       elevation = res.ok ? Number((await res.json()).elevation?.[0]) : NaN;
-    } catch { elevation = NaN; }
+    } catch {
+      elevation = NaN;
+    }
     if (!Number.isFinite(elevation)) return null; // not cached: try again next time
     dbPut(key, elevation);
   }
@@ -135,8 +169,9 @@ export async function siteElevation(lat, lon, signal) {
 export async function fetchStationHours({ id, startYear, endYear, onProgress, signal }) {
   const years = [];
   for (let y = startYear; y <= endYear; y++) years.push(y);
-  const parts = new Array(years.length);
-  let done = 0, next = 0;
+  const parts: any[] = Array.from({ length: years.length });
+  let done = 0,
+    next = 0;
   onProgress?.(0, years.length);
   const worker = async () => {
     while (next < years.length) {
@@ -154,15 +189,22 @@ export async function fetchStationHours({ id, startYear, endYear, onProgress, si
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, years.length) }, worker));
   const n = parts.reduce((s, p) => s + p.hours.length, 0);
-  const hours = new Int32Array(n), wind = new Uint8Array(n);
+  const hours = new Int32Array(n),
+    wind = new Uint8Array(n);
   let o = 0;
-  for (const p of parts) { hours.set(p.hours, o); wind.set(p.wind, o); o += p.hours.length; }
+  for (const p of parts) {
+    hours.set(p.hours, o);
+    wind.set(p.wind, o);
+    o += p.hours.length;
+  }
   return { hours, wind };
 }
 
 async function fetchStationYear(id, year, signal) {
   const q = new URLSearchParams({
-    f: "csv", CLIMATE_IDENTIFIER: id, limit: "10000",
+    f: "csv",
+    CLIMATE_IDENTIFIER: id,
+    limit: "10000",
     datetime: `${year}-01-01T00:00:00Z/${year}-12-31T23:59:59Z`,
     properties: "UTC_DATE,WIND_SPEED",
   });
@@ -173,8 +215,10 @@ async function fetchStationYear(id, year, signal) {
 export function parseStationCsv(text) {
   const lines = text.split(/\r?\n/).filter(Boolean);
   const head = (lines[0] || "").split(",").map((s) => s.trim());
-  const iT = head.indexOf("UTC_DATE"), iW = head.indexOf("WIND_SPEED");
-  const hours = [], wind = [];
+  const iT = head.indexOf("UTC_DATE"),
+    iW = head.indexOf("WIND_SPEED");
+  const hours = [],
+    wind = [];
   if (iT >= 0 && iW >= 0) {
     for (let k = 1; k < lines.length; k++) {
       const c = lines[k].split(",");
@@ -201,8 +245,10 @@ async function getText(url, signal, what) {
       if (signal?.aborted) throw e;
       if (!retry) throw new Error(`Couldn't reach Environment Canada's climate service for ${what}: ${e.message}`);
     }
-    if (res && !(res.status === 429 || res.status >= 500)) throw new Error(`Environment Canada's climate service refused ${what} (${res.status}).`);
-    if (!retry) throw new Error(`Environment Canada's climate service is busy (${res?.status}). Press Analyse again to resume.`);
+    if (res && !(res.status === 429 || res.status >= 500))
+      throw new Error(`Environment Canada's climate service refused ${what} (${res.status}).`);
+    if (!retry)
+      throw new Error(`Environment Canada's climate service is busy (${res?.status}). Press Analyse again to resume.`);
     const after = Number(res?.headers.get("retry-after"));
     await sleep(after > 0 ? after * 1000 : 5000 * (attempt + 1), signal);
   }

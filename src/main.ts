@@ -1,8 +1,28 @@
+// @ts-nocheck -- typed in the first strictness round, after this file is split up
 // UI: form <-> URL hash, map, data loading, rendering. Chart.js and Leaflet are loaded as globals.
-import { EXAMPLE_ROTOR_M, circleArea, exampleCurve, parseCurve, formatCurve, checkCurve, betzLimitW, makeCurveFn, LOAD_PRESETS, simulate } from "./model.js";
-import { fetchWeather, searchPlaces, clearWeatherCache } from "./weather.js";
-import { findStations, fetchStationHours, siteElevation, pickStation, nearCanada, clearStationMemory, SEARCH_RADIUS_KM } from "./stations.js";
-import { blendStation, POOR_CORRELATION } from "./blend.js";
+import {
+  EXAMPLE_ROTOR_M,
+  circleArea,
+  exampleCurve,
+  parseCurve,
+  formatCurve,
+  checkCurve,
+  betzLimitW,
+  makeCurveFn,
+  LOAD_PRESETS,
+  simulate,
+} from "./model.ts";
+import { fetchWeather, searchPlaces, clearWeatherCache } from "./weather.ts";
+import {
+  findStations,
+  fetchStationHours,
+  siteElevation,
+  pickStation,
+  nearCanada,
+  clearStationMemory,
+  SEARCH_RADIUS_KM,
+} from "./stations.ts";
+import { blendStation, POOR_CORRELATION } from "./blend.ts";
 
 const $ = (sel) => document.querySelector(sel);
 const form = $("#form");
@@ -17,36 +37,91 @@ const ELEVATION_SAY_M = 50; // below this, the picker doesn't mention the height
 
 const DEFAULTS = {
   place: "Lethbridge, Alberta, Canada",
-  lat: "49.6935", lon: "-112.8418", windSource: "auto", years: "20", endYear: String(new Date().getFullYear() - 1),
-  nTurbines: "1", hubHeight: "16", curve: formatCurve(exampleCurve()), captureShape: "round", captureM: String(EXAMPLE_ROTOR_M), captureW: "", captureH: "", augmentation: "1",
-  clampPhysics: false, densityCorrection: true, windLossPct: "5",
-  siteMeanKmh: "", windScale: "1",
-  pvKwp: "3", pvLossPct: "14", tilt: "", azimuth: "", tempCoeffPct: "-0.4",
-  loadKwh: "11800", loadProfile: "residential",
+  lat: "49.6935",
+  lon: "-112.8418",
+  windSource: "auto",
+  years: "20",
+  endYear: String(new Date().getFullYear() - 1),
+  nTurbines: "1",
+  hubHeight: "16",
+  curve: formatCurve(exampleCurve()),
+  captureShape: "round",
+  captureM: String(EXAMPLE_ROTOR_M),
+  captureW: "",
+  captureH: "",
+  augmentation: "1",
+  clampPhysics: false,
+  densityCorrection: true,
+  windLossPct: "5",
+  siteMeanKmh: "",
+  windScale: "1",
+  pvKwp: "3",
+  pvLossPct: "14",
+  tilt: "",
+  azimuth: "",
+  tempCoeffPct: "-0.4",
+  loadKwh: "11800",
+  loadProfile: "residential",
   loadHourly: LOAD_PRESETS.residential.hourly.join(", "),
   loadMonthly: LOAD_PRESETS.residential.monthly.join(", "),
-  battKwh: "48", battKw: "6", battMinSoc: "50", battRte: "82", inverterKw: "6",
-  currency: "$", price: "0.20", exportCredit: "0.08", turbineCost: "20000", omPerTurbine: "200",
+  battKwh: "48",
+  battKw: "6",
+  battMinSoc: "50",
+  battRte: "82",
+  inverterKw: "6",
+  currency: "$",
+  price: "0.20",
+  exportCredit: "0.08",
+  turbineCost: "20000",
+  omPerTurbine: "200",
 };
 
 // Share links leave out values equal to the defaults, so they carry a version: a link
 // without one was made with these earlier defaults, and keeps meaning what it meant.
 const HASH_VERSION = "2";
 const DEFAULTS_V1 = {
-  place: "Amarillo, Texas, United States", hubHeight: "18",
-  curve: "0, 0\n10.9, 0\n11, 40\n14, 120\n17, 260\n20, 440\n23, 660\n26, 960\n29, 1330\n32, 1780\n35, 2330\n38, 2990\n41, 3500\n90, 3500",
-  captureM: "4", pvKwp: "10", loadKwh: "15000",
-  battKwh: "20", battKw: "5", battMinSoc: "20", battRte: "90", inverterKw: "", turbineCost: "25000", omPerTurbine: "250",
+  place: "Amarillo, Texas, United States",
+  hubHeight: "18",
+  curve:
+    "0, 0\n10.9, 0\n11, 40\n14, 120\n17, 260\n20, 440\n23, 660\n26, 960\n29, 1330\n32, 1780\n35, 2330\n38, 2990\n41, 3500\n90, 3500",
+  captureM: "4",
+  pvKwp: "10",
+  loadKwh: "15000",
+  battKwh: "20",
+  battKw: "5",
+  battMinSoc: "20",
+  battRte: "90",
+  inverterKw: "",
+  turbineCost: "25000",
+  omPerTurbine: "250",
 };
 
-const state = { loading: false, wx: null, wxKey: null, req: null, source: null, stations: { key: null }, stationLayer: null, params: null, result: null, capped: null, charts: {}, map: null, marker: null, cell: null };
+const state = {
+  loading: false,
+  wx: null,
+  wxKey: null,
+  req: null,
+  source: null,
+  stations: { key: null },
+  stationLayer: null,
+  params: null,
+  result: null,
+  capped: null,
+  charts: {} as Record<string, any>,
+  map: null,
+  marker: null,
+  cell: null,
+};
 
 // ---------- formatting ----------
 
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const fmt = (x, d = 0) => (Number.isFinite(x) ? x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : "—");
+const esc = (s) =>
+  String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const fmt = (x, d = 0) =>
+  Number.isFinite(x) ? x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : "—";
 const pct = (x, d = 0) => `${fmt(x * 100, d)}%`;
-const money = (x, d = 0) => (Number.isFinite(x) ? `${x < 0 ? "−" : ""}${state.params.currency}${fmt(Math.abs(x), d)}` : "—");
+const money = (x, d = 0) =>
+  Number.isFinite(x) ? `${x < 0 ? "−" : ""}${state.params.currency}${fmt(Math.abs(x), d)}` : "—";
 
 // ---------- form, validation, URL ----------
 
@@ -82,7 +157,7 @@ function writeHash(v) {
 }
 
 function readHash() {
-  const out = {};
+  const out: Record<string, any> = {};
   for (const [k, v] of new URLSearchParams(location.hash.slice(1))) {
     if (k in DEFAULTS) out[k] = typeof DEFAULTS[k] === "boolean" ? v === "1" : v;
   }
@@ -104,15 +179,24 @@ function num(v, key, label, { min = -Infinity, max = Infinity, optional = false 
   if (v[key] === "" && optional) return null;
   const x = Number(v[key]);
   if (v[key] === "" || !Number.isFinite(x) || x < min || x > max) {
-    const range = Number.isFinite(min) && Number.isFinite(max) ? ` between ${min} and ${max}` : Number.isFinite(min) ? ` of at least ${min}` : "";
+    const range =
+      Number.isFinite(min) && Number.isFinite(max)
+        ? ` between ${min} and ${max}`
+        : Number.isFinite(min)
+          ? ` of at least ${min}`
+          : "";
     throw invalid(key, `${label}: enter a number${range}.`);
   }
   return x;
 }
 
 function list(v, key, label, n) {
-  const xs = v[key].split(/[\s,;]+/).filter(Boolean).map(Number);
-  if (xs.length !== n || xs.some((x) => !Number.isFinite(x) || x < 0)) throw invalid(key, `${label}: enter ${n} numbers (zero or more).`);
+  const xs = v[key]
+    .split(/[\s,;]+/)
+    .filter(Boolean)
+    .map(Number);
+  if (xs.length !== n || xs.some((x) => !Number.isFinite(x) || x < 0))
+    throw invalid(key, `${label}: enter ${n} numbers (zero or more).`);
   return xs;
 }
 
@@ -130,20 +214,30 @@ function dataRequest(v) {
   return { lat, lon, startYear: endYear - Math.round(years) + 1, endYear, tilt, azimuth, compass, apiKey: v.apiKey };
 }
 
-const requestKey = (r) => [r.lat.toFixed(4), r.lon.toFixed(4), r.startYear, r.endYear, r.tilt, r.azimuth, r.station?.id ?? "model"].join("|");
+const requestKey = (r) =>
+  [r.lat.toFixed(4), r.lon.toFixed(4), r.startYear, r.endYear, r.tilt, r.azimuth, r.station?.id ?? "model"].join("|");
 
 // ---------- measured wind: nearby stations ----------
 
 /** Starts (or reuses) the search for stations around the pin; resolves to a list, or null if the search failed. */
 function loadStations() {
-  const lat = Number(form.elements.lat.value), lon = Number(form.elements.lon.value);
+  const lat = Number(form.elements.lat.value),
+    lon = Number(form.elements.lon.value);
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90) return Promise.resolve([]);
   const key = `${lat.toFixed(3)}|${lon.toFixed(3)}`;
   if (state.stations.key === key) return state.stations.promise;
   // Each station's height above (+) or below (−) the site; "auto" weighs it against distance.
   const promise = Promise.all([findStations(lat, lon), siteElevation(lat, lon)])
-    .then(([list, elevation]) => list.map((s) => ({ ...s, rise: elevation === null || !Number.isFinite(s.elevation) ? NaN : s.elevation - elevation })))
-    .catch((e) => { console.warn(e); return null; });
+    .then(([list, elevation]) =>
+      list.map((s) => ({
+        ...s,
+        rise: elevation === null || !Number.isFinite(s.elevation) ? NaN : s.elevation - elevation,
+      })),
+    )
+    .catch((e) => {
+      console.warn(e);
+      return null;
+    });
   state.stations = { key, promise, list: undefined };
   renderStationPicker();
   promise.then((list) => {
@@ -170,50 +264,61 @@ function resolveStation(choice, list, req) {
 const missingYears = (req) => (s) => req.endYear - req.startYear + 1 - Math.max(0, yearsOverlap(s, req));
 
 /** Stations "auto" may use: close enough, with enough years of records in the period. */
-const autoEligible = (req) => (s) => s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= Math.min(5, req.endYear - req.startYear + 1);
+const autoEligible = (req) => (s) =>
+  s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= Math.min(5, req.endYear - req.startYear + 1);
 
 const stationPlace = (s) => (s.distanceKm < 1 ? "at the site" : `${fmt(s.distanceKm)} km ${s.direction}`);
 const fromSite = (s) => (s.distanceKm < 1 ? "at the site" : `${stationPlace(s)} of the site`);
 /** ", 330 m higher" when the height difference is worth mentioning. */
-const riseText = (s, joiner = ", ") => (Math.abs(s.rise) >= ELEVATION_SAY_M ? `${joiner}${fmt(Math.abs(s.rise))} m ${s.rise > 0 ? "higher" : "lower"}` : "");
+const riseText = (s, joiner = ", ") =>
+  Math.abs(s.rise) >= ELEVATION_SAY_M ? `${joiner}${fmt(Math.abs(s.rise))} m ${s.rise > 0 ? "higher" : "lower"}` : "";
 
 /** The "Wind data" picker, its hint and the station pins on the map. */
 function renderStationPicker() {
   const sel = $("#stationSelect");
   const hint = $("#stationHint");
-  const lat = Number(form.elements.lat.value), lon = Number(form.elements.lon.value);
+  const lat = Number(form.elements.lat.value),
+    lon = Number(form.elements.lon.value);
   const { list } = state.stations;
   const choice = form.elements.windSource.value;
   // The period, read leniently: validation messages belong to Analyse, not to this picker.
-  const years = Number(form.elements.years.value), endYear = Number(form.elements.endYear.value);
+  const years = Number(form.elements.years.value),
+    endYear = Number(form.elements.endYear.value);
   const req = years >= 1 && endYear > 1900 ? { startYear: endYear - Math.round(years) + 1, endYear } : null;
   const active = list && req ? resolveStation(choice, list, req) : null;
 
   sel.replaceChildren(new Option("Weather model only (ERA5)", "model"));
   for (const s of list || []) {
     const o = new Option(`${s.name}, ${stationPlace(s)} · ${s.first}–${s.last}`, `eccc:${s.id}`);
-    if (req && yearsOverlap(s, req) < 1) { o.disabled = true; o.text += " (no records for these years)"; }
+    if (req && yearsOverlap(s, req) < 1) {
+      o.disabled = true;
+      o.text += " (no records for these years)";
+    }
     sel.add(o);
   }
   sel.value = active ? `eccc:${active.id}` : "model";
 
   let text;
-  if (!nearCanada(lat, lon)) text = "Measured station data is available for sites in Canada. Elsewhere the tool uses the weather model.";
+  if (!nearCanada(lat, lon))
+    text = "Measured station data is available for sites in Canada. Elsewhere the tool uses the weather model.";
   else if (list === undefined) text = "Looking for nearby weather stations…";
   else if (list === null) text = "Couldn't load the list of weather stations, so the weather model is used.";
-  else if (!list.length) text = `No Environment Canada station with hourly records within ${SEARCH_RADIUS_KM} km, so the weather model is used.`;
+  else if (!list.length)
+    text = `No Environment Canada station with hourly records within ${SEARCH_RADIUS_KM} km, so the weather model is used.`;
   else if (active) {
     text = `Hourly wind measured at ${active.name}, ${fromSite(active)}${riseText(active, " and ")}. Hours the station missed are filled from the weather model.`;
     const nearest = active.explicit ? null : list.find(autoEligible(req));
     if (nearest && nearest.id !== active.id) {
       const gap = missingYears(req)(nearest) - missingYears(req)(active);
-      const why = Math.abs(nearest.rise) - Math.abs(active.rise) >= ELEVATION_SAY_M
-        ? `${fmt(Math.abs(nearest.rise))} m ${nearest.rise > 0 ? "higher" : "lower"}`
-        : gap > 0 ? `its records cover ${gap} fewer year${gap === 1 ? "" : "s"} of the period` : "a weaker match";
+      const why =
+        Math.abs(nearest.rise) - Math.abs(active.rise) >= ELEVATION_SAY_M
+          ? `${fmt(Math.abs(nearest.rise))} m ${nearest.rise > 0 ? "higher" : "lower"}`
+          : gap > 0
+            ? `its records cover ${gap} fewer year${gap === 1 ? "" : "s"} of the period`
+            : "a weaker match";
       text += ` Chosen over ${nearest.name}, which is ${nearest.distanceKm < active.distanceKm - 0.5 ? "closer" : "as close"} but ${why}.`;
     }
-  }
-  else text = "Pick a station to use its measured wind instead of the weather model's.";
+  } else text = "Pick a station to use its measured wind instead of the weather model's.";
   hint.textContent = text;
   renderStationPins(list || [], active);
 }
@@ -221,13 +326,23 @@ function renderStationPicker() {
 function renderStationPins(list, active) {
   if (!state.map) return;
   state.stationLayer?.remove();
-  state.stationLayer = L.layerGroup(list.map((s) => {
-    const on = active?.id === s.id;
-    const m = L.circleMarker([s.lat, s.lon], { radius: on ? 7 : 5, color: on ? COLORS.wind : "#556074", weight: on ? 2 : 1, fillColor: on ? COLORS.wind : "#ffffff", fillOpacity: on ? 0.9 : 0.8 })
-      .bindTooltip(`${s.name}: ${stationPlace(s)}${riseText(s)}, hourly records ${s.first}–${s.last}${on ? " (in use)" : ""}`)
-      .on("click", () => chooseWindSource(`eccc:${s.id}`));
-    return m;
-  })).addTo(state.map);
+  state.stationLayer = L.layerGroup(
+    list.map((s) => {
+      const on = active?.id === s.id;
+      const m = L.circleMarker([s.lat, s.lon], {
+        radius: on ? 7 : 5,
+        color: on ? COLORS.wind : "#556074",
+        weight: on ? 2 : 1,
+        fillColor: on ? COLORS.wind : "#ffffff",
+        fillOpacity: on ? 0.9 : 0.8,
+      })
+        .bindTooltip(
+          `${s.name}: ${stationPlace(s)}${riseText(s)}, hourly records ${s.first}–${s.last}${on ? " (in use)" : ""}`,
+        )
+        .on("click", () => chooseWindSource(`eccc:${s.id}`));
+      return m;
+    }),
+  ).addTo(state.map);
   // The picker is the keyboard route to the same choice, so the pins aren't tab stops.
   state.stationLayer.eachLayer((m) => m.getElement()?.setAttribute("tabindex", "-1"));
 }
@@ -263,7 +378,11 @@ function syncCapture() {
 
 function modelParams(v) {
   let curvePts;
-  try { curvePts = parseCurve(v.curve); } catch (e) { throw invalid("curve", e.message); }
+  try {
+    curvePts = parseCurve(v.curve);
+  } catch (e) {
+    throw invalid("curve", e.message);
+  }
   return {
     nTurbines: Math.round(num(v, "nTurbines", "Number of turbines", { min: 1, max: 100000 })),
     hubHeight: num(v, "hubHeight", "Hub height", { min: 1, max: 200 }),
@@ -312,7 +431,9 @@ function flash(btn, text, ms = 2000) {
   clearTimeout(btn._flash);
   btn.dataset.label ??= btn.textContent;
   btn.textContent = text;
-  btn._flash = setTimeout(() => { btn.textContent = btn.dataset.label; }, ms);
+  btn._flash = setTimeout(() => {
+    btn.textContent = btn.dataset.label;
+  }, ms);
 }
 
 function status(html, kind = "info") {
@@ -328,7 +449,11 @@ let runToken = 0;
 let abortCtl = null;
 
 async function analyse({ fetchIfNeeded = true } = {}) {
-  form.querySelectorAll(".invalid").forEach((el) => { el.classList.remove("invalid"); el.removeAttribute("aria-invalid"); el.removeAttribute("aria-describedby"); });
+  form.querySelectorAll(".invalid").forEach((el) => {
+    el.classList.remove("invalid");
+    el.removeAttribute("aria-invalid");
+    el.removeAttribute("aria-describedby");
+  });
   formError("");
   const v = readForm();
   let req, params;
@@ -349,7 +474,11 @@ async function analyse({ fetchIfNeeded = true } = {}) {
   req.station = resolveStation(v.windSource, await loadStations(), req);
   if (requestKey(req) !== state.wxKey) {
     if (!fetchIfNeeded) {
-      if (state.result && !state.loading) status("The location, period, panel orientation or wind data changed. Press <strong>Analyse this site</strong> to load weather data for it.", "stale");
+      if (state.result && !state.loading)
+        status(
+          "The location, period, panel orientation or wind data changed. Press <strong>Analyse this site</strong> to load weather data for it.",
+          "stale",
+        );
       return;
     }
     const token = ++runToken;
@@ -361,22 +490,37 @@ async function analyse({ fetchIfNeeded = true } = {}) {
     const period = req.startYear === req.endYear ? String(req.endYear) : `${req.startYear}–${req.endYear}`;
     state.loading = true;
     // Weather model and station years download side by side; progress counts both.
-    const progress = { model: [0, req.endYear - req.startYear + 1], station: [0, req.station ? req.endYear - req.startYear + 1 : 0] };
+    const progress = {
+      model: [0, req.endYear - req.startYear + 1],
+      station: [0, req.station ? req.endYear - req.startYear + 1 : 0],
+    };
     const what = req.station ? `hourly weather and ${esc(req.station.name)} station readings` : "hourly weather";
     const showProgress = (part) => (done, total) => {
       if (token !== runToken) return;
       progress[part] = [done, total];
-      const d = progress.model[0] + progress.station[0], t = progress.model[1] + progress.station[1];
+      const d = progress.model[0] + progress.station[0],
+        t = progress.model[1] + progress.station[1];
       runBtn.textContent = `Loading weather… ${Math.round((100 * d) / t)}%`;
-      status(`Loading ${what} for ${period}…` + `<div class="progress"><div style="width:${Math.round((100 * d) / t)}%"></div></div>`);
+      status(
+        `Loading ${what} for ${period}…` +
+          `<div class="progress"><div style="width:${Math.round((100 * d) / t)}%"></div></div>`,
+      );
     };
     try {
       const signal = abortCtl.signal;
       const [wx, obs] = await Promise.all([
         fetchWeather({ ...req, signal, onProgress: showProgress("model") }),
         req.station
-          ? fetchStationHours({ id: req.station.id, startYear: req.startYear, endYear: req.endYear, signal, onProgress: showProgress("station") })
-            .catch((e) => { if (signal.aborted) throw e; return { error: e.message || String(e) }; })
+          ? fetchStationHours({
+              id: req.station.id,
+              startYear: req.startYear,
+              endYear: req.endYear,
+              signal,
+              onProgress: showProgress("station"),
+            }).catch((e) => {
+              if (signal.aborted) throw e;
+              return { error: e.message || String(e) };
+            })
           : null,
       ]);
       if (token !== runToken) return;
@@ -386,21 +530,29 @@ async function analyse({ fetchIfNeeded = true } = {}) {
       status(esc(e.message || e), "error");
       return;
     } finally {
-      if (token === runToken) { runBtn.disabled = false; runBtn.textContent = "Analyse this site"; state.loading = false; }
+      if (token === runToken) {
+        runBtn.disabled = false;
+        runBtn.textContent = "Analyse this site";
+        state.loading = false;
+      }
     }
   }
 
   state.params = params;
   state.result = simulate(state.wx, params);
   const check = checkCurve(params.curvePts, params.captureAreaM2, params.augmentation);
-  state.capped = check.worstRatio > 1 && !params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: true }) : null;
+  state.capped =
+    check.worstRatio > 1 && !params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: true }) : null;
   // With the cap on, the uncapped run says what the cap took away (after losses, so it matches the figures).
-  state.uncapped = check.worstRatio > 1 && params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: false }) : null;
+  state.uncapped =
+    check.worstRatio > 1 && params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: false }) : null;
   status("");
   render(v, check);
   if (fetchIfNeeded && matchMedia("(max-width: 960px)").matches) {
     // Single-column layout: the report sits below the form, so bring it into view.
-    $("#results").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    $("#results").scrollIntoView({
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
   }
 }
 
@@ -428,8 +580,12 @@ function render(v, check) {
   $("#print").disabled = false;
 
   const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
-  $("#reportHead").innerHTML = `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} year${wx.years === 1 ? "" : "s"} of hourly weather (${wx.startYear === wx.endYear ? wx.endYear : `${wx.startYear}–${wx.endYear}`})` +
-    (state.source?.stats ? `, wind measured at ${esc(state.source.station.name)} (${stationPlace(state.source.station)})` : "") + ` · ` +
+  $("#reportHead").innerHTML =
+    `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} year${wx.years === 1 ? "" : "s"} of hourly weather (${wx.startYear === wx.endYear ? wx.endYear : `${wx.startYear}–${wx.endYear}`})` +
+    (state.source?.stats
+      ? `, wind measured at ${esc(state.source.station.name)} (${stationPlace(state.source.station)})`
+      : "") +
+    ` · ` +
     `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString(undefined, { dateStyle: "medium" })}</p>`;
 
   renderVerdict(r, p);
@@ -442,7 +598,13 @@ function render(v, check) {
   if (state.map) {
     state.cell?.remove();
     const h = ERA5_CELL_DEG / 2;
-    state.cell = L.rectangle([[wx.gridLat - h, wx.gridLon - h], [wx.gridLat + h, wx.gridLon + h]], { color: COLORS.wind, weight: 1, fillOpacity: 0.08 })
+    state.cell = L.rectangle(
+      [
+        [wx.gridLat - h, wx.gridLon - h],
+        [wx.gridLat + h, wx.gridLon + h],
+      ],
+      { color: COLORS.wind, weight: 1, fillOpacity: 0.08 },
+    )
       .bindTooltip("Weather data grid cell (~28 km): wind and sunlight are averaged over this area")
       .addTo(state.map);
     state.cell.getElement()?.setAttribute("tabindex", "-1"); // hover-only hint, not a tab stop
@@ -453,9 +615,15 @@ const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function verdictFor(r) {
   const pb = r.econ.payback;
-  if (pb <= 10) return { cls: "good", label: "Promising", text: `the turbines pay back in about ${fmt(pb, pb < 10 ? 1 : 0)} years` };
+  if (pb <= 10)
+    return {
+      cls: "good",
+      label: "Promising",
+      text: `the turbines pay back in about ${fmt(pb, pb < 10 ? 1 : 0)} years`,
+    };
   if (pb <= 20) return { cls: "warn", label: "Marginal", text: `the turbines pay back in about ${fmt(pb)} years` };
-  if (Number.isFinite(pb)) return { cls: "bad", label: "Weak", text: `the turbines take about ${fmt(pb)} years to pay back` };
+  if (Number.isFinite(pb))
+    return { cls: "bad", label: "Weak", text: `the turbines take about ${fmt(pb)} years to pay back` };
   return { cls: "bad", label: "Not viable", text: "the turbines' savings don't cover their maintenance" };
 }
 
@@ -472,7 +640,8 @@ function renderVerdict(r) {
       `The figures below take the curve at face value. Capped at the physical limit: ${fmt(state.capped.windKwh)} kWh a year from wind, and ${c.text}. Only an independently measured power curve can settle it.`,
     ];
   }
-  $("#verdict").innerHTML = `<h3 id="verdictHead" class="verdict-head"><span class="tag ${tag.cls}">${esc(tag.label)}</span> ${esc(head)}</h3>` +
+  $("#verdict").innerHTML =
+    `<h3 id="verdictHead" class="verdict-head"><span class="tag ${tag.cls}">${esc(tag.label)}</span> ${esc(head)}</h3>` +
     lines.map((l) => `<p class="verdict-detail">${esc(l)}</p>`).join("");
 }
 
@@ -496,46 +665,76 @@ function renderNotes(r, p, check) {
     const area = `${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m² of capture area (${p.captureDesc})`;
     const aug = p.augmentation > 1 ? `, even with ${fmt(p.augmentation, 1)}× duct augmentation` : "";
     if (p.clampPhysics) {
-      items.push(["warn", `<strong>Power curve:</strong> output is capped at the physical limit for ${area}, which takes wind energy from ${fmt(state.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`]);
+      items.push([
+        "warn",
+        `<strong>Power curve:</strong> output is capped at the physical limit for ${area}, which takes wind energy from ${fmt(state.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`,
+      ]);
     } else {
-      items.push(["bad", `<strong>Power curve:</strong> at ${fmt(check.atKmh)} km/h it is ${fmt(check.worstRatio)}× the most the wind through ${area} can deliver (the Betz limit${aug}). ` +
-        `Even a perfect device this size could capture at most ${fmt(r.physicsCapKwh)} kWh a year here, before losses. Shapes inside the device, such as scoops, spirals or torque-multiplying coils, can redirect that energy but not add to it. ` +
-        `Before quoting customers, measure the electrical output against the free wind speed, and enter the device's full frontal outline as the capture area.`]);
+      items.push([
+        "bad",
+        `<strong>Power curve:</strong> at ${fmt(check.atKmh)} km/h it is ${fmt(check.worstRatio)}× the most the wind through ${area} can deliver (the Betz limit${aug}). ` +
+          `Even a perfect device this size could capture at most ${fmt(r.physicsCapKwh)} kWh a year here, before losses. Shapes inside the device, such as scoops, spirals or torque-multiplying coils, can redirect that energy but not add to it. ` +
+          `Before quoting customers, measure the electrical output against the free wind speed, and enter the device's full frontal outline as the capture area.`,
+      ]);
     }
   }
   const src = state.source;
   if (src?.stats) {
     const st = src.stats;
-    items.push(["info", `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${fromSite(src.station)}, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
-      `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
-      `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`]);
+    items.push([
+      "info",
+      `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${fromSite(src.station)}, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
+        `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
+        `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`,
+    ]);
     items.push(...stationChecks(src.station, st, state.wx.elevation));
   } else if (src?.error) {
-    items.push(["warn", `<strong>Station data:</strong> couldn't load readings from ${esc(src.station.name)} (${esc(src.error)}), so this report uses the weather model. Press <em>Analyse this site</em> to try again.`]);
+    items.push([
+      "warn",
+      `<strong>Station data:</strong> couldn't load readings from ${esc(src.station.name)} (${esc(src.error)}), so this report uses the weather model. Press <em>Analyse this site</em> to try again.`,
+    ]);
   } else if (src) {
-    items.push(["warn", `<strong>Station data:</strong> ${esc(src.station.name)} has wind readings for only ${pct(src.unused)} of these hours, so this report uses the weather model${src.station.explicit ? "" : ". Pick the station under <em>Wind data</em> to use it anyway"}.`]);
+    items.push([
+      "warn",
+      `<strong>Station data:</strong> ${esc(src.station.name)} has wind readings for only ${pct(src.unused)} of these hours, so this report uses the weather model${src.station.explicit ? "" : ". Pick the station under <em>Wind data</em> to use it anyway"}.`,
+    ]);
   }
   if (p.siteMeanKmh > 0) {
-    items.push(["warn", `<strong>Wind data:</strong> scaled ×${fmt(r.scale, 2)} so the mean at hub height matches the measured ${fmt(p.siteMeanKmh, 1)} km/h. The weather data alone gave ${fmt(r.modelHubMean, 1)} km/h.`]);
+    items.push([
+      "warn",
+      `<strong>Wind data:</strong> scaled ×${fmt(r.scale, 2)} so the mean at hub height matches the measured ${fmt(p.siteMeanKmh, 1)} km/h. The weather data alone gave ${fmt(r.modelHubMean, 1)} km/h.`,
+    ]);
   } else if (p.windScale !== 1) {
     items.push(["warn", `<strong>Wind data:</strong> scaled ×${fmt(p.windScale, 2)} by hand.`]);
   } else if (!src?.stats) {
-    items.push(["warn", `<strong>Wind data:</strong> not calibrated. It's averaged over a ~28 km grid cell, and terrain, trees and buildings can change the wind at the turbine a lot; energy rises with the cube of wind speed. Enter a measured mean under <em>Site wind calibration</em> if one exists.`]);
+    items.push([
+      "warn",
+      `<strong>Wind data:</strong> not calibrated. It's averaged over a ~28 km grid cell, and terrain, trees and buildings can change the wind at the turbine a lot; energy rises with the cube of wind speed. Enter a measured mean under <em>Site wind calibration</em> if one exists.`,
+    ]);
   }
-  if (p.hubHeight < 10) items.push(["warn", `<strong>Hub height:</strong> below 10 m the wind is extrapolated downward, and wind near roofs and the ground is turbulent and hard to predict.`]);
-  if (state.wx.missing > 0) items.push(["warn", `<strong>Missing data:</strong> ${fmt(state.wx.missing)} hours had gaps and were skipped.`]);
+  if (p.hubHeight < 10)
+    items.push([
+      "warn",
+      `<strong>Hub height:</strong> below 10 m the wind is extrapolated downward, and wind near roofs and the ground is turbulent and hard to predict.`,
+    ]);
+  if (state.wx.missing > 0)
+    items.push(["warn", `<strong>Missing data:</strong> ${fmt(state.wx.missing)} hours had gaps and were skipped.`]);
   $("#notes").innerHTML = items.map(([cls, html]) => `<li class="${cls}">${html}</li>`).join("");
 }
 
 /** One figure: label, value (with optional unit) and a supporting line. */
 const figure = (label, value, unit, sub, cls = "") =>
   `<div><dt>${esc(label)}</dt><dd class="value ${cls}">${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>` +
-  (sub ? `<dd class="sub">${esc(sub)}</dd>` : "") + `</div>`;
+  (sub ? `<dd class="sub">${esc(sub)}</dd>` : "") +
+  `</div>`;
 
 function renderFigures(r, p, req) {
-  const A = r.pvOnly, B = r.withWind, e = r.econ;
+  const A = r.pvOnly,
+    B = r.withWind,
+    e = r.econ;
   const cut = A.importKwh - B.importKwh;
-  const cutShare = A.importKwh > 0 ? `${pct(cut / A.importKwh)} less than without wind` : "No grid purchases even without wind";
+  const cutShare =
+    A.importKwh > 0 ? `${pct(cut / A.importKwh)} less than without wind` : "No grid purchases even without wind";
   $("#figures").innerHTML = [
     figure("Wind energy", fmt(r.windKwh), "kWh/yr", `${pct(r.capacityFactor, 1)} capacity factor`, "wind"),
     figure("Grid purchases cut by", fmt(cut), "kWh/yr", cutShare),
@@ -549,18 +748,46 @@ function renderFigures(r, p, req) {
     `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
   // Supporting figures only: anything already in the summary or the assumptions isn't repeated here.
   $("#stats").innerHTML = [
-    stat("Mean wind at hub", fmt(r.meanHub, 1), "km/h", state.source?.stats ? `${fmt(r.meanW10, 1)} at 10 m, measured with gaps filled` : `Weather data: ${fmt(r.meanW10, 1)} at 10 m, ${fmt(r.meanW100, 1)} at 100 m`),
-    ...(state.source?.stats ? [
-      stat("Station vs weather model", `${fmt(state.source.stats.meanStation, 1)} vs ${fmt(state.source.stats.meanModel, 1)}`, "km/h", `at 10 m, same hours; ${fmt(state.source.stats.energyRatio, 1)}× the wind energy`),
-      stat("Measured hours", pct(state.source.stats.coverage, 1), "", `${fmt(state.source.stats.filled)} hours filled from the model`),
-    ] : []),
+    stat(
+      "Mean wind at hub",
+      fmt(r.meanHub, 1),
+      "km/h",
+      state.source?.stats
+        ? `${fmt(r.meanW10, 1)} at 10 m, measured with gaps filled`
+        : `Weather data: ${fmt(r.meanW10, 1)} at 10 m, ${fmt(r.meanW100, 1)} at 100 m`,
+    ),
+    ...(state.source?.stats
+      ? [
+          stat(
+            "Station vs weather model",
+            `${fmt(state.source.stats.meanStation, 1)} vs ${fmt(state.source.stats.meanModel, 1)}`,
+            "km/h",
+            `at 10 m, same hours; ${fmt(state.source.stats.energyRatio, 1)}× the wind energy`,
+          ),
+          stat(
+            "Measured hours",
+            pct(state.source.stats.coverage, 1),
+            "",
+            `${fmt(state.source.stats.filled)} hours filled from the model`,
+          ),
+        ]
+      : []),
     stat("Turbines producing", pct(r.generatingShare), "", "of all hours"),
-    p.nTurbines > 1 ? stat("Per turbine", fmt(r.windKwhPerTurbine), "kWh/yr", `${fmt(r.windKwhPerTurbine / 365, 1)} kWh a day`) : "",
+    p.nTurbines > 1
+      ? stat("Per turbine", fmt(r.windKwhPerTurbine), "kWh/yr", `${fmt(r.windKwhPerTurbine / 365, 1)} kWh a day`)
+      : "",
     stat("Wind cost per kWh", money(e.costPerKwh20, 2), "", `over 20 years, vs ${money(p.price, 2)} from the grid`),
     stat("Solar energy", fmt(r.pvKwh), "kWh/yr", `${fmt(p.pvKwp, 1)} kWp, tilt ${req.tilt}°, facing ${req.compass}°`),
     stat("Self-sufficiency", pct(B.selfSufficiency), "", `${pct(A.selfSufficiency)} without wind`),
     stat("Surplus exported", fmt(B.exportKwh), "kWh/yr", `${fmt(A.exportKwh)} without wind`),
-    p.inverterKw > 0 ? stat("Lost to the inverter limit", fmt(r.inverterLostKwh.withWind), "kWh/yr", `${fmt(r.inverterLostKwh.pvOnly)} without wind`) : "",
+    p.inverterKw > 0
+      ? stat(
+          "Lost to the inverter limit",
+          fmt(r.inverterLostKwh.withWind),
+          "kWh/yr",
+          `${fmt(r.inverterLostKwh.pvOnly)} without wind`,
+        )
+      : "",
   ].join("");
 }
 
@@ -585,7 +812,9 @@ function drawChart(id, config) {
   state.charts[id] = new Chart(document.getElementById(id), {
     ...config,
     options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: legendLabels }, ...config.options?.plugins },
       ...config.options,
@@ -604,8 +833,23 @@ function renderCharts(r, p) {
     data: {
       labels: bins,
       datasets: [
-        { type: "bar", label: "Hours per year", data: r.hist.hours.slice(0, last + 1).map((x) => Math.round(x)), backgroundColor: "rgba(31,119,180,0.35)", yAxisID: "y" },
-        { type: "line", label: "Wind energy (kWh/yr)", data: r.hist.energy.slice(0, last + 1).map((x) => Math.round(x)), borderColor: COLORS.wind, backgroundColor: COLORS.wind, pointRadius: 0, tension: 0.3, yAxisID: "y1" },
+        {
+          type: "bar",
+          label: "Hours per year",
+          data: r.hist.hours.slice(0, last + 1).map((x) => Math.round(x)),
+          backgroundColor: "rgba(31,119,180,0.35)",
+          yAxisID: "y",
+        },
+        {
+          type: "line",
+          label: "Wind energy (kWh/yr)",
+          data: r.hist.energy.slice(0, last + 1).map((x) => Math.round(x)),
+          borderColor: COLORS.wind,
+          backgroundColor: COLORS.wind,
+          pointRadius: 0,
+          tension: 0.3,
+          yAxisID: "y1",
+        },
       ],
     },
     options: {
@@ -624,7 +868,14 @@ function renderCharts(r, p) {
       datasets: [
         { type: "bar", label: "Wind", data: round(r.monthly.wind), backgroundColor: COLORS.wind, stack: "gen" },
         { type: "bar", label: "Solar", data: round(r.monthly.pv), backgroundColor: COLORS.solar, stack: "gen" },
-        { type: "line", label: "Electricity use", data: round(r.monthly.load), borderColor: COLORS.load, backgroundColor: COLORS.load, pointRadius: 2 },
+        {
+          type: "line",
+          label: "Electricity use",
+          data: round(r.monthly.load),
+          borderColor: COLORS.load,
+          backgroundColor: COLORS.load,
+          pointRadius: 2,
+        },
       ],
     },
     options: { scales: { x: { stacked: true }, y: axis("kWh per month", { stacked: true, beginAtZero: true }) } },
@@ -649,8 +900,20 @@ function renderCharts(r, p) {
     data: {
       labels: r.yearly.map((y) => String(y.year)),
       datasets: [
-        { type: "bar", label: "Wind energy", data: r.yearly.map((y) => Math.round(y.kwh)), backgroundColor: COLORS.wind },
-        { type: "line", label: "Average", data: r.yearly.map(() => Math.round(mean)), borderColor: COLORS.load, borderDash: [5, 4], pointRadius: 0 },
+        {
+          type: "bar",
+          label: "Wind energy",
+          data: r.yearly.map((y) => Math.round(y.kwh)),
+          backgroundColor: COLORS.wind,
+        },
+        {
+          type: "line",
+          label: "Average",
+          data: r.yearly.map(() => Math.round(mean)),
+          borderColor: COLORS.load,
+          borderDash: [5, 4],
+          pointRadius: 0,
+        },
       ],
     },
     options: { scales: { y: axis("kWh per year", { beginAtZero: true }) } },
@@ -664,16 +927,33 @@ function renderCharts(r, p) {
     data: {
       labels: speeds.map(String),
       datasets: [
-        { label: "Entered power curve (W)", data: speeds.map((s) => positive(curve(s))), borderColor: COLORS.wind, backgroundColor: COLORS.wind, pointRadius: 0 },
-        { label: `Physical limit, ${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m²${p.augmentation > 1 ? ` ×${fmt(p.augmentation, 1)}` : ""} (W)`, data: speeds.map((s) => positive(betzLimitW(s, p.captureAreaM2) * p.augmentation)), borderColor: COLORS.limit, backgroundColor: COLORS.limit, borderDash: [6, 4], pointRadius: 0 },
+        {
+          label: "Entered power curve (W)",
+          data: speeds.map((s) => positive(curve(s))),
+          borderColor: COLORS.wind,
+          backgroundColor: COLORS.wind,
+          pointRadius: 0,
+        },
+        {
+          label: `Physical limit, ${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m²${p.augmentation > 1 ? ` ×${fmt(p.augmentation, 1)}` : ""} (W)`,
+          data: speeds.map((s) => positive(betzLimitW(s, p.captureAreaM2) * p.augmentation)),
+          borderColor: COLORS.limit,
+          backgroundColor: COLORS.limit,
+          borderDash: [6, 4],
+          pointRadius: 0,
+        },
       ],
     },
     options: {
       scales: {
         x: axis("Wind speed (km/h)", { ticks: { maxTicksLimit: 13 } }),
         y: axis("Watts (log scale)", {
-          type: "logarithmic", min: 0.1,
-          ticks: { callback: (v) => ([0.1, 1, 10, 100, 1000, 10000, 100000].includes(v) ? (v >= 1000 ? `${v / 1000}k` : String(v)) : "") },
+          type: "logarithmic",
+          min: 0.1,
+          ticks: {
+            callback: (v) =>
+              [0.1, 1, 10, 100, 1000, 10000, 100000].includes(v) ? (v >= 1000 ? `${v / 1000}k` : String(v)) : "",
+          },
         }),
       },
     },
@@ -691,12 +971,39 @@ function renderSoc() {
     data: {
       labels: hours,
       datasets: [
-        { label: "With wind", data: asPct(r.socDay.withWind[mo]), borderColor: COLORS.wind, backgroundColor: COLORS.wind, pointRadius: 0, tension: 0.3 },
-        { label: "Without wind", data: asPct(r.socDay.pvOnly[mo]), borderColor: COLORS.grey, backgroundColor: COLORS.grey, borderDash: [6, 4], pointRadius: 0, tension: 0.3 },
-        { label: "Minimum charge", data: hours.map(() => state.params.battMinSoc * 100), borderColor: COLORS.limit, borderWidth: 1, borderDash: [2, 3], pointRadius: 0 },
+        {
+          label: "With wind",
+          data: asPct(r.socDay.withWind[mo]),
+          borderColor: COLORS.wind,
+          backgroundColor: COLORS.wind,
+          pointRadius: 0,
+          tension: 0.3,
+        },
+        {
+          label: "Without wind",
+          data: asPct(r.socDay.pvOnly[mo]),
+          borderColor: COLORS.grey,
+          backgroundColor: COLORS.grey,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          tension: 0.3,
+        },
+        {
+          label: "Minimum charge",
+          data: hours.map(() => state.params.battMinSoc * 100),
+          borderColor: COLORS.limit,
+          borderWidth: 1,
+          borderDash: [2, 3],
+          pointRadius: 0,
+        },
       ],
     },
-    options: { scales: { y: axis("Battery charge (%)", { min: 0, max: 100 }), x: axis("Hour of day", { ticks: { maxTicksLimit: 8 } }) } },
+    options: {
+      scales: {
+        y: axis("Battery charge (%)", { min: 0, max: 100 }),
+        x: axis("Hour of day", { ticks: { maxTicksLimit: 8 } }),
+      },
+    },
   });
 }
 
@@ -709,26 +1016,52 @@ function monthlyRows(r) {
 
 function renderMonthly(r) {
   const { head, rows, total } = monthlyRows(r);
-  const tr = (cells, tag = "td") => `<tr>${cells.map((c, i) => `<${tag}>${i ? fmt(c) : esc(c)}</${tag}>`).join("")}</tr>`;
-  $("#monthlyTable").innerHTML = `<caption class="visually-hidden">Monthly energy in kWh for an average year</caption><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>` +
+  const tr = (cells, tag = "td") =>
+    `<tr>${cells.map((c, i) => `<${tag}>${i ? fmt(c) : esc(c)}</${tag}>`).join("")}</tr>`;
+  $("#monthlyTable").innerHTML =
+    `<caption class="visually-hidden">Monthly energy in kWh for an average year</caption><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>` +
     `<tbody>${rows.map((row) => tr(row)).join("")}</tbody><tfoot>${tr(total)}</tfoot>`;
 }
 
 function assumptionRows(r, p, req, wx) {
   const ratedKw = r.ratedKw / p.nTurbines;
   return [
-    ["Site", `${req.lat.toFixed(4)}, ${req.lon.toFixed(4)}; weather grid cell centred ${wx.gridLat}, ${wx.gridLon}; elevation ${fmt(wx.elevation)} m; ${wx.timezone}`],
-    ["Weather data", `ERA5 reanalysis via Open-Meteo, hourly, ${wx.startYear}–${wx.endYear} (${fmt(wx.n)} hours, ${fmt(wx.missing)} missing)`],
+    [
+      "Site",
+      `${req.lat.toFixed(4)}, ${req.lon.toFixed(4)}; weather grid cell centred ${wx.gridLat}, ${wx.gridLon}; elevation ${fmt(wx.elevation)} m; ${wx.timezone}`,
+    ],
+    [
+      "Weather data",
+      `ERA5 reanalysis via Open-Meteo, hourly, ${wx.startYear}–${wx.endYear} (${fmt(wx.n)} hours, ${fmt(wx.missing)} missing)`,
+    ],
     ...(state.source?.stats ? [["Wind data", windDataText(state.source)]] : []),
-    ["Wind at hub", `${p.hubHeight} m, from ${state.source?.stats ? "the 10 m wind with the weather model's" : "10 m and 100 m winds with an"} hourly shear exponent (mean ${fmt(r.meanAlpha, 2)}); scaled ×${fmt(r.scale, 2)}; air density correction ${p.densityCorrection ? "on" : "off"}; ${p.windLossPct}% losses`],
-    ["Turbines", `${p.nTurbines} × ${fmt(ratedKw, 2)} kW peak; ${p.curvePts.length}-point power curve; capture area ${fmt(p.captureAreaM2, 2)} m² (${p.captureDesc}), augmentation ×${fmt(p.augmentation, 1)}; ${p.clampPhysics ? "capped at" : "not capped at"} the physical limit`],
-    ["Solar", `${p.pvKwp} kWp, tilt ${req.tilt}°, facing ${req.compass}°; ${p.pvLossPct}% losses; ${p.tempCoeffPct}%/°C`],
+    [
+      "Wind at hub",
+      `${p.hubHeight} m, from ${state.source?.stats ? "the 10 m wind with the weather model's" : "10 m and 100 m winds with an"} hourly shear exponent (mean ${fmt(r.meanAlpha, 2)}); scaled ×${fmt(r.scale, 2)}; air density correction ${p.densityCorrection ? "on" : "off"}; ${p.windLossPct}% losses`,
+    ],
+    [
+      "Turbines",
+      `${p.nTurbines} × ${fmt(ratedKw, 2)} kW peak; ${p.curvePts.length}-point power curve; capture area ${fmt(p.captureAreaM2, 2)} m² (${p.captureDesc}), augmentation ×${fmt(p.augmentation, 1)}; ${p.clampPhysics ? "capped at" : "not capped at"} the physical limit`,
+    ],
+    [
+      "Solar",
+      `${p.pvKwp} kWp, tilt ${req.tilt}°, facing ${req.compass}°; ${p.pvLossPct}% losses; ${p.tempCoeffPct}%/°C`,
+    ],
     ["Electricity use", `${fmt(p.loadKwh)} kWh/yr, ${LOAD_PRESETS[p.loadProfile]?.label ?? "custom profile"}`],
-    ["Battery", `${p.battKwh} kWh, ${p.battKw} kW, kept above ${fmt(p.battMinSoc * 100)}%, ${fmt(p.battRte * 100)}% round trip; charged from surplus, then surplus exported`],
-    ["Inverter", p.inverterKw > 0
-      ? `${fmt(p.inverterKw, 1)} kW shared by wind and solar; output above it is lost (${fmt(r.inverterLostKwh.withWind)} kWh/yr, ${fmt(r.inverterLostKwh.pvOnly)} without wind)`
-      : "no shared limit"],
-    ["Economics", `grid ${money(p.price, 2)}/kWh, export credit ${money(p.exportCredit, 2)}/kWh, ${money(p.turbineCost)} installed and ${money(p.omPerTurbine)}/yr maintenance per turbine; no inflation, discounting or incentives`],
+    [
+      "Battery",
+      `${p.battKwh} kWh, ${p.battKw} kW, kept above ${fmt(p.battMinSoc * 100)}%, ${fmt(p.battRte * 100)}% round trip; charged from surplus, then surplus exported`,
+    ],
+    [
+      "Inverter",
+      p.inverterKw > 0
+        ? `${fmt(p.inverterKw, 1)} kW shared by wind and solar; output above it is lost (${fmt(r.inverterLostKwh.withWind)} kWh/yr, ${fmt(r.inverterLostKwh.pvOnly)} without wind)`
+        : "no shared limit",
+    ],
+    [
+      "Economics",
+      `grid ${money(p.price, 2)}/kWh, export credit ${money(p.exportCredit, 2)}/kWh, ${money(p.turbineCost)} installed and ${money(p.omPerTurbine)}/yr maintenance per turbine; no inflation, discounting or incentives`,
+    ],
   ];
 }
 
@@ -741,33 +1074,53 @@ function stationChecks(station, st, siteElevationM) {
   const rise = station.elevation - siteElevationM;
   if (Math.abs(rise) >= ELEVATION_NOTE_M) {
     const req = state.req;
-    const better = state.stations.list && req
-      ? pickStation(state.stations.list.filter((s) => s.id !== station.id && Math.abs(s.rise) < ELEVATION_NOTE_M), autoEligible(req), missingYears(req))
-      : null;
-    out.push(["warn", `<strong>Station elevation:</strong> ${name} is ${fmt(Math.abs(rise))} m ${rise > 0 ? "higher" : "lower"} than the site ` +
-      `(${fmt(station.elevation)} m against ${fmt(siteElevationM)} m). Stations on hills and ridges usually measure stronger wind than lower ground nearby, and stations in valleys weaker, ` +
-      `so the wind at the site may be well ${rise > 0 ? "below" : "above"} what was measured.` +
-      (better ? ` ${esc(better.name)}, ${fromSite(better)}, is closer to the site's elevation; pick it under <em>Wind data</em> to compare.` : "")]);
+    const better =
+      state.stations.list && req
+        ? pickStation(
+            state.stations.list.filter((s) => s.id !== station.id && Math.abs(s.rise) < ELEVATION_NOTE_M),
+            autoEligible(req),
+            missingYears(req),
+          )
+        : null;
+    out.push([
+      "warn",
+      `<strong>Station elevation:</strong> ${name} is ${fmt(Math.abs(rise))} m ${rise > 0 ? "higher" : "lower"} than the site ` +
+        `(${fmt(station.elevation)} m against ${fmt(siteElevationM)} m). Stations on hills and ridges usually measure stronger wind than lower ground nearby, and stations in valleys weaker, ` +
+        `so the wind at the site may be well ${rise > 0 ? "below" : "above"} what was measured.` +
+        (better
+          ? ` ${esc(better.name)}, ${fromSite(better)}, is closer to the site's elevation; pick it under <em>Wind data</em> to compare.`
+          : ""),
+    ]);
   }
   if (st.correlation < POOR_CORRELATION) {
-    out.push(["warn", `<strong>Station match:</strong> the station and the weather model agree poorly hour by hour (correlation ${fmt(st.correlation, 2)}). ` +
-      `Wind at ${name} follows its own local pattern, such as a valley or lake breeze, so it may not represent the site either. Use a closer or more similar station if there is one.`]);
+    out.push([
+      "warn",
+      `<strong>Station match:</strong> the station and the weather model agree poorly hour by hour (correlation ${fmt(st.correlation, 2)}). ` +
+        `Wind at ${name} follows its own local pattern, such as a valley or lake breeze, so it may not represent the site either. Use a closer or more similar station if there is one.`,
+    ]);
   }
   const h = st.homogeneity;
   if (h?.issue === "step") {
     const s = h.step;
     const recent = s.to - s.year + 1;
-    const fix = recent >= 5
-      ? ` <button type="button" class="link" data-years="${recent}" data-end="${s.to}">Use ${span(s.year, s.to)} only</button>`
-      : ` Consider another station under <em>Wind data</em>.`;
-    out.push(["warn", `<strong>Station record:</strong> from ${s.year} the wind measured at ${name} is ${pct(Math.abs(s.change))} ${s.change > 0 ? "higher" : "lower"} ` +
-      `relative to the weather model than in ${span(s.from, s.year - 1)}. A jump like this usually means the instrument was moved, raised or replaced, not that the climate changed, ` +
-      `so the years before and after don't measure the same thing.${fix}`]);
+    const fix =
+      recent >= 5
+        ? ` <button type="button" class="link" data-years="${recent}" data-end="${s.to}">Use ${span(s.year, s.to)} only</button>`
+        : ` Consider another station under <em>Wind data</em>.`;
+    out.push([
+      "warn",
+      `<strong>Station record:</strong> from ${s.year} the wind measured at ${name} is ${pct(Math.abs(s.change))} ${s.change > 0 ? "higher" : "lower"} ` +
+        `relative to the weather model than in ${span(s.from, s.year - 1)}. A jump like this usually means the instrument was moved, raised or replaced, not that the climate changed, ` +
+        `so the years before and after don't measure the same thing.${fix}`,
+    ]);
   } else if (h?.issue === "trend") {
     const t = h.trend;
-    out.push(["warn", `<strong>Station record:</strong> relative to the weather model, the wind measured at ${name} ${t.change < 0 ? "fell" : "rose"} about ${pct(Math.abs(t.change))} from ${t.from} to ${t.to}. ` +
-      `A steady drift like this usually comes from changes around the instrument, such as trees growing or new buildings, rather than the climate. ` +
-      `This report averages all years, so treat its wind figures as uncertain by about that much.`]);
+    out.push([
+      "warn",
+      `<strong>Station record:</strong> relative to the weather model, the wind measured at ${name} ${t.change < 0 ? "fell" : "rose"} about ${pct(Math.abs(t.change))} from ${t.from} to ${t.to}. ` +
+        `A steady drift like this usually comes from changes around the instrument, such as trees growing or new buildings, rather than the climate. ` +
+        `This report averages all years, so treat its wind figures as uncertain by about that much.`,
+    ]);
   }
   return out;
 }
@@ -777,18 +1130,23 @@ function homogeneityText(h) {
   if (!h || h.years < 5) return "";
   const signed = (x) => `${x > 0 ? "+" : "−"}${pct(Math.abs(x))}`;
   if (h.issue === "step") return `; record steps ${signed(h.step.change)} relative to the model in ${h.step.year}`;
-  if (h.issue === "trend") return `; record drifts ${signed(h.trend.change)} relative to the model over ${span(h.trend.from, h.trend.to)}`;
+  if (h.issue === "trend")
+    return `; record drifts ${signed(h.trend.change)} relative to the model over ${span(h.trend.from, h.trend.to)}`;
   return `; no step or drift relative to the model across ${h.years} years`;
 }
 
 function windDataText({ station: s, stats: st }) {
-  return `measured hourly at ${s.name} (Environment and Climate Change Canada, climate ID ${s.id}), ${fromSite(s)}, ` +
+  return (
+    `measured hourly at ${s.name} (Environment and Climate Change Canada, climate ID ${s.id}), ${fromSite(s)}, ` +
     `elevation ${fmt(s.elevation)} m, 10 m mast; ${pct(st.coverage, 1)} of hours measured, the rest filled from ERA5 at the site ` +
-    `through a seasonal quantile mapping fitted on ${fmt(st.measured)} shared hours (correlation ${fmt(st.correlation, 2)})${homogeneityText(st.homogeneity)}`;
+    `through a seasonal quantile mapping fitted on ${fmt(st.measured)} shared hours (correlation ${fmt(st.correlation, 2)})${homogeneityText(st.homogeneity)}`
+  );
 }
 
 function renderAssumptions(r, p, req, wx) {
-  $("#assumptions").innerHTML = assumptionRows(r, p, req, wx).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("");
+  $("#assumptions").innerHTML = assumptionRows(r, p, req, wx)
+    .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`)
+    .join("");
 }
 
 function downloadCsv() {
@@ -798,14 +1156,22 @@ function downloadCsv() {
   const { head, rows, total } = monthlyRows(r);
   const lines = [
     ["Wind + solar site estimate", readForm().place || ""],
-    ["Latitude", req.lat], ["Longitude", req.lon],
+    ["Latitude", req.lat],
+    ["Longitude", req.lon],
     ...assumptionRows(r, p, req, wx),
     [],
-    ["Wind kWh/yr", r.windKwh], ["Capacity factor", r.capacityFactor], ["Solar kWh/yr", r.pvKwh], ["Use kWh/yr", r.loadKwh],
-    ["Bought kWh/yr, solar + battery", r.pvOnly.importKwh], ["Bought kWh/yr, with wind", r.withWind.importKwh],
-    ["Savings from wind per yr", r.econ.savings], ["Simple payback (yrs)", Number.isFinite(r.econ.payback) ? r.econ.payback : "never"],
+    ["Wind kWh/yr", r.windKwh],
+    ["Capacity factor", r.capacityFactor],
+    ["Solar kWh/yr", r.pvKwh],
+    ["Use kWh/yr", r.loadKwh],
+    ["Bought kWh/yr, solar + battery", r.pvOnly.importKwh],
+    ["Bought kWh/yr, with wind", r.withWind.importKwh],
+    ["Savings from wind per yr", r.econ.savings],
+    ["Simple payback (yrs)", Number.isFinite(r.econ.payback) ? r.econ.payback : "never"],
     [],
-    head.map((h) => `${h} (kWh)`), ...rows, total,
+    head.map((h) => `${h} (kWh)`),
+    ...rows,
+    total,
   ];
   const blob = new Blob([lines.map((l) => l.map(q).join(",")).join("\n")], { type: "text/csv" });
   const a = document.createElement("a");
@@ -818,12 +1184,24 @@ function downloadCsv() {
 // ---------- map and place search ----------
 
 function initMap() {
-  if (typeof L === "undefined") { $("#map").hidden = true; return; }
-  const lat = Number(form.elements.lat.value) || 0, lon = Number(form.elements.lon.value) || 0;
+  if (typeof L === "undefined") {
+    $("#map").hidden = true;
+    return;
+  }
+  const lat = Number(form.elements.lat.value) || 0,
+    lon = Number(form.elements.lon.value) || 0;
   const map = L.map("map", { scrollWheelZoom: false }).setView([lat, lon], 6);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap contributors" }).addTo(map);
-  const marker = L.marker([lat, lon], { draggable: true, alt: "Site location", title: "Drag to move the site" }).addTo(map);
-  marker.on("dragend", () => { const ll = marker.getLatLng(); setLocation(ll.lat, ll.lng, ""); });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: "© OpenStreetMap contributors",
+  }).addTo(map);
+  const marker = L.marker([lat, lon], { draggable: true, alt: "Site location", title: "Drag to move the site" }).addTo(
+    map,
+  );
+  marker.on("dragend", () => {
+    const ll = marker.getLatLng();
+    setLocation(ll.lat, ll.lng, "");
+  });
   map.on("click", (e) => setLocation(e.latlng.lat, e.latlng.lng, ""));
   Object.assign(state, { map, marker });
 }
@@ -842,12 +1220,18 @@ function setLocation(lat, lon, name, { pan = false } = {}) {
 async function placeSearch() {
   const q = $("#placeSearch").value.trim();
   const ul = $("#placeResults");
-  if (!q) { ul.hidden = true; return; }
+  if (!q) {
+    ul.hidden = true;
+    return;
+  }
   ul.hidden = false;
   ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">Searching…</li>`;
   try {
     const places = await searchPlaces(q);
-    if (!places.length) { ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">No places found.</li>`; return; }
+    if (!places.length) {
+      ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">No places found.</li>`;
+      return;
+    }
     ul.innerHTML = "";
     for (const pl of places) {
       const li = document.createElement("li");
@@ -882,20 +1266,26 @@ function onChange(name) {
   }
   if (name === "loadHourly" || name === "loadMonthly") form.elements.loadProfile.value = "custom";
   if (name === "lat" || name === "lon") {
-    const lat = Number(form.elements.lat.value), lon = Number(form.elements.lon.value);
+    const lat = Number(form.elements.lat.value),
+      lon = Number(form.elements.lon.value);
     if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90) state.marker?.setLatLng([lat, lon]);
   }
   writeHash(readForm());
   clearTimeout(debounce);
   debounce = setTimeout(() => {
-    if (name === "lat" || name === "lon" || name === "years" || name === "endYear") loadStations().then(renderStationPicker);
+    if (name === "lat" || name === "lon" || name === "years" || name === "endYear")
+      loadStations().then(renderStationPicker);
     analyse({ fetchIfNeeded: false });
   }, 250);
 }
 
 function init() {
   const sel = form.elements.loadProfile;
-  for (const [key, preset] of [...Object.entries(LOAD_PRESETS), ["custom", { label: "Custom (edit below)" }]]) sel.add(new Option(preset.label, key));
+  const presets: [string, { label: string }][] = [
+    ...Object.entries(LOAD_PRESETS),
+    ["custom", { label: "Custom (edit below)" }],
+  ];
+  for (const [key, preset] of presets) sel.add(new Option(preset.label, key));
   MONTHS.forEach((m, i) => $("#socMonth").add(new Option(m, String(i))));
 
   const fromHash = readHash();
@@ -914,16 +1304,30 @@ function init() {
   $("#stationSelect").addEventListener("change", (e) => chooseWindSource(e.target.value));
   loadStations();
 
-  form.addEventListener("submit", (e) => { e.preventDefault(); analyse(); });
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    analyse();
+  });
   form.addEventListener("input", (e) => {
     if (!e.target.name) return;
-    if (e.target.name === "lat" || e.target.name === "lon") { form.elements.place.value = ""; form.elements.windSource.value = "auto"; }
+    if (e.target.name === "lat" || e.target.name === "lon") {
+      form.elements.place.value = "";
+      form.elements.windSource.value = "auto";
+    }
     if (e.target.name.startsWith("capture")) syncCapture();
     onChange(e.target.name);
   });
-  $("#placeSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); placeSearch(); } });
+  $("#placeSearch").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      placeSearch();
+    }
+  });
   $("#placeGo").addEventListener("click", placeSearch);
-  $("#resetCurve").addEventListener("click", () => { form.elements.curve.value = DEFAULTS.curve; onChange("curve"); });
+  $("#resetCurve").addEventListener("click", () => {
+    form.elements.curve.value = DEFAULTS.curve;
+    onChange("curve");
+  });
   $("#socMonth").addEventListener("change", renderSoc);
   $("#tryExample").addEventListener("click", () => {
     setLocation(Number(DEFAULTS.lat), Number(DEFAULTS.lon), DEFAULTS.place, { pan: true });
@@ -937,13 +1341,20 @@ function init() {
     form.elements.years.value = b.dataset.years;
     form.elements.endYear.value = b.dataset.end;
     writeHash(readForm());
-    loadStations().then(renderStationPicker).then(() => analyse());
+    loadStations()
+      .then(renderStationPicker)
+      .then(() => analyse());
   });
   $("#print").addEventListener("click", () => window.print());
   $("#share").addEventListener("click", async () => {
     writeHash(readForm());
-    try { await navigator.clipboard.writeText(location.href); flash($("#share"), "Link copied"); status("Link copied. Anyone opening it sees this site with these assumptions."); }
-    catch { window.prompt("Copy this link:", location.href); }
+    try {
+      await navigator.clipboard.writeText(location.href);
+      flash($("#share"), "Link copied");
+      status("Link copied. Anyone opening it sees this site with these assumptions.");
+    } catch {
+      window.prompt("Copy this link:", location.href);
+    }
   });
   $("#clearCache").addEventListener("click", async () => {
     await clearWeatherCache();
@@ -959,11 +1370,15 @@ function init() {
   let closedForPrint = [];
   window.addEventListener("beforeprint", () => {
     closedForPrint = [...document.querySelectorAll("#results details:not([open])")];
-    closedForPrint.forEach((d) => { d.open = true; });
+    closedForPrint.forEach((d) => {
+      d.open = true;
+    });
     resizeCharts();
   });
   window.addEventListener("afterprint", () => {
-    closedForPrint.forEach((d) => { d.open = false; });
+    closedForPrint.forEach((d) => {
+      d.open = false;
+    });
     resizeCharts();
   });
 

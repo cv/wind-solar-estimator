@@ -18,7 +18,10 @@ export const circleArea = (diameterM) => Math.PI * (diameterM / 2) ** 2;
  */
 export function exampleCurve() {
   const area = circleArea(EXAMPLE_ROTOR_M);
-  const pts = [[0, 0], [5.9, 0]];
+  const pts = [
+    [0, 0],
+    [5.9, 0],
+  ];
   for (let v = 6; v <= 30; v += 2) {
     const cp = Math.min(0.36, 0.12 + (v - 6) * 0.024);
     const w = 0.5 * STD_RHO * area * (v / 3.6) ** 3 * cp;
@@ -93,17 +96,26 @@ export function checkCurve(pts, areaM2, augmentation) {
 export const LOAD_PRESETS = {
   residential: {
     label: "Farm house / residential",
-    hourly: [0.6, 0.5, 0.5, 0.5, 0.5, 0.6, 0.9, 1.2, 1.1, 0.9, 0.8, 0.8, 0.8, 0.8, 0.8, 0.9, 1.1, 1.5, 1.7, 1.6, 1.4, 1.2, 0.9, 0.7],
+    hourly: [
+      0.6, 0.5, 0.5, 0.5, 0.5, 0.6, 0.9, 1.2, 1.1, 0.9, 0.8, 0.8, 0.8, 0.8, 0.8, 0.9, 1.1, 1.5, 1.7, 1.6, 1.4, 1.2, 0.9,
+      0.7,
+    ],
     monthly: [1.3, 1.2, 1.05, 0.95, 0.85, 0.8, 0.85, 0.85, 0.85, 0.95, 1.15, 1.3],
   },
   farm: {
     label: "Farm operation (daytime work)",
-    hourly: [0.5, 0.5, 0.5, 0.5, 0.6, 0.8, 1.1, 1.4, 1.5, 1.5, 1.5, 1.4, 1.3, 1.4, 1.5, 1.5, 1.4, 1.2, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5],
+    hourly: [
+      0.5, 0.5, 0.5, 0.5, 0.6, 0.8, 1.1, 1.4, 1.5, 1.5, 1.5, 1.4, 1.3, 1.4, 1.5, 1.5, 1.4, 1.2, 1.0, 0.9, 0.8, 0.7, 0.6,
+      0.5,
+    ],
     monthly: [1.1, 1.05, 1.0, 1.0, 1.05, 1.0, 0.95, 1.0, 1.05, 1.0, 0.95, 1.05],
   },
   greenhouse: {
     label: "Greenhouse (grow lights 04–22 h, winter-heavy)",
-    hourly: [0.5, 0.5, 0.5, 0.5, 1.3, 1.3, 1.3, 1.3, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.2, 1.3, 1.3, 1.3, 1.3, 1.3, 0.5, 0.5],
+    hourly: [
+      0.5, 0.5, 0.5, 0.5, 1.3, 1.3, 1.3, 1.3, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.2, 1.3, 1.3, 1.3, 1.3, 1.3, 0.5,
+      0.5,
+    ],
     monthly: [1.5, 1.4, 1.2, 1.0, 0.8, 0.65, 0.6, 0.65, 0.85, 1.05, 1.3, 1.5],
   },
   flat: {
@@ -152,14 +164,20 @@ export function simulate(wx, p) {
   // 1. Wind at hub height: per-hour shear exponent from the 10 m and 100 m winds.
   const hub = new Float32Array(n);
   const lnH = Math.log(p.hubHeight / 10);
-  let sum10 = 0, sum100 = 0, sumHub = 0, sumAlpha = 0;
+  let sum10 = 0,
+    sum100 = 0,
+    sumHub = 0,
+    sumAlpha = 0;
   for (let i = 0; i < n; i++) {
     const a = wx.w10[i];
     const b = wx.w100[i];
     let alpha = 1 / 7;
     if (a > 1 && b > 0) alpha = Math.min(0.6, Math.max(0, Math.log(b / a) / Math.LN10));
     hub[i] = a * Math.exp(alpha * lnH);
-    sum10 += a; sum100 += b; sumHub += hub[i]; sumAlpha += alpha;
+    sum10 += a;
+    sum100 += b;
+    sumHub += hub[i];
+    sumAlpha += alpha;
   }
   const modelHubMean = sumHub / n;
   const scale = p.siteMeanKmh > 0 ? p.siteMeanKmh / modelHubMean : p.windScale;
@@ -173,16 +191,24 @@ export function simulate(wx, p) {
   const pvOnly = battery(p.battKwh, p.battMinSoc, p.battRte, p.battKw);
   const withWind = battery(p.battKwh, p.battMinSoc, p.battRte, p.battKw);
 
-  const BIN = 2, NBINS = 50;
+  const BIN = 2,
+    NBINS = 50;
   const hist = { binKmh: BIN, hours: zeros(NBINS), energy: zeros(NBINS) };
   const m = { wind: zeros(12), pv: zeros(12), load: zeros(12), importPv: zeros(12), importBoth: zeros(12) };
   const byYear = new Map();
   const soc = { pvOnly: zeros(288), withWind: zeros(288), count: zeros(288) };
-  let wind = 0, pv = 0, loadTot = 0, physicsCap = 0, sumV = 0, genHours = 0, clipped = 0;
+  let wind = 0,
+    pv = 0,
+    loadTot = 0,
+    physicsCap = 0,
+    sumV = 0,
+    genHours = 0,
+    clipped = 0;
   const windLoss = 1 - p.windLossPct / 100;
   // A shared inverter caps what wind and solar together can deliver; the rest is lost.
   const inverter = p.inverterKw > 0 ? p.inverterKw : Infinity;
-  let invLostPv = 0, invLostBoth = 0;
+  let invLostPv = 0,
+    invLostBoth = 0;
   const pvLoss = 1 - p.pvLossPct / 100;
 
   for (let i = 0; i < n; i++) {
@@ -192,12 +218,15 @@ export function simulate(wx, p) {
     let w = curve(v);
     if (p.densityCorrection) w *= rho / STD_RHO;
     const limit = betzLimitW(v, p.captureAreaM2, rho) * p.augmentation;
-    if (p.clampPhysics && w > limit) { clipped += (w - limit) * p.nTurbines / 1000; w = limit; }
-    const windKw = (w * p.nTurbines / 1000) * windLoss;
+    if (p.clampPhysics && w > limit) {
+      clipped += ((w - limit) * p.nTurbines) / 1000;
+      w = limit;
+    }
+    const windKw = ((w * p.nTurbines) / 1000) * windLoss;
 
     const g = wx.gti[i];
     const cellT = t + (g * 25) / 800;
-    const pvKw = Math.max(0, (p.pvKwp * g / 1000) * pvLoss * (1 + (p.tempCoeffPct / 100) * (cellT - 25)));
+    const pvKw = Math.max(0, ((p.pvKwp * g) / 1000) * pvLoss * (1 + (p.tempCoeffPct / 100) * (cellT - 25)));
     const L = load[i] * loadScale;
 
     const outPv = Math.min(pvKw, inverter);
@@ -209,14 +238,20 @@ export function simulate(wx, p) {
 
     const mo = wx.month[i];
     const slot = mo * 24 + wx.hour[i];
-    wind += windKw; pv += pvKw; loadTot += L; sumV += v;
+    wind += windKw;
+    pv += pvKw;
+    loadTot += L;
+    sumV += v;
     physicsCap += (limit * p.nTurbines) / 1000;
     if (windKw > 0) genHours++;
-    m.wind[mo] += windKw; m.pv[mo] += pvKw; m.load[mo] += L;
+    m.wind[mo] += windKw;
+    m.pv[mo] += pvKw;
+    m.load[mo] += L;
     if (gridPv > 0) m.importPv[mo] += gridPv;
     if (gridBoth > 0) m.importBoth[mo] += gridBoth;
     const bin = Math.min(NBINS - 1, Math.floor(v / BIN));
-    hist.hours[bin]++; hist.energy[bin] += windKw;
+    hist.hours[bin]++;
+    hist.energy[bin] += windKw;
     byYear.set(wx.year[i], (byYear.get(wx.year[i]) || 0) + windKw);
     if (p.battKwh > 0) {
       soc.pvOnly[slot] += pvOnly.soc / p.battKwh;
@@ -229,8 +264,10 @@ export function simulate(wx, p) {
   for (const k of Object.keys(m)) m[k] = m[k].map(perYear);
   hist.hours = hist.hours.map(perYear);
   hist.energy = hist.energy.map(perYear);
-  const socDay = (arr) => Array.from({ length: 12 }, (_, mo) =>
-    Array.from({ length: 24 }, (_, h) => (soc.count[mo * 24 + h] ? arr[mo * 24 + h] / soc.count[mo * 24 + h] : null)));
+  const socDay = (arr) =>
+    Array.from({ length: 12 }, (_, mo) =>
+      Array.from({ length: 24 }, (_, h) => (soc.count[mo * 24 + h] ? arr[mo * 24 + h] / soc.count[mo * 24 + h] : null)),
+    );
 
   const scenario = (b) => ({
     importKwh: perYear(b.imported),
@@ -258,7 +295,7 @@ export function simulate(wx, p) {
     ratedKw: (ratedW * p.nTurbines) / 1000,
     windKwh,
     windKwhPerTurbine: windKwh / p.nTurbines,
-    capacityFactor: ratedW > 0 ? wind / ((ratedW * p.nTurbines / 1000) * n) : 0,
+    capacityFactor: ratedW > 0 ? wind / (((ratedW * p.nTurbines) / 1000) * n) : 0,
     generatingShare: genHours / n,
     physicsCapKwh: perYear(physicsCap),
     clippedKwh: perYear(clipped),

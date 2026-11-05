@@ -87,28 +87,30 @@ calibration* where one exists, or compare with the
 
 ## Running it
 
-It is a static site with no build step. Serve the folder with any web server:
+The site is TypeScript in `src/`, bundled by esbuild into a static `dist/` (no backend).
+Node 24 or later:
 
 ```sh
-python3 -m http.server 8000   # then open http://localhost:8000
+npm ci
+npm run build                  # dist/: index.html plus hashed JS and CSS
+python3 -m http.server -d dist 8000   # then open http://localhost:8000
+npm run dev                    # rebuild dist/ on every change
 ```
 
-Opening `index.html` directly from disk does not work (browsers block ES modules on `file://`).
-
-Tests for the simulation model (Node 18+):
+Checks, all run in CI before every deploy:
 
 ```sh
-npm test
+npm run check    # typecheck (tsc), lint (oxlint), format check (oxfmt), tests
+npm run fmt      # format src/, tests/ and scripts/
 ```
+
+Tests run the TypeScript sources directly on Node (`node --test`), no build needed.
 
 ## Deploying to GitHub Pages
 
-Push to GitHub, then *Settings → Pages → Deploy from a branch → `main` / root*. The
-`.nojekyll` file makes Pages serve the files as they are.
-
-Browsers may cache each file for hours, so `index.html` loads the site's own JS and CSS
-through URLs versioned by content (an import map). After changing any of them, run
-`npm run stamp` before committing; `npm test` fails if the versions are out of date.
+`.github/workflows/pages.yml` checks, builds and deploys `dist/` on every push to `main`
+(*Settings → Pages → Source: GitHub Actions*). Asset file names carry a content hash, so
+browsers never mix cached files from different releases.
 
 ## Data and licences
 
@@ -127,14 +129,16 @@ through URLs versioned by content (an import map). After changing any of them, r
 
 | Path | Contents |
 | --- | --- |
-| `index.html`, `css/style.css` | Page and styles |
-| `js/app.js` | Form, URL state, map, rendering |
-| `js/weather.js` | Open-Meteo downloads, retries and caching; place search |
-| `js/stations.js` | Environment Canada station search and hourly wind downloads |
-| `js/blend.js` | Station + ERA5 combination: alignment, quantile-mapped gap filling (pure) |
-| `js/cache.js` | Shared IndexedDB cache |
-| `js/model.js` | Hourly simulation (pure functions, no DOM) |
-| `tests/*.test.mjs` | Model, blending and station-parsing tests (`npm test`) |
+| `index.html` | Page template; the build adds the hashed asset tags |
+| `src/main.ts` | Form, URL state, map, rendering |
+| `src/weather.ts` | Open-Meteo downloads, retries and caching; place search |
+| `src/stations.ts` | Environment Canada station search and hourly wind downloads |
+| `src/blend.ts` | Station + ERA5 combination: alignment, quantile-mapped gap filling (pure) |
+| `src/cache.ts` | Shared IndexedDB cache |
+| `src/model.ts` | Hourly simulation (pure functions, no DOM) |
+| `src/styles/style.css` | Styles |
+| `scripts/build.ts` | esbuild bundle into `dist/` |
+| `tests/*.test.ts` | Model, blending and station-parsing tests (`npm test`) |
 
 ## Limitations
 
