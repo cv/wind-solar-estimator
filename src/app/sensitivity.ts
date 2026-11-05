@@ -1,5 +1,5 @@
-// Works out the report's comparisons once it is shown (the wind sensitivity, then other setups,
-// then any station comparison): after a pause, one run per task, so typing and dragging stay
+// Works out the report's comparisons once it is shown (the wind sensitivity, every hour, other
+// setups, then any station comparison): after a pause, one run per task, so typing and dragging stay
 // quick and a newer analysis simply abandons the old one.
 import { state } from "./state.ts";
 import type { Analysis } from "./state.ts";
@@ -11,6 +11,8 @@ import { setupCase, setupGrid } from "../model/setups.ts";
 import type { SetupPoint } from "../model/setups.ts";
 import { renderSensitivity } from "../report/sensitivity.ts";
 import { renderSetups } from "../report/setups.ts";
+import { renderHours } from "../report/hours.ts";
+import { recordHours, weeksOf } from "../model/hours.ts";
 
 let cancel = (): void => {
   // Nothing scheduled yet.
@@ -28,6 +30,11 @@ export function scheduleSensitivity(a: Analysis): void {
     (): void => {
       a.sensitivity = wind;
       renderSensitivity(a);
+    },
+    (): void => {
+      const rec = recordHours(a.wx, a.params);
+      a.hours = { rec, weeks: weeksOf(a.wx.year, rec) };
+      renderHours(a);
     },
     ...setupGrid(a.params).map((s) => (): void => {
       setups.push(setupCase(a.wx, a.params, a.result, s));

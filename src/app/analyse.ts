@@ -196,6 +196,7 @@ function simulateAndRender({ wx, req, source }: LoadedWeather, v: FormInput, par
     result,
     limit: physicsLimit(wx, params),
     sensitivity: null,
+    hours: null,
     setups: null,
     windCases: null,
   };

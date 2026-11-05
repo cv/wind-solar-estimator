@@ -209,6 +209,23 @@
         </div>
       </section>
 
+      <section class="block hours" id="hours" aria-labelledby="secHours" hidden>
+        <h3 id="secHours">Hour by hour</h3>
+        <figure class="card" id="hoursCard">
+          <figcaption id="hoursText" class="hinge-text" aria-live="polite"></figcaption>
+          <div class="week-picks screen-only" role="group" aria-label="Pick a week">
+            <button type="button" class="secondary small" data-pick="hardest">Hardest week for the grid</button>
+            <button type="button" class="secondary small" data-pick="calmest">Calmest week</button>
+            <button type="button" class="secondary small" data-pick="windiest">Windiest week</button>
+            <button type="button" class="secondary small" data-pick="prev" aria-label="Previous week">‹ Week before</button>
+            <button type="button" class="secondary small" data-pick="next" aria-label="Next week">Week after ›</button>
+          </div>
+          <canvas id="weekStrip" class="week-strip" tabindex="0" role="application" aria-label="Every week of the record, a row per year, darker when the turbines made more. Arrow keys change the week shown below." aria-describedby="hoursText"></canvas>
+          <p class="hint">Each square is a week, darker when the turbines made more; the outlined one is plotted below. Click a square to see that week.</p>
+          <div class="chart"><canvas id="chWeek" role="img" aria-label="The week hour by hour: wind and solar output, electricity use, grid purchases and battery charge"></canvas></div>
+        </figure>
+      </section>
+
       <details class="more" id="more">
         <summary><h3>Behind the numbers</h3></summary>
         <div class="block">

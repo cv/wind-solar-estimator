@@ -12,6 +12,7 @@ import { renderMonthly, renderAssumptions } from "./tables.ts";
 import { scrubbable } from "./scrubbable.ts";
 import { renderSensitivity } from "./sensitivity.ts";
 import { renderSetups } from "./setups.ts";
+import { renderHours } from "./hours.ts";
 import { renderWindCases } from "./windCases.ts";
 import { renderVerdict } from "./verdict.ts";
 import type { ModelParams } from "../model/simulate.ts";
@@ -49,6 +50,7 @@ export function render(v: FormValues): void {
   renderNotes(a);
   renderSensitivity(a);
   renderSetups(a);
+  renderHours(a);
   renderWindCases(a);
   renderFigures(r, p, req, source);
   renderCharts(r, p);

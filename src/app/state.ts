@@ -7,6 +7,8 @@ import type { CurveExceedsLimit, CurveWithinLimit } from "../model/powerCurve.ts
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 import type { SensitivityPoint } from "../model/sensitivity.ts";
 import type { SetupPoint } from "../model/setups.ts";
+import type { Week } from "../model/hours.ts";
+import type { HourRecord } from "../model/simulate.ts";
 import type { BlendStats } from "../wind/blend.ts";
 
 /** A station near the site, with its height above (+) or below (−) the site in metres (NaN if unknown). */
@@ -147,6 +149,8 @@ export interface Analysis {
   sensitivity: SensitivityPoint[] | null;
   /** Payback for other turbine counts and hub heights; null until worked out, after the sensitivity. */
   setups: SetupPoint[] | null;
+  /** Every hour of the run, and the record in weeks; null until worked out, after the sensitivity. */
+  hours: { rec: HourRecord; weeks: Week[] } | null;
   /** Payback with each compared station's wind and the model's; null unless a comparison is loaded. */
   windCases: WindCase[] | null;
 }

@@ -52,6 +52,15 @@ export interface ModelParams {
   omPerTurbine: number;
 }
 
+/** Every hour of a run with the turbines (see hours.ts): output, use and grid exchange in kWh (+ bought, − sold), battery charge in kWh. */
+export interface HourRecord {
+  wind: Float32Array;
+  pv: Float32Array;
+  load: Float32Array;
+  grid: Float32Array;
+  soc: Float32Array;
+}
+
 /** Grid exchange per year for one system (PV only, or PV with the turbines). */
 export interface Scenario {
   importKwh: Kwh;
