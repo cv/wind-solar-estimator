@@ -106,6 +106,21 @@ npm run fmt      # format src/, tests/ and scripts/
 
 Tests run the TypeScript sources directly on Node (`node --test`), no build needed.
 
+What the checks enforce:
+
+- **TypeScript** in its strictest settings (`strict`, `noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes` and the rest). Physical quantities are branded types
+  (`src/model/units.ts`: `Kmh`, `Watts`, `Kwh`, `Metres`, `Fraction`, ...), so passing watts
+  where km/h is expected doesn't compile; states that depend on a flag are discriminated
+  unions (curve check, record check, wind source, station list, physics limit).
+- **oxlint**, type-aware: correctness, suspicious, perf and pedantic categories plus a
+  selection of stricter rules (no `any`, no non-null assertions, explicit conditions,
+  exhaustive switches, no floating promises, size and complexity limits).
+- **Layering** (`no-restricted-imports`, `import/no-cycle`): `model`, `wind` and `data` never
+  import the UI; `report` renders an `Analysis` and doesn't import the UI controls; `ui`
+  reports changes through callbacks wired in `app/init.ts`.
+- **oxfmt** formatting.
+
 ## Deploying to GitHub Pages
 
 `.github/workflows/pages.yml` checks, builds and deploys `dist/` on every push to `main`
@@ -136,7 +151,8 @@ browsers never mix cached files from different releases.
 | `src/report/` | Report rendering: verdict, notes, figures, charts, tables, CSV |
 | `src/model/` | Hourly simulation: physics, power curve, load shapes, battery (pure, no DOM) |
 | `src/wind/` | Station + ERA5 combination, quantile mapping, record checks, station choice (pure) |
-| `src/data/` | Downloads and caching: Open-Meteo weather and elevation, place search, Environment Canada stations |
+| `src/data/` | Downloads and caching: Open-Meteo weather and elevation, place search, Environment Canada stations, a shared retry loop |
+| `src/util/` | Small shared helpers: checked indexing, type guards, abortable sleep |
 | `src/styles/` | Styles, one file per concern, imported in order by `style.css` |
 | `scripts/build.ts` | esbuild bundle into `dist/` |
 | `tests/` | Tests mirroring `src/` (`npm test`) |
