@@ -60,7 +60,7 @@ export function formError(message: string, field?: FormField | null): void {
   el.textContent = message;
   el.hidden = !message;
   if (!message) return;
-  (field ? field.closest(".row") || field.closest("label") || field : $("#run")).after(el);
+  (field ? (field.closest(".row") ?? field.closest("label") ?? field) : $("#run")).after(el);
   field?.setAttribute("aria-describedby", "formError");
 }
 
@@ -68,7 +68,7 @@ export function formError(message: string, field?: FormField | null): void {
 const flashTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
 
 // Brief confirmation on the button that was pressed.
-export function flash(btn: HTMLElement, text: string, ms: number = 2000): void {
+export function flash(btn: HTMLElement, text: string, ms = 2000): void {
   clearTimeout(flashTimers.get(btn));
   btn.dataset["label"] ??= btn.textContent;
   btn.textContent = text;

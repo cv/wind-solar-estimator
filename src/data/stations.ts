@@ -98,9 +98,11 @@ function stationFromFeature(f: unknown): StationRecord | null {
   const firstDate = p["HLY_FIRST_DATE"];
   if (!isNumber(lon) || !isNumber(lat) || id === null || !isString(firstDate) || !firstDate) return null;
   const elevation = scalar(p["ELEVATION"]);
+  const name = scalar(p["STATION_NAME"]);
   return {
     id: String(id),
-    rawName: String(scalar(p["STATION_NAME"]) || id), // labelled on use, so label fixes apply to cached lists
+    // labelled on use, so label fixes apply to cached lists; a missing, empty or 0 name falls back to the id
+    rawName: String(name === null || name === "" || name === 0 ? id : name),
     lat,
     lon,
     elevation: elevation === null ? NaN : Number(elevation),
@@ -213,7 +215,7 @@ export async function fetchStationHours({
       const idx = next++;
       const key = `eccc|${id}|${years[idx]}`;
       // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
-      let part = memoryGet(key, isStationHours) || (await dbGet(key, isStationHours));
+      let part = memoryGet(key, isStationHours) ?? (await dbGet(key, isStationHours));
       if (!part) {
         // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
         part = await fetchStationYear(id, at(years, idx), signal);
@@ -251,7 +253,7 @@ async function fetchStationYear(id: string, year: number, signal?: AbortSignal):
 /** Parses the API's CSV (x, y, UTC_DATE, WIND_SPEED); rows without a wind reading are skipped. */
 export function parseStationCsv(text: string): StationHours {
   const lines = text.split(/\r?\n/).filter(Boolean);
-  const head = (lines[0] || "").split(",").map((s) => s.trim());
+  const head = (lines[0] ?? "").split(",").map((s) => s.trim());
   const iT = head.indexOf("UTC_DATE"),
     iW = head.indexOf("WIND_SPEED");
   const hours: number[] = [],

@@ -2,11 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { alignStation, blendStation, shearAlpha, MIN_PAIRS, type BlendWeather } from "../../src/wind/blend.ts";
 import type { StationHours } from "../../src/data/stations.ts";
+import type { Weather } from "../../src/data/weather.ts";
 import { close } from "../helpers.ts";
 import { at } from "../../src/util/checked.ts";
 
 /** A year of model weather with a repeating daily wind pattern; t counts UTC hours from 2020. */
-function modelYear() {
+function modelYear(): BlendWeather & Pick<Weather, "years" | "hour"> {
   const n = 8760,
     t0 = Date.UTC(2020, 0, 1) / 3.6e6;
   const wx = {

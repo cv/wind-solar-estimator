@@ -26,5 +26,5 @@ export const stationPlace = (s: Station): string =>
   s.distanceKm < 1 ? "at the site" : `${fmt(s.distanceKm)} km ${s.direction}`;
 export const fromSite = (s: Station): string => (s.distanceKm < 1 ? "at the site" : `${stationPlace(s)} of the site`);
 /** ", 330 m higher" when the height difference is worth mentioning. */
-export const riseText = (s: RankedStation, joiner: string = ", "): string =>
+export const riseText = (s: RankedStation, joiner = ", "): string =>
   Math.abs(s.rise) >= ELEVATION_SAY_M ? `${joiner}${fmt(Math.abs(s.rise))} m ${s.rise > 0 ? "higher" : "lower"}` : "";

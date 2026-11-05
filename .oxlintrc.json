@@ -56,7 +56,55 @@
     "typescript/unbound-method": "error",
     "typescript/no-redundant-type-constituents": "error",
     "typescript/only-throw-error": "error",
-    "typescript/prefer-promise-reject-errors": "error"
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/explicit-module-boundary-types": "error",
+    "typescript/explicit-function-return-type": [
+      "error",
+      {
+        "allowExpressions": true,
+        "allowTypedFunctionExpressions": true,
+        "allowHigherOrderFunctions": true
+      }
+    ],
+    "typescript/consistent-type-definitions": [
+      "error",
+      "interface"
+    ],
+    "typescript/array-type": [
+      "error",
+      {
+        "default": "array-simple"
+      }
+    ],
+    "typescript/no-inferrable-types": "error",
+    "typescript/prefer-readonly": "error",
+    "typescript/no-unnecessary-type-parameters": "error",
+    "typescript/no-unnecessary-type-arguments": "error",
+    "typescript/prefer-reduce-type-parameter": "error",
+    "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-optional-chain": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "error",
+    "typescript/no-confusing-void-expression": [
+      "error",
+      {
+        "ignoreArrowShorthand": true
+      }
+    ],
+    "typescript/no-meaningless-void-operator": "error",
+    "typescript/prefer-includes": "error",
+    "typescript/prefer-string-starts-ends-with": "error",
+    "typescript/no-unnecessary-template-expression": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/use-unknown-in-catch-callback-variable": "error",
+    "typescript/promise-function-async": "error",
+    "typescript/non-nullable-type-assertion-style": "error",
+    "typescript/prefer-return-this-type": "error",
+    "typescript/no-unnecessary-qualifier": "error",
+    "typescript/related-getter-setter-pairs": "error"
   },
   "overrides": [
     {

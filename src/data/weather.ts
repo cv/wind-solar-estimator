@@ -74,10 +74,10 @@ interface ArchiveData {
   utc_offset_seconds?: number;
   hourly: {
     time: number[];
-    wind_speed_10m: (number | null)[];
-    wind_speed_100m: (number | null)[];
-    temperature_2m: (number | null)[];
-    global_tilted_irradiance: (number | null)[];
+    wind_speed_10m: Array<number | null>;
+    wind_speed_100m: Array<number | null>;
+    temperature_2m: Array<number | null>;
+    global_tilted_irradiance: Array<number | null>;
   };
 }
 
@@ -104,7 +104,7 @@ const memory = new Map<string, Weather>();
 const optionalNumber = (v: unknown): boolean => v === undefined || isNumber(v);
 
 /** An hourly column as long as the time column. */
-const isColumn = (v: unknown, n: number): v is (number | null)[] => isArrayOf(v, isNumberOrNull) && v.length === n;
+const isColumn = (v: unknown, n: number): v is Array<number | null> => isArrayOf(v, isNumberOrNull) && v.length === n;
 
 /** Checks the fields of an archive reply that compactYear reads. */
 function isArchiveData(v: unknown): v is ArchiveData {
@@ -237,7 +237,7 @@ export async function fetchWeather({
   return wx;
 }
 
-const col = (a: (number | null)[]): Float32Array => Float32Array.from(a, (x) => (x == null ? NaN : x));
+const col = (a: Array<number | null>): Float32Array => Float32Array.from(a, (x) => x ?? NaN);
 
 /** Typed arrays keep the IndexedDB cache small; missing values become NaN. */
 function compactYear(json: ArchiveData): YearPart {
@@ -247,7 +247,7 @@ function compactYear(json: ArchiveData): YearPart {
     longitude: json.longitude,
     elevation: json.elevation ?? 0,
     timezone: json.timezone,
-    offset: json.utc_offset_seconds || 0,
+    offset: json.utc_offset_seconds ?? 0,
     time: Float64Array.from(h.time),
     w10: col(h.wind_speed_10m),
     w100: col(h.wind_speed_100m),
@@ -287,7 +287,7 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: Year
 
   for (let attempt = 0; ; attempt++) {
     const retry = attempt < MAX_RETRIES;
-    const wait = () => sleep(10000 * (attempt + 1), signal);
+    const wait = async (): Promise<void> => sleep(10000 * (attempt + 1), signal);
     let res: Response, text: string;
     try {
       // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one

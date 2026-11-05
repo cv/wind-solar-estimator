@@ -39,7 +39,7 @@ export interface Step {
 export interface Homogeneity {
   /** Years with enough coverage to use. */
   years: number;
-  ratios: { year: number; ratio: number }[];
+  ratios: Array<{ year: number; ratio: number }>;
   trend: Trend | null;
   step: Step | null;
   issue: "step" | "trend" | null;

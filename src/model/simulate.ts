@@ -63,7 +63,7 @@ export interface Scenario {
 export type MonthlySeries = "wind" | "pv" | "load" | "importPv" | "importBoth";
 
 /** Average state of charge (0–1) by month (12) and hour (24); null where there are no hours. */
-export type SocDay = (number | null)[][];
+export type SocDay = Array<Array<number | null>>;
 
 export interface SimResult {
   hours: number;
@@ -88,7 +88,7 @@ export interface SimResult {
   withWind: Scenario;
   /** kWh per calendar month (12 values each), per year. */
   monthly: Record<MonthlySeries, number[]>;
-  yearly: { year: number; kwh: number }[];
+  yearly: Array<{ year: number; kwh: number }>;
   /** Hours and wind energy per year by hub wind speed bin. */
   hist: { binKmh: number; hours: number[]; energy: number[] };
   socDay: { pvOnly: SocDay; withWind: SocDay };
@@ -253,7 +253,9 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
       histEnergy[bin] = f64(histEnergy, bin) + windKw;
     }
     const year = u16(wx.year, i);
-    byYear.set(year, (byYear.get(year) || 0) + windKw); // a year's first hour starts from 0
+    // A year's first hour starts from 0; as before, a NaN running total also restarts from 0.
+    const sofar = byYear.get(year) ?? 0;
+    byYear.set(year, (Number.isNaN(sofar) ? 0 : sofar) + windKw);
     if (p.battKwh > 0) {
       soc.pvOnly[slot] = f64(soc.pvOnly, slot) + pvOnly.soc / p.battKwh;
       soc.withWind[slot] = f64(soc.withWind, slot) + withWind.soc / p.battKwh;

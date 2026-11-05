@@ -15,10 +15,10 @@ export const esc = (s: string | number): string =>
     if (e === undefined) throw new Error(`no entity for ${c}`);
     return e;
   });
-export const fmt = (x: number, d: number = 0): string =>
+export const fmt = (x: number, d = 0): string =>
   Number.isFinite(x) ? x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : "—";
-export const pct = (x: number, d: number = 0): string => `${fmt(x * 100, d)}%`;
-export const money = (x: number, d: number = 0): string =>
+export const pct = (x: number, d = 0): string => `${fmt(x * 100, d)}%`;
+export const money = (x: number, d = 0): string =>
   Number.isFinite(x) ? `${x < 0 ? "−" : ""}${analysis().params.currency}${fmt(Math.abs(x), d)}` : "—";
 
 export const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);

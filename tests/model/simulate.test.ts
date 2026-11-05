@@ -2,12 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { circleArea, betzLimitW } from "../../src/model/physics.ts";
 import { exampleCurve } from "../../src/model/powerCurve.ts";
-import { simulate } from "../../src/model/simulate.ts";
+import { simulate, type SimWeather } from "../../src/model/simulate.ts";
+import type { Weather } from "../../src/data/weather.ts";
 import { at } from "../../src/util/checked.ts";
 import { close } from "../helpers.ts";
 
 /** One year of identical hours, so results are easy to check by hand. */
-function syntheticYear({ w10 = 50, w100 = 50, temp = 15, gti = 0 } = {}) {
+function syntheticYear({ w10 = 50, w100 = 50, temp = 15, gti = 0 } = {}): SimWeather & Pick<Weather, "missing"> {
   const n = 8760;
   const wx = {
     n,

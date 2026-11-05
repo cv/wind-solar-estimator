@@ -15,7 +15,7 @@ export interface Candidate {
 
 export const KM_PER_METRE_RISE = 0.1;
 export const KM_PER_MISSING_YEAR = 2;
-export const stationScore = (s: Candidate, missingYears: number = 0): number =>
+export const stationScore = (s: Candidate, missingYears = 0): number =>
   s.distanceKm +
   (s.rise !== undefined && Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0) +
   Math.max(0, missingYears) * KM_PER_MISSING_YEAR;

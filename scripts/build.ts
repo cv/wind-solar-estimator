@@ -19,7 +19,7 @@ const writeIndex: esbuild.Plugin = {
     build.onEnd(async (result) => {
       if (result.errors.length || !result.metafile) return;
       const outputs = Object.entries(result.metafile.outputs);
-      const find = (entry: string) => outputs.find(([, o]) => o.entryPoint === entry)?.[0];
+      const find = (entry: string): string | undefined => outputs.find(([, o]) => o.entryPoint === entry)?.[0];
       const js = find("src/main.ts");
       const css = outputs.find(([file]) => file.endsWith(".css") && !file.endsWith(".map"))?.[0];
       if (!js || !css) throw new Error("build: missing JS or CSS output");

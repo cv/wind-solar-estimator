@@ -20,7 +20,7 @@ export function init(): void {
   hooks.onChange = onChange;
   hooks.analyse = () => startAnalyse();
   const sel = form.elements.loadProfile;
-  const presets: [string, { label: string }][] = [
+  const presets: Array<[string, { label: string }]> = [
     ...Object.entries(LOAD_PRESETS),
     ["custom", { label: "Custom (edit below)" }],
   ];
@@ -36,7 +36,7 @@ export function init(): void {
   if (preset) Object.assign(fromHash, { loadHourly: preset.hourly.join(", "), loadMonthly: preset.monthly.join(", ") });
   setForm({ ...DEFAULTS, ...fromHash });
   syncCapture();
-  form.elements.apiKey.value = localStorage.getItem(API_KEY_STORAGE) || "";
+  form.elements.apiKey.value = localStorage.getItem(API_KEY_STORAGE) ?? "";
   $("#placeSearch", HTMLInputElement).value = form.elements.place.value;
   initMap({ onPinClick: chooseWindSource });
   const stationSelect = $("#stationSelect", HTMLSelectElement);
@@ -88,7 +88,7 @@ export function init(): void {
     writeHash(readForm());
     loadStations()
       .then(renderStationPicker)
-      .then(() => analyse())
+      .then(async () => analyse())
       .catch(showFailure);
   });
   $("#print").addEventListener("click", () => window.print());

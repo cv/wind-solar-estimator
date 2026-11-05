@@ -1,7 +1,7 @@
 // A pause that ends early, rejecting, when its AbortSignal fires.
 
 /** Resolves after ms; rejects with the signal's reason (an Error) if it is aborted first. */
-export const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+export const sleep = async (ms: number, signal?: AbortSignal): Promise<void> =>
   new Promise<void>((resolve, reject) => {
     const t = setTimeout(resolve, ms);
     signal?.addEventListener(

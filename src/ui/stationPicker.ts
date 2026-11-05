@@ -13,10 +13,10 @@ import { renderStationPins } from "./map.ts";
 import { pickStation } from "../wind/stationChoice.ts";
 
 /** Starts (or reuses) the search for stations around the pin; resolves to a list, or null if the search failed. */
-export function loadStations(): Promise<RankedStation[] | null> {
+export async function loadStations(): Promise<RankedStation[] | null> {
   const lat = Number(form.elements.lat.value),
     lon = Number(form.elements.lon.value);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90) return Promise.resolve([]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90) return [];
   const key = `${lat.toFixed(3)}|${lon.toFixed(3)}`;
   const current = state.stations;
   if (current.key === key && current.promise) return current.promise;
@@ -76,7 +76,7 @@ export function renderStationPicker(): void {
   const active = list && req ? resolveStation(choice, list, req) : null;
 
   sel.replaceChildren(new Option("Weather model only (ERA5)", "model"));
-  for (const s of list || []) {
+  for (const s of list ?? []) {
     const o = new Option(`${s.name}, ${stationPlace(s)} · ${s.first}–${s.last}`, `eccc:${s.id}`);
     if (req && yearsOverlap(s, req) < 1) {
       o.disabled = true;
@@ -109,7 +109,7 @@ export function renderStationPicker(): void {
     }
   } else text = "Pick a station to use its measured wind instead of the weather model's.";
   hint.textContent = text;
-  renderStationPins(list || [], active);
+  renderStationPins(list ?? [], active);
 }
 
 export function chooseWindSource(value: string): void {

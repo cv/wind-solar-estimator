@@ -54,7 +54,7 @@ const obs = {
   hours: Int32Array.from({ length: n }, (_, i) => t0 + i).filter((_, i) => i % 50 !== 0),
   wind: Uint8Array.from({ length: n - Math.ceil(n / 50) }, (_, i) => Math.round(9 + 6 * Math.sin(i / 37))),
 };
-const time = (label: string, f: () => unknown, reps = 7) => {
+const time = (label: string, f: () => unknown, reps = 7): void => {
   f();
   const ts: number[] = [];
   for (let k = 0; k < reps; k++) {

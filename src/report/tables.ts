@@ -42,7 +42,7 @@ export function monthlyRows(r: SimResult): MonthlyTable {
 }
 
 /** One table row: the month label, then each kWh figure. */
-const tr = ([label, ...kwh]: MonthlyRow, tag: string = "td"): string =>
+const tr = ([label, ...kwh]: MonthlyRow, tag = "td"): string =>
   `<tr><${tag}>${esc(label)}</${tag}>${kwh.map((c) => `<${tag}>${fmt(c)}</${tag}>`).join("")}</tr>`;
 
 export function renderMonthly(r: SimResult): void {

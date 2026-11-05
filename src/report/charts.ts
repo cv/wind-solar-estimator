@@ -37,7 +37,7 @@ export const legendLabels: Partial<LegendOptions<ChartType>["labels"]> = {
       if (ds === undefined) return item;
       // A live chart's config always has its type (mixed charts get the default one); these charts use plain colours.
       const chartType = "type" in chart.config ? chart.config.type : undefined;
-      return (ds.type || chartType) === "line"
+      return (ds.type ?? chartType) === "line"
         ? {
             ...item,
             pointStyle: "line",
@@ -79,7 +79,7 @@ interface AxisTitle {
 const round = (a: readonly number[]): number[] => a.map((x) => Math.round(x));
 const positive = (x: number): number | null => (x > 0 ? x : null);
 /** State-of-charge fractions as percentages to one decimal, keeping gaps. */
-const asPct = (a: readonly (number | null)[]): (number | null)[] =>
+const asPct = (a: ReadonlyArray<number | null>): Array<number | null> =>
   a.map((x) => (x == null ? null : Math.round(x * 1000) / 10));
 
 export function renderCharts(r: SimResult, p: ModelParams): void {

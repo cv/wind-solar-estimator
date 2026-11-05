@@ -11,7 +11,7 @@ export function downloadCsv(): void {
   if (!state.result) return; // nothing analysed yet
   const { result: r, params: p, req, wx } = analysis();
   const { head, rows, total } = monthlyRows(r);
-  const lines: (string | number)[][] = [
+  const lines: Array<Array<string | number>> = [
     ["Wind + solar site estimate", readForm().place || ""],
     ["Latitude", req.lat],
     ["Longitude", req.lon],
