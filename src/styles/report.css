@@ -340,3 +340,19 @@ html.scrubbing * {
   cursor: ew-resize !important;
   user-select: none;
 }
+
+/* ---------- What the result hinges on (report/sensitivity.ts) ---------- */
+
+.hinge .hinge-text {
+  max-width: 72ch;
+  font-weight: 400;
+  font-size: var(--t-prose);
+  margin-bottom: var(--s3);
+}
+.hinge .card {
+  transition: opacity 150ms ease-out;
+}
+/* Being worked out again for new inputs: the old answer stays, faded. */
+.hinge.pending .card {
+  opacity: 0.5;
+}

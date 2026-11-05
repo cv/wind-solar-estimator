@@ -5,6 +5,7 @@ import type { Station } from "../data/stations.ts";
 import type { Weather } from "../data/weather.ts";
 import type { CurveExceedsLimit, CurveWithinLimit } from "../model/powerCurve.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
+import type { SensitivityPoint } from "../model/sensitivity.ts";
 import type { BlendStats } from "../wind/blend.ts";
 
 /** A station near the site, with its height above (+) or below (−) the site in metres (NaN if unknown). */
@@ -108,6 +109,8 @@ export interface Analysis {
   limit: PhysicsLimit;
   /** null when the run used the weather model alone. */
   source: WindSource | null;
+  /** The result for wind weaker or stronger than the data; null until worked out, after a pause (app/sensitivity.ts). */
+  sensitivity: SensitivityPoint[] | null;
 }
 
 /**

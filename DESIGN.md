@@ -263,7 +263,7 @@ A two-column working layout: a fixed-width input panel (300–360px) beside a fl
 
 Spacing follows a 4px base (`s1`–`s7`: 4, 8, 12, 16, 24, 32, 48). Inside the report, major sections are separated by 24px, items within a section by 12px, and cards and charts sit in an auto-fill grid with a 26rem minimum track and 16px gaps. Long text is capped at 68–72ch.
 
-The report reads top-down in a fixed order: report header, summary (verdict + key figures; a supporting sentence only when the verdict needs one), notes, "Through the year" (monthly energy and grid purchases), then two closed disclosures, "Behind the numbers" (supporting stats and four diagnostic charts; opened automatically when the power curve fails the physics check) and "Monthly figures" (table + CSV), then "Assumptions and data". Nothing is repeated: a value shown in the summary or the assumptions doesn't reappear in the stats. For print the panel, header actions, intro and status disappear, every disclosure opens, the app bar becomes a blue rule, and charts sit two per row.
+The report reads top-down in a fixed order: report header, summary (verdict + key figures; a supporting sentence only when the verdict needs one), notes, "What the result hinges on" (payback if the wind at the turbine is 30% weaker to 30% stronger than the data), "Through the year" (monthly energy and grid purchases), then two closed disclosures, "Behind the numbers" (supporting stats and four diagnostic charts; opened automatically when the power curve fails the physics check) and "Monthly figures" (table + CSV), then "Assumptions and data". Nothing is repeated: a value shown in the summary or the assumptions doesn't reappear in the stats. For print the panel, header actions, intro and status disappear, every disclosure opens, the app bar becomes a blue rule, and charts sit two per row.
 
 ## Elevation & Depth
 
@@ -310,6 +310,9 @@ Quiet and exact: small radii, hairlines, colour reserved for meaning.
 - **Focus:** border turns Grid Blue with the focus ring.
 - **Error:** Problem Red border on the Problem Wash, marked `aria-invalid`. The message (label size, 600, Problem Ink) appears directly under the field or field row at fault, or under the Analyse button for non-field errors; on submit the field's group opens and the field takes focus.
 - **Disabled:** 50% opacity, not-allowed cursor.
+
+### Sensitivity (What the result hinges on)
+A card under the notes that turns the wind-data caveat into its consequence. A sentence in prose size (which carries the point on paper) gives the payback with the wind 20% weaker and 20% stronger than the data; under it, a line chart of simple payback against wind from −30% to +30%, in Wind Blue, the "as the data" point larger. Behind the line, the verdict's bands as washes (good up to 10 years, caution to 20, problem beyond), each named in its ink at the right edge. It is worked out after a 300 ms pause, one extra run per task, so typing and dragging stay quick; while it is being worked out again the previous card stays, faded to 50%.
 
 ### Draggable numbers
 Assumptions that appear in the report are controls where they stand, so the reader changes the system without leaving the result: the report header's turbines, hub height, solar size, battery and grid price, and the per-turbine installed cost under the payback figure.

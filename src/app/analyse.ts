@@ -15,6 +15,7 @@ import { checkCurve } from "../model/powerCurve.ts";
 import { simulate } from "../model/simulate.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 import { render } from "../report/render.ts";
+import { scheduleSensitivity } from "./sensitivity.ts";
 import { loadStations, resolveStation, renderStationPicker } from "../ui/stationPicker.ts";
 import { blendStation } from "../wind/blend.ts";
 
@@ -183,9 +184,11 @@ async function fetchStationObs(
 /** Simulates with these parameters (and the capped or uncapped variant the power-curve check calls for), then renders. */
 function simulateAndRender({ wx, req, source }: LoadedWeather, v: FormInput, params: ModelParams): void {
   const result = simulate(wx, params);
-  state.analysis = { wx, req, source, params, result, limit: physicsLimit(wx, params) };
+  const a = { wx, req, source, params, result, limit: physicsLimit(wx, params), sensitivity: null };
+  state.analysis = a;
   status("");
   render(v);
+  scheduleSensitivity(a);
 }
 
 /** The power curve's check against the physical limit, with the comparison run it calls for. */

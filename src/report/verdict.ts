@@ -14,15 +14,21 @@ export interface Verdict {
   text: string;
 }
 
-export function verdictFor(r: SimResult): Verdict {
-  const pb = r.econ.payback;
-  if (pb <= 10)
+/** Paybacks up to these many years are "Promising", then "Marginal"; longer ones are "Weak". */
+export const PROMISING_YEARS = 10;
+export const MARGINAL_YEARS = 20;
+
+export const verdictFor = (r: SimResult): Verdict => verdictForPayback(r.econ.payback);
+
+export function verdictForPayback(pb: number): Verdict {
+  if (pb <= PROMISING_YEARS)
     return {
       cls: "good",
       label: "Promising",
       text: `the turbines pay back in about ${fmt(pb, pb < 10 ? 1 : 0)} years`,
     };
-  if (pb <= 20) return { cls: "warn", label: "Marginal", text: `the turbines pay back in about ${fmt(pb)} years` };
+  if (pb <= MARGINAL_YEARS)
+    return { cls: "warn", label: "Marginal", text: `the turbines pay back in about ${fmt(pb)} years` };
   if (Number.isFinite(pb))
     return { cls: "bad", label: "Weak", text: `the turbines take about ${fmt(pb)} years to pay back` };
   return { cls: "bad", label: "Not viable", text: "the turbines' savings don't cover their maintenance" };

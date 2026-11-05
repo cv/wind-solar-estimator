@@ -10,6 +10,7 @@ import { renderFigures } from "./figures.ts";
 import { renderNotes } from "./notes.ts";
 import { renderMonthly, renderAssumptions } from "./tables.ts";
 import { scrubbable } from "./scrubbable.ts";
+import { renderSensitivity } from "./sensitivity.ts";
 import { renderVerdict } from "./verdict.ts";
 import type { ModelParams } from "../model/simulate.ts";
 
@@ -44,6 +45,7 @@ export function render(v: FormValues): void {
   renderVerdict(r, capped);
   if (capped) $("#more", HTMLDetailsElement).open = true; // the power-curve chart is the evidence
   renderNotes(a);
+  renderSensitivity(a);
   renderFigures(r, p, req, source);
   renderCharts(r, p);
   renderMonthly(r);
