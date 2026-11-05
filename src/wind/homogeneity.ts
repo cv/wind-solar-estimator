@@ -36,14 +36,35 @@ export interface Step {
   t: number;
 }
 
-export interface Homogeneity {
+/** What checkHomogeneity found, whatever the verdict. */
+interface HomogeneityFields {
   /** Years with enough coverage to use. */
   years: number;
   ratios: Array<{ year: number; ratio: number }>;
+  /** The fitted trend and best step; null when there are too few years to test. */
   trend: Trend | null;
   step: Step | null;
-  issue: "step" | "trend" | null;
 }
+
+/** No clear break (or too few years to tell). */
+export interface Homogeneous extends HomogeneityFields {
+  issue: null;
+}
+
+/** A clear step: the record changed abruptly in step.year. */
+export interface StepIssue extends HomogeneityFields {
+  issue: "step";
+  step: Step;
+}
+
+/** A clear drift: the record changed steadily over trend.from–trend.to. */
+export interface TrendIssue extends HomogeneityFields {
+  issue: "trend";
+  trend: Trend;
+}
+
+/** checkHomogeneity's result, discriminated on the issue it found. */
+export type Homogeneity = Homogeneous | StepIssue | TrendIssue;
 
 export interface HomogeneityOptions {
   minYears?: number;
@@ -74,8 +95,7 @@ export function checkHomogeneity(
     .filter((y) => y.coverage >= 0.5 && y.model > 0)
     .map((y) => ({ year: y.year, ratio: y.station / y.model }));
   const n = ys.length;
-  const out: Homogeneity = { years: n, ratios: ys, trend: null, step: null, issue: null };
-  if (n < minYears) return out;
+  if (n < minYears) return { years: n, ratios: ys, trend: null, step: null, issue: null };
   const r = ys.map((y) => y.ratio),
     x = ys.map((y) => y.year);
   const mr = avg(r),
@@ -95,7 +115,7 @@ export function checkHomogeneity(
     last = at(x, n - 1);
   const start = mr + slope * (first - mx),
     end = mr + slope * (last - mx);
-  out.trend = {
+  const trend: Trend = {
     from: first,
     to: last,
     start,
@@ -104,6 +124,7 @@ export function checkHomogeneity(
     t: se > 0 ? Math.abs(slope) / se : Infinity,
   };
 
+  let step: Step | null = null;
   for (let k = minSide; k <= n - minSide; k++) {
     const b = r.slice(0, k),
       a = r.slice(k);
@@ -112,13 +133,13 @@ export function checkHomogeneity(
     const ss = b.reduce((s, v) => s + (v - mb) ** 2, 0) + a.reduce((s, v) => s + (v - ma) ** 2, 0);
     const s = Math.sqrt(ss / (n - 2));
     const t = s > 0 ? Math.abs(ma - mb) / (s * Math.sqrt(1 / k + 1 / (n - k))) : Infinity;
-    if (!out.step || t > out.step.t)
-      out.step = { year: at(x, k), from: first, to: last, before: mb, after: ma, change: ma / mb - 1, t };
+    if (!step || t > step.t)
+      step = { year: at(x, k), from: first, to: last, before: mb, after: ma, change: ma / mb - 1, t };
   }
 
-  const clear = <F extends Trend | Step>(f: F | null): f is F =>
-    f !== null && Math.abs(f.change) >= minChange && f.t >= minT;
-  if (clear(out.step) && (!clear(out.trend) || out.step.t >= out.trend.t)) out.issue = "step";
-  else if (clear(out.trend)) out.issue = "trend";
-  return out;
+  const found = { years: n, ratios: ys, trend, step };
+  const clear = (f: Trend | Step | null): boolean => f !== null && Math.abs(f.change) >= minChange && f.t >= minT;
+  if (step && clear(step) && (!clear(trend) || step.t >= trend.t)) return { ...found, issue: "step", step };
+  if (clear(trend)) return { ...found, issue: "trend" };
+  return { ...found, issue: null };
 }

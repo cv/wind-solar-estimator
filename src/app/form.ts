@@ -11,6 +11,7 @@ import { circleArea } from "../model/physics.ts";
 import { parseCurve } from "../model/powerCurve.ts";
 import type { CurvePoint } from "../model/powerCurve.ts";
 import type { ModelParams } from "../model/simulate.ts";
+import { fraction, kmh, kw, kwh, metres, percent, squareMetres } from "../model/units.ts";
 
 /** The form's field names (DEFAULTS' keys). */
 const FORM_KEYS = Object.keys(DEFAULTS).filter((k) => isFormKey(k));
@@ -141,10 +142,10 @@ export function captureParams(v: FormInput): Pick<ModelParams, "captureAreaM2" |
   if (v.captureShape === "rect") {
     const w = num(v, "captureW", "Capture width", { min: 0.01, max: 500 });
     const h = num(v, "captureH", "Capture height", { min: 0.01, max: 500 });
-    return { captureAreaM2: w * h, captureDesc: `${fmt(w, 2)} × ${fmt(h, 2)} m opening` };
+    return { captureAreaM2: squareMetres(w * h), captureDesc: `${fmt(w, 2)} × ${fmt(h, 2)} m opening` };
   }
   const d = num(v, "captureM", "Diameter", { min: 0.01, max: 200 });
-  return { captureAreaM2: circleArea(d), captureDesc: `${fmt(d, 2)} m diameter` };
+  return { captureAreaM2: circleArea(metres(d)), captureDesc: `${fmt(d, 2)} m diameter` };
 }
 
 /** Shows the diameter or width × height fields to match the opening shape, and the area they give. */
@@ -155,10 +156,13 @@ export function syncCapture(): void {
   if (rect && !el.captureW.value && !el.captureH.value) el.captureW.value = el.captureH.value = el.captureM.value;
   $("#captureRound").hidden = rect;
   $("#captureRect").hidden = !rect;
-  const area = rect ? Number(el.captureW.value) * Number(el.captureH.value) : circleArea(Number(el.captureM.value));
+  const area = rect
+    ? Number(el.captureW.value) * Number(el.captureH.value)
+    : circleArea(metres(Number(el.captureM.value)));
   $("#captureArea").textContent = area > 0 ? `Capture area ${fmt(area, area < 10 ? 2 : 1)} m².` : "";
 }
 
+/** The model parameters from validated form input: where the numbers get their units. */
 export function modelParams(v: FormInput): ModelParams {
   let curvePts: CurvePoint[];
   try {
@@ -168,27 +172,27 @@ export function modelParams(v: FormInput): ModelParams {
   }
   return {
     nTurbines: Math.round(num(v, "nTurbines", "Number of turbines", { min: 1, max: 100_000 })),
-    hubHeight: num(v, "hubHeight", "Hub height", { min: 1, max: 200 }),
+    hubHeight: metres(num(v, "hubHeight", "Hub height", { min: 1, max: 200 })),
     curvePts,
     ...captureParams(v),
     augmentation: num(v, "augmentation", "Duct augmentation", { min: 1, max: 10 }),
     clampPhysics: v.clampPhysics,
     densityCorrection: v.densityCorrection,
-    windLossPct: num(v, "windLossPct", "Wind system losses", { min: 0, max: 90 }),
-    siteMeanKmh: num(v, "siteMeanKmh", "Measured mean wind", { min: 0, max: 100, optional: true }) ?? 0,
+    windLossPct: percent(num(v, "windLossPct", "Wind system losses", { min: 0, max: 90 })),
+    siteMeanKmh: kmh(num(v, "siteMeanKmh", "Measured mean wind", { min: 0, max: 100, optional: true }) ?? 0),
     windScale: num(v, "windScale", "Wind scale", { min: 0.1, max: 5 }),
-    pvKwp: num(v, "pvKwp", "PV size", { min: 0 }),
-    pvLossPct: num(v, "pvLossPct", "PV losses", { min: 0, max: 90 }),
+    pvKwp: kw(num(v, "pvKwp", "PV size", { min: 0 })),
+    pvLossPct: percent(num(v, "pvLossPct", "PV losses", { min: 0, max: 90 })),
     tempCoeffPct: num(v, "tempCoeffPct", "Temperature coefficient", { min: -2, max: 0 }),
-    loadKwh: num(v, "loadKwh", "Annual use", { min: 0 }),
+    loadKwh: kwh(num(v, "loadKwh", "Annual use", { min: 0 })),
     loadProfile: v.loadProfile,
     loadHourly: list(v, "loadHourly", "Hourly shape", 24),
     loadMonthly: list(v, "loadMonthly", "Monthly shape", 12),
-    battKwh: num(v, "battKwh", "Battery capacity", { min: 0 }),
-    battKw: num(v, "battKw", "Battery power", { min: 0 }),
-    battMinSoc: num(v, "battMinSoc", "Minimum charge", { min: 0, max: 100 }) / 100,
-    battRte: num(v, "battRte", "Round-trip efficiency", { min: 50, max: 100 }) / 100,
-    inverterKw: num(v, "inverterKw", "Inverter limit", { min: 0.1, optional: true }) ?? 0,
+    battKwh: kwh(num(v, "battKwh", "Battery capacity", { min: 0 })),
+    battKw: kw(num(v, "battKw", "Battery power", { min: 0 })),
+    battMinSoc: fraction(num(v, "battMinSoc", "Minimum charge", { min: 0, max: 100 }) / 100),
+    battRte: fraction(num(v, "battRte", "Round-trip efficiency", { min: 50, max: 100 }) / 100),
+    inverterKw: kw(num(v, "inverterKw", "Inverter limit", { min: 0.1, optional: true }) ?? 0),
     currency: v.currency || "$",
     price: num(v, "price", "Grid price", { min: 0 }),
     exportCredit: num(v, "exportCredit", "Export credit", { min: 0 }),

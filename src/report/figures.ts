@@ -63,7 +63,7 @@ export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest): v
     stat("Solar energy", fmt(r.pvKwh), "kWh/yr", `${fmt(p.pvKwp, 1)} kWp, tilt ${req.tilt}°, facing ${req.compass}°`),
     stat("Self-sufficiency", pct(B.selfSufficiency), "", `${pct(A.selfSufficiency)} without wind`),
     stat("Surplus exported", fmt(B.exportKwh), "kWh/yr", `${fmt(A.exportKwh)} without wind`),
-    (p.inverterKw ?? 0) > 0
+    p.inverterKw > 0
       ? stat(
           "Lost to the inverter limit",
           fmt(r.inverterLostKwh.withWind),

@@ -1,6 +1,7 @@
 // Input and result types of the hourly simulation (see simulate.ts).
 
 import type { CurvePoint } from "./powerCurve.ts";
+import type { Fraction, Kmh, Kw, Kwh, Metres, Percent, SquareMetres } from "./units.ts";
 import type { Weather } from "../data/weather.ts";
 
 /** The weather fields simulate reads. */
@@ -9,37 +10,38 @@ export type SimWeather = Pick<
   "n" | "years" | "elevation" | "year" | "month" | "hour" | "w10" | "w100" | "temp" | "gti"
 >;
 
-/** Simulation inputs. Units: km/h, m, m², kW, kWh, %, fractions (0–1) where noted. */
+/** Simulation inputs; the types carry the units (see units.ts). */
 export interface ModelParams {
   nTurbines: number;
-  hubHeight: number;
+  hubHeight: Metres;
   curvePts: readonly CurvePoint[];
-  captureAreaM2: number;
+  captureAreaM2: SquareMetres;
   /** Readable description of the capture area (display only). */
   captureDesc?: string;
   augmentation: number;
   clampPhysics: boolean;
   densityCorrection: boolean;
-  windLossPct: number;
+  windLossPct: Percent;
   /** Measured mean wind at hub height; 0 = use windScale instead. */
-  siteMeanKmh: number;
+  siteMeanKmh: Kmh;
   windScale: number;
-  pvKwp: number;
-  pvLossPct: number;
+  pvKwp: Kw;
+  pvLossPct: Percent;
+  /** PV output change per °C of cell temperature, % (negative). */
   tempCoeffPct: number;
-  loadKwh: number;
+  /** Yearly use. */
+  loadKwh: Kwh;
   /** A LoadProfileKey, or another name (e.g. "custom") for a hand-entered shape. */
   loadProfile: string;
   loadHourly: readonly number[];
   loadMonthly: readonly number[];
-  battKwh: number;
-  battKw: number;
-  /** Fraction 0–1. */
-  battMinSoc: number;
-  /** Round-trip efficiency, fraction 0–1. */
-  battRte: number;
-  /** Shared inverter limit (kW); 0 or absent = no limit. */
-  inverterKw?: number;
+  battKwh: Kwh;
+  battKw: Kw;
+  battMinSoc: Fraction;
+  /** Round-trip efficiency. */
+  battRte: Fraction;
+  /** Shared inverter limit; 0 = no limit. */
+  inverterKw: Kw;
   /** Currency symbol (display only). */
   currency?: string;
   price: number;
@@ -50,42 +52,43 @@ export interface ModelParams {
 
 /** Grid exchange per year for one system (PV only, or PV with the turbines). */
 export interface Scenario {
-  importKwh: number;
-  exportKwh: number;
-  selfSufficiency: number;
+  importKwh: Kwh;
+  exportKwh: Kwh;
+  selfSufficiency: Fraction;
 }
 
 export type MonthlySeries = "wind" | "pv" | "load" | "importPv" | "importBoth";
 
-/** Average state of charge (0–1) by month (12) and hour (24); null where there are no hours. */
-export type SocDay = Array<Array<number | null>>;
+/** Average state of charge by month (12) and hour (24); null where there are no hours. */
+export type SocDay = Array<Array<Fraction | null>>;
 
 export interface SimResult {
   hours: number;
   years: number;
-  meanW10: number;
-  meanW100: number;
+  meanW10: Kmh;
+  meanW100: Kmh;
   meanAlpha: number;
-  modelHubMean: number;
+  modelHubMean: Kmh;
   scale: number;
-  meanHub: number;
-  ratedKw: number;
-  windKwh: number;
-  windKwhPerTurbine: number;
-  capacityFactor: number;
-  generatingShare: number;
-  physicsCapKwh: number;
-  clippedKwh: number;
-  inverterLostKwh: { pvOnly: number; withWind: number };
-  pvKwh: number;
-  loadKwh: number;
+  meanHub: Kmh;
+  ratedKw: Kw;
+  /** Energy figures are per year. */
+  windKwh: Kwh;
+  windKwhPerTurbine: Kwh;
+  capacityFactor: Fraction;
+  generatingShare: Fraction;
+  physicsCapKwh: Kwh;
+  clippedKwh: Kwh;
+  inverterLostKwh: { pvOnly: Kwh; withWind: Kwh };
+  pvKwh: Kwh;
+  loadKwh: Kwh;
   pvOnly: Scenario;
   withWind: Scenario;
   /** kWh per calendar month (12 values each), per year. */
-  monthly: Record<MonthlySeries, number[]>;
-  yearly: Array<{ year: number; kwh: number }>;
+  monthly: Record<MonthlySeries, Kwh[]>;
+  yearly: Array<{ year: number; kwh: Kwh }>;
   /** Hours and wind energy per year by hub wind speed bin. */
-  hist: { binKmh: number; hours: number[]; energy: number[] };
+  hist: { binKmh: Kmh; hours: number[]; energy: Kwh[] };
   socDay: { pvOnly: SocDay; withWind: SocDay };
   econ: {
     savings: number;

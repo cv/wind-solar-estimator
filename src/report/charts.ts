@@ -6,6 +6,7 @@ import { fmt } from "../app/format.ts";
 import { analysis, state } from "../app/state.ts";
 import { betzLimitW } from "../model/physics.ts";
 import { makeCurveFn } from "../model/powerCurve.ts";
+import { kmh } from "../model/units.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 import { axis, drawChart } from "./chartKit.ts";
 
@@ -138,7 +139,7 @@ function logTick(v: string | number): string {
 /** The entered power curve against the physical limit for the capture area, on a log scale. */
 function drawCurve(p: ModelParams): void {
   const curve = makeCurveFn(p.curvePts);
-  const speeds = Array.from({ length: 61 }, (_, i) => i);
+  const speeds = Array.from({ length: 61 }, (_, i) => kmh(i));
   drawChart("chCurve", {
     type: "line",
     data: {

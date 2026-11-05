@@ -50,11 +50,8 @@ export function renderVerdict(r: SimResult, capped: SimResult | null): void {
 /** Says what the Betz cap does for the current curve, next to the checkbox, so toggling it never looks inert. */
 export function renderClampStatus(a: Analysis, check: CurveCheck): void {
   const { result: r, params: p, capped, uncapped } = a;
-  let text: string;
-  // atKmh is only null when no point has power, so never when the ratio exceeds 1.
-  if (check.worstRatio <= 1 || check.atKmh === null) {
-    text = `This curve stays within the limit at every wind speed (at most ${pct(check.worstRatio)} of it), so capping changes nothing.`;
-  } else {
+  let text = `This curve stays within the limit at every wind speed (at most ${pct(check.worstRatio)} of it), so capping changes nothing.`;
+  if (check.exceeds) {
     // analyse.ts makes the comparison run whenever the curve exceeds the limit: uncapped with the cap on, capped with it off.
     const other = p.clampPhysics ? uncapped : capped;
     if (!other) throw new Error("renderClampStatus: the curve exceeds the limit but the comparison run is missing");

@@ -20,8 +20,7 @@ export function renderNotes(a: Analysis, check: CurveCheck): void {
   const { result: r, params: p, wx, source: src } = a;
   renderClampStatus(a, check);
   const items: Note[] = [];
-  // atKmh is only null when no point has power, so never when the ratio exceeds 1.
-  if (check.worstRatio > 1 && check.atKmh !== null) {
+  if (check.exceeds) {
     const area = `${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m² of capture area (${p.captureDesc})`;
     const aug = p.augmentation > 1 ? `, even with ${fmt(p.augmentation, 1)}× duct augmentation` : "";
     if (p.clampPhysics) {
@@ -119,8 +118,7 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
     ]);
   }
   const h = st.homogeneity;
-  // issue names a test that found something, so its result is set.
-  if (h?.issue === "step" && h.step) {
+  if (h?.issue === "step") {
     const s = h.step;
     const recent = s.to - s.year + 1;
     const fix =
@@ -133,7 +131,7 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
         `relative to the weather model than in ${span(s.from, s.year - 1)}. A jump like this usually means the instrument was moved, raised or replaced, not that the climate changed, ` +
         `so the years before and after don't measure the same thing.${fix}`,
     ]);
-  } else if (h?.issue === "trend" && h.trend) {
+  } else if (h?.issue === "trend") {
     const t = h.trend;
     out.push([
       "warn",
@@ -151,9 +149,8 @@ const signed = (x: number): string => `${x > 0 ? "+" : "−"}${pct(Math.abs(x))}
 /** One line on the station record's consistency, for the assumptions table. */
 export function homogeneityText(h: Homogeneity | null | undefined): string {
   if (!h || h.years < 5) return "";
-  if (h.issue === "step" && h.step)
-    return `; record steps ${signed(h.step.change)} relative to the model in ${h.step.year}`;
-  if (h.issue === "trend" && h.trend)
+  if (h.issue === "step") return `; record steps ${signed(h.step.change)} relative to the model in ${h.step.year}`;
+  if (h.issue === "trend")
     return `; record drifts ${signed(h.trend.change)} relative to the model over ${span(h.trend.from, h.trend.to)}`;
   return `; no step or drift relative to the model across ${h.years} years`;
 }

@@ -1,19 +1,32 @@
 // Turbine power curves: the built-in example, parsing, interpolation and a physics check.
 
 import { STD_RHO, circleArea, betzLimitW } from "./physics.ts";
+import { kmh, metres, watts } from "./units.ts";
+import type { Kmh, Metres, SquareMetres, Watts } from "./units.ts";
 import { at } from "../util/checked.ts";
 
-/** One point of a power curve: wind speed (km/h) and output (W). */
-export type CurvePoint = readonly [kmh: number, watts: number];
+/** One point of a power curve: wind speed and output. */
+export type CurvePoint = readonly [kmh: Kmh, watts: Watts];
 
-/** checkCurve's result: the highest ratio of the curve to the physical limit, and the speed where it occurs. */
-export interface CurveCheck {
+/** checkCurve's result for a curve within the physical limit at every speed (worstRatio <= 1). */
+export interface CurveWithinLimit {
+  exceeds: false;
+  /** The highest ratio of the curve to the limit (0 when no point has power). */
   worstRatio: number;
-  /** Speed (km/h) of the worst point, or null when no point has power. */
-  atKmh: number | null;
 }
 
-export const EXAMPLE_ROTOR_M = 6;
+/** checkCurve's result for a curve that claims more than the physical limit (worstRatio > 1). */
+export interface CurveExceedsLimit {
+  exceeds: true;
+  worstRatio: number;
+  /** Speed of the worst point. */
+  atKmh: Kmh;
+}
+
+/** checkCurve's result: the highest ratio of the curve to the physical limit, and where it exceeds it. */
+export type CurveCheck = CurveWithinLimit | CurveExceedsLimit;
+
+export const EXAMPLE_ROTOR_M: Metres = metres(6);
 
 /**
  * Illustrative power curve for a generic 3.5 kW turbine with a 6 m rotor: output from
@@ -24,15 +37,15 @@ export const EXAMPLE_ROTOR_M = 6;
 export function exampleCurve(): CurvePoint[] {
   const area = circleArea(EXAMPLE_ROTOR_M);
   const pts: CurvePoint[] = [
-    [0, 0],
-    [5.9, 0],
+    [kmh(0), watts(0)],
+    [kmh(5.9), watts(0)],
   ];
   for (let v = 6; v <= 30; v += 2) {
     const cp = Math.min(0.36, 0.12 + (v - 6) * 0.024);
     const w = 0.5 * STD_RHO * area * (v / 3.6) ** 3 * cp;
-    pts.push([v, Math.min(3500, Math.round(w / 10) * 10)]);
+    pts.push([kmh(v), watts(Math.min(3500, Math.round(w / 10) * 10))]);
   }
-  pts.push([100, 3500]);
+  pts.push([kmh(100), watts(3500)]);
   return pts;
 }
 
@@ -46,7 +59,7 @@ export function parseCurve(text: string): CurvePoint[] {
     if (v === undefined || w === undefined || !Number.isFinite(v) || !Number.isFinite(w) || v < 0 || w < 0) {
       throw new Error(`Power curve: can't read "${line.trim()}" (expected "km/h, W")`);
     }
-    pts.push([v, w]);
+    pts.push([kmh(v), watts(w)]);
   }
   if (pts.length < 2) throw new Error("Power curve needs at least two points");
   return pts.toSorted((a, b) => a[0] - b[0]);
@@ -55,11 +68,12 @@ export function parseCurve(text: string): CurvePoint[] {
 export const formatCurve = (pts: readonly CurvePoint[]): string => pts.map(([v, w]) => `${v}, ${w}`).join("\n");
 
 /** Linear interpolation of the curve; 0 above its last point (cut-out). */
-export function makeCurveFn(pts: readonly CurvePoint[]): (v: number) => number {
+export function makeCurveFn(pts: readonly CurvePoint[]): (v: Kmh) => Watts {
   const first = at(pts, 0);
   const maxV = at(pts, pts.length - 1)[0];
-  return (v: number): number => {
-    if (!(v >= 0) || v > maxV) return 0;
+  const none = watts(0);
+  return (v: Kmh): Watts => {
+    if (!(v >= 0) || v > maxV) return none;
     if (v <= first[0]) return first[1];
     // v > first[0] here, so the first point never matches and only seeds prev.
     let prev = first;
@@ -69,22 +83,23 @@ export function makeCurveFn(pts: readonly CurvePoint[]): (v: number) => number {
         const y1 = cur[1],
           x0 = prev[0],
           y0 = prev[1];
-        return x1 === x0 ? y1 : y0 + ((y1 - y0) * (v - x0)) / (x1 - x0);
+        return x1 === x0 ? y1 : watts(y0 + ((y1 - y0) * (v - x0)) / (x1 - x0));
       }
       prev = cur;
     }
-    return 0;
+    return none;
   };
 }
 
 /** How far the curve exceeds the physical limit for a capture area (ratio > 1 is impossible). */
-export function checkCurve(pts: readonly CurvePoint[], areaM2: number, augmentation: number): CurveCheck {
+export function checkCurve(pts: readonly CurvePoint[], area: SquareMetres, augmentation: number): CurveCheck {
   let worst = 0;
-  let atKmh: number | null = null;
+  let atKmh = kmh(0);
   for (const [v, w] of pts) {
     if (v <= 0 || w <= 0) continue;
-    const ratio = w / (betzLimitW(v, areaM2) * augmentation);
+    const ratio = w / (betzLimitW(v, area) * augmentation);
     if (ratio > worst) [worst, atKmh] = [ratio, v];
   }
-  return { worstRatio: worst, atKmh };
+  // A ratio above 1 comes from a point with power, so atKmh is that point's speed.
+  return worst > 1 ? { exceeds: true, worstRatio: worst, atKmh } : { exceeds: false, worstRatio: worst };
 }

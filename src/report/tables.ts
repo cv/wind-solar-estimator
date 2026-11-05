@@ -89,7 +89,7 @@ export function assumptionRows(r: SimResult, p: ModelParams, req: DataRequest, w
     ],
     [
       "Inverter",
-      p.inverterKw !== undefined && p.inverterKw > 0
+      p.inverterKw > 0
         ? `${fmt(p.inverterKw, 1)} kW shared by wind and solar; output above it is lost (${fmt(r.inverterLostKwh.withWind)} kWh/yr, ${fmt(r.inverterLostKwh.pvOnly)} without wind)`
         : "no shared limit",
     ],

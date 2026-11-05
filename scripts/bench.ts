@@ -4,6 +4,7 @@ import { simulate } from "../src/model/simulate.ts";
 import type { ModelParams } from "../src/model/simulate.ts";
 import { exampleCurve } from "../src/model/powerCurve.ts";
 import { circleArea } from "../src/model/physics.ts";
+import { fraction, kmh, kw, kwh, metres, percent } from "../src/model/units.ts";
 import { blendStation } from "../src/wind/blend.ts";
 
 const n = 20 * 8766;
@@ -23,28 +24,28 @@ const wx = {
   gti: Float32Array.from({ length: n }, (_, i) => Math.max(0, 800 * Math.sin((((i % 24) - 6) / 12) * Math.PI))),
 };
 const p: ModelParams = {
-  hubHeight: 16,
-  siteMeanKmh: 0,
+  hubHeight: metres(16),
+  siteMeanKmh: kmh(0),
   windScale: 1,
   curvePts: exampleCurve(),
   nTurbines: 1,
   densityCorrection: true,
   clampPhysics: false,
-  captureAreaM2: circleArea(6),
+  captureAreaM2: circleArea(metres(6)),
   augmentation: 1,
-  windLossPct: 5,
-  pvKwp: 3,
-  pvLossPct: 14,
+  windLossPct: percent(5),
+  pvKwp: kw(3),
+  pvLossPct: percent(14),
   tempCoeffPct: -0.4,
-  loadKwh: 11_800,
+  loadKwh: kwh(11_800),
   loadProfile: "residential",
   loadHourly: Array.from({ length: 24 }, () => 1),
   loadMonthly: Array.from({ length: 12 }, () => 1),
-  battKwh: 48,
-  battMinSoc: 0.5,
-  battRte: 0.82,
-  battKw: 6,
-  inverterKw: 6,
+  battKwh: kwh(48),
+  battMinSoc: fraction(0.5),
+  battRte: fraction(0.82),
+  battKw: kw(6),
+  inverterKw: kw(6),
   price: 0.2,
   exportCredit: 0.08,
   turbineCost: 20_000,

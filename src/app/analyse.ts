@@ -184,10 +184,9 @@ function simulateAndRender(wx: Weather, v: FormInput, params: ModelParams): void
   state.params = params;
   state.result = simulate(wx, params);
   const check = checkCurve(params.curvePts, params.captureAreaM2, params.augmentation);
-  state.capped = check.worstRatio > 1 && !params.clampPhysics ? simulate(wx, { ...params, clampPhysics: true }) : null;
+  state.capped = check.exceeds && !params.clampPhysics ? simulate(wx, { ...params, clampPhysics: true }) : null;
   // With the cap on, the uncapped run says what the cap took away (after losses, so it matches the figures).
-  state.uncapped =
-    check.worstRatio > 1 && params.clampPhysics ? simulate(wx, { ...params, clampPhysics: false }) : null;
+  state.uncapped = check.exceeds && params.clampPhysics ? simulate(wx, { ...params, clampPhysics: false }) : null;
   status("");
   render(v, check);
 }
