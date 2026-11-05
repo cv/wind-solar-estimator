@@ -1,4 +1,5 @@
 // Chart.js charts: wind distribution, monthly energy, imports, battery charge, yearly wind and power curve.
+import { at } from "../util/checked.ts";
 import type {
   Chart as ChartJs,
   ChartConfiguration,
@@ -29,6 +30,7 @@ export const legendLabels: Partial<LegendOptions<ChartType>["labels"]> = {
       // Legend items for these charts are per dataset, so datasetIndex is always set; leave any other as is.
       if (item.datasetIndex === undefined) return item;
       const ds = chart.data.datasets[item.datasetIndex];
+      if (ds === undefined) return item;
       // A live chart's config always has its type (mixed charts get the default one); these charts use plain colours.
       return (ds.type || (chart.config as ChartConfiguration).type) === "line"
         ? { ...item, pointStyle: "line", strokeStyle: ds.borderColor as Color, lineWidth: 2.5 }
@@ -68,7 +70,7 @@ const asPct = (a: readonly (number | null)[]): (number | null)[] =>
 export function renderCharts(r: SimResult, p: ModelParams): void {
   // Wind speed distribution and energy by speed
   let last = r.hist.hours.length - 1;
-  while (last > 0 && r.hist.hours[last] < 1 && r.hist.energy[last] < 1) last--;
+  while (last > 0 && at(r.hist.hours, last) < 1 && at(r.hist.energy, last) < 1) last--;
   const bins = r.hist.hours.slice(0, last + 1).map((_, i) => `${i * r.hist.binKmh}`);
   drawChart("chDist", {
     data: {
@@ -220,7 +222,7 @@ function drawSoc(r: SimResult, p: ModelParams): void {
       datasets: [
         {
           label: "With wind",
-          data: asPct(r.socDay.withWind[mo]),
+          data: asPct(at(r.socDay.withWind, mo)),
           borderColor: COLORS.wind,
           backgroundColor: COLORS.wind,
           pointRadius: 0,
@@ -228,7 +230,7 @@ function drawSoc(r: SimResult, p: ModelParams): void {
         },
         {
           label: "Without wind",
-          data: asPct(r.socDay.pvOnly[mo]),
+          data: asPct(at(r.socDay.pvOnly, mo)),
           borderColor: COLORS.grey,
           backgroundColor: COLORS.grey,
           borderDash: [6, 4],

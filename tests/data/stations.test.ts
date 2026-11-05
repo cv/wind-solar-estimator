@@ -9,8 +9,7 @@ test("station CSV parsing skips hours without a wind reading", () => {
     "x,y,UTC_DATE,WIND_SPEED\r\n-113.6,50.0,2024-01-01T07:00:00,8\r\n-113.6,50.0,2024-01-01T08:00:00,\r\n-113.6,50.0,2024-01-01T09:00:00,17\r\n";
   const { hours, wind } = parseStationCsv(csv);
   assert.deepEqual([...wind], [8, 17]);
-  assert.equal(hours[0], Date.UTC(2024, 0, 1, 7) / 3.6e6);
-  assert.equal(hours[1] - hours[0], 2);
+  assert.deepEqual([...hours], [Date.UTC(2024, 0, 1, 7) / 3.6e6, Date.UTC(2024, 0, 1, 9) / 3.6e6]);
 });
 
 test("station names, distance and direction read naturally", () => {

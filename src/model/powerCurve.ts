@@ -1,6 +1,7 @@
 // Turbine power curves: the built-in example, parsing, interpolation and a physics check.
 
 import { STD_RHO, circleArea, betzLimitW } from "./physics.ts";
+import { at } from "../util/checked.ts";
 
 /** One point of a power curve: wind speed (km/h) and output (W). */
 export type CurvePoint = readonly [kmh: number, watts: number];
@@ -42,7 +43,7 @@ export function parseCurve(text: string): CurvePoint[] {
     const s = line.replace(/#.*/, "").trim();
     if (!s) continue;
     const [v, w] = s.split(/[\s,;]+/).map(Number);
-    if (!Number.isFinite(v) || !Number.isFinite(w) || v < 0 || w < 0) {
+    if (v === undefined || w === undefined || !Number.isFinite(v) || !Number.isFinite(w) || v < 0 || w < 0) {
       throw new Error(`Power curve: can't read "${line.trim()}" (expected "km/h, W")`);
     }
     pts.push([v, w]);
@@ -55,16 +56,22 @@ export const formatCurve = (pts: readonly CurvePoint[]): string => pts.map(([v, 
 
 /** Linear interpolation of the curve; 0 above its last point (cut-out). */
 export function makeCurveFn(pts: readonly CurvePoint[]): (v: number) => number {
-  const maxV = pts[pts.length - 1][0];
+  const first = at(pts, 0);
+  const maxV = at(pts, pts.length - 1)[0];
   return (v: number): number => {
     if (!(v >= 0) || v > maxV) return 0;
-    if (v <= pts[0][0]) return pts[0][1];
-    for (let i = 1; i < pts.length; i++) {
-      if (v <= pts[i][0]) {
-        const [x0, y0] = pts[i - 1];
-        const [x1, y1] = pts[i];
+    if (v <= first[0]) return first[1];
+    // v > first[0] here, so the first point never matches and only seeds prev.
+    let prev = first;
+    for (const cur of pts) {
+      const x1 = cur[0];
+      if (v <= x1) {
+        const y1 = cur[1],
+          x0 = prev[0],
+          y0 = prev[1];
         return x1 === x0 ? y1 : y0 + ((y1 - y0) * (v - x0)) / (x1 - x0);
       }
+      prev = cur;
     }
     return 0;
   };

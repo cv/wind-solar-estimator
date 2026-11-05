@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { circleArea, betzLimitW } from "../../src/model/physics.ts";
 import { exampleCurve } from "../../src/model/powerCurve.ts";
 import { simulate } from "../../src/model/simulate.ts";
+import { at } from "../../src/util/checked.ts";
 import { close } from "../helpers.ts";
 
 /** One year of identical hours, so results are easy to check by hand. */
@@ -95,7 +96,7 @@ test("energy balance without a battery: import − export = load − generation"
 
 test("a lossless battery shifts surplus to deficit hours", () => {
   const wx = syntheticYear({ w10: 0, w100: 0, gti: 0 });
-  for (let i = 0; i < wx.n; i++) wx.gti[i] = wx.hour[i] < 12 ? 1000 : 0; // 12 h of sun
+  for (let i = 0; i < wx.n; i++) wx.gti[i] = at(wx.hour, i) < 12 ? 1000 : 0; // 12 h of sun
   const p = { ...base, pvKwp: 2, loadKwh: 8760, battKwh: 100, battKw: 10 };
   const r = simulate(wx, p);
   close(r.pvKwh, 8760, 1e-3); // 2 kW × 12 h × 365

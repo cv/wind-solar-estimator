@@ -4,6 +4,7 @@
 // 20 years for one site costs about 500 of those. Commercial use needs an API key.
 
 import { dbGet, dbPut, dbClear } from "./cache.ts";
+import { at } from "../util/checked.ts";
 
 const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 const ARCHIVE_COMMERCIAL = "https://customer-archive-api.open-meteo.com/v1/archive";
@@ -154,7 +155,7 @@ export async function fetchWeather({
       let part = await dbGet<YearPart>(yearKey);
       if (!part) {
         // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
-        part = compactYear(await fetchYear({ lat, lon, year: years[idx], tilt, azimuth, apiKey, signal }));
+        part = compactYear(await fetchYear({ lat, lon, year: at(years, idx), tilt, azimuth, apiKey, signal }));
         dbPut(yearKey, part); // best effort, not awaited
       }
       parts[idx] = part;
@@ -163,21 +164,23 @@ export async function fetchWeather({
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, years.length) }, worker));
 
-  const offset = parts[0].offset;
+  const first = at(parts, 0);
+  const offset = first.offset;
   const cols: Record<Column, number[]> = { t: [], year: [], month: [], hour: [], w10: [], w100: [], temp: [], gti: [] };
   let missing = 0;
   for (const part of parts) {
     for (let i = 0; i < part.time.length; i++) {
-      const w10 = part.w10[i],
-        w100 = part.w100[i],
-        t = part.temp[i],
-        g = part.gti[i];
+      const w10 = at(part.w10, i),
+        w100 = at(part.w100, i),
+        t = at(part.temp, i),
+        g = at(part.gti, i),
+        time = at(part.time, i);
       if (Number.isNaN(w10) || Number.isNaN(w100) || Number.isNaN(t) || Number.isNaN(g)) {
         missing++;
         continue;
       }
-      const d = new Date((part.time[i] + offset) * 1000);
-      cols.t.push(Math.round(part.time[i] / 3600)); // UTC hour number, to line up with station records
+      const d = new Date((time + offset) * 1000);
+      cols.t.push(Math.round(time / 3600)); // UTC hour number, to line up with station records
       cols.year.push(d.getUTCFullYear());
       cols.month.push(d.getUTCMonth());
       cols.hour.push(d.getUTCHours());
@@ -195,10 +198,10 @@ export async function fetchWeather({
     years: years.length,
     startYear,
     endYear,
-    gridLat: parts[0].latitude,
-    gridLon: parts[0].longitude,
-    elevation: parts[0].elevation,
-    timezone: parts[0].timezone,
+    gridLat: first.latitude,
+    gridLon: first.longitude,
+    elevation: first.elevation,
+    timezone: first.timezone,
     t: Int32Array.from(cols.t),
     year: Uint16Array.from(cols.year),
     month: Uint8Array.from(cols.month),

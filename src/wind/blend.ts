@@ -11,6 +11,7 @@ import { fitQuantileMap, applyQuantileMap } from "./quantileMap.ts";
 import { checkHomogeneity, type Homogeneity, type YearlyMeans } from "./homogeneity.ts";
 import type { Weather } from "../data/weather.ts";
 import type { StationHours } from "../data/stations.ts";
+import { at } from "../util/checked.ts";
 
 /** The weather fields blendStation reads. */
 export type BlendWeather = Pick<Weather, "n" | "t" | "year" | "month" | "w10" | "w100">;
@@ -48,10 +49,19 @@ export const POOR_CORRELATION = 0.5; // below this, station and model follow dif
 export function alignStation(t: ArrayLike<number>, obs: StationHours): Float32Array {
   const out = new Float32Array(t.length).fill(NaN);
   const index = new Map<number, number>();
-  for (let i = 0; i < t.length; i++) index.set(t[i], i);
+  // Hot loops: direct reads checked in place (at() is slower here: its one load site sees every array type).
+  for (let i = 0; i < t.length; i++) {
+    const ti = t[i];
+    if (ti === undefined) throw new RangeError(`hour ${i} out of range`);
+    index.set(ti, i);
+  }
   for (let k = 0; k < obs.hours.length; k++) {
-    const i = index.get(obs.hours[k]);
-    if (i !== undefined) out[i] = obs.wind[k];
+    const h = obs.hours[k],
+      w = obs.wind[k];
+    if (h === undefined || w === undefined) throw new RangeError(`station reading ${k} out of range`);
+    const i = index.get(h);
+    if (i === undefined) continue;
+    out[i] = w;
   }
   return out;
 }
@@ -81,21 +91,25 @@ export function blendStation<W extends BlendWeather = Weather>(wx: W, obs: Stati
     cy = 0;
   const years = new Map<number, [number, number, number, number]>(); // year -> [hours, shared hours, station sum, model sum]
   for (let i = 0; i < n; i++) {
-    let yr = years.get(wx.year[i]);
+    const year = wx.year[i],
+      y = st[i],
+      x = wx.w10[i],
+      month = wx.month[i];
+    if (year === undefined || y === undefined || x === undefined || month === undefined)
+      throw new RangeError(`hour ${i} out of range of the weather series`);
+    let yr = years.get(year);
     if (!yr) {
       yr = [0, 0, 0, 0];
-      years.set(wx.year[i], yr);
+      years.set(year, yr);
     }
     yr[0]++;
-    const y = st[i];
     if (Number.isNaN(y)) continue;
     yr[1]++;
     yr[2] += y;
-    yr[3] += wx.w10[i];
-    const x = wx.w10[i];
-    const s = SEASON[wx.month[i]];
-    px[s].push(x);
-    py[s].push(y);
+    yr[3] += x;
+    const s = at(SEASON, month);
+    at(px, s).push(x);
+    at(py, s).push(y);
     pairs++;
     sx += x;
     sy += y;
@@ -108,18 +122,22 @@ export function blendStation<W extends BlendWeather = Weather>(wx: W, obs: Stati
   if (pairs < MIN_PAIRS) return null;
 
   const all = fitQuantileMap(px.flat(), py.flat());
-  const maps = px.map((x, s) => (x.length >= MIN_PAIRS_SEASON ? fitQuantileMap(x, py[s]) : all));
+  const maps = px.map((x, s) => (x.length >= MIN_PAIRS_SEASON ? fitQuantileMap(x, at(py, s)) : all));
   const w10 = new Float32Array(n),
     w100 = new Float32Array(n);
   let filled = 0;
   for (let i = 0; i < n; i++) {
+    const m10 = wx.w10[i],
+      m100 = wx.w100[i];
     let v = st[i];
+    if (m10 === undefined || m100 === undefined || v === undefined)
+      throw new RangeError(`hour ${i} out of range of the weather series`);
     if (Number.isNaN(v)) {
-      v = applyQuantileMap(maps[SEASON[wx.month[i]]], wx.w10[i]);
+      v = applyQuantileMap(at(maps, at(SEASON, at(wx.month, i))), m10);
       filled++;
     }
     w10[i] = v;
-    w100[i] = v * 10 ** shearAlpha(wx.w10[i], wx.w100[i]);
+    w100[i] = v * 10 ** shearAlpha(m10, m100);
   }
 
   const yearly = [...years]

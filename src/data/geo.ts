@@ -1,5 +1,7 @@
 // Great-circle distance and compass direction between two points.
 
+import { at } from "../util/checked.ts";
+
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
 
 /** One of the eight compass points. */
@@ -20,5 +22,5 @@ export function direction(lat1: number, lon1: number, lat2: number, lon2: number
   const x =
     Math.cos(rad(lat1)) * Math.sin(rad(lat2)) - Math.sin(rad(lat1)) * Math.cos(rad(lat2)) * Math.cos(rad(lon2 - lon1));
   const deg = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-  return COMPASS[Math.round(deg / 45) % 8];
+  return at(COMPASS, Math.round(deg / 45) % 8);
 }

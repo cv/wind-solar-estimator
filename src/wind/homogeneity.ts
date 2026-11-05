@@ -1,5 +1,7 @@
 // Checks a station record for breaks (moves, new instruments, sheltering) against the weather model.
 
+import { at } from "../util/checked.ts";
+
 /** Station and model annual means over the hours both have, and the share of hours the station has. */
 export interface YearlyMeans {
   year: number;
@@ -81,19 +83,21 @@ export function checkHomogeneity(
 
   let sxx = 0,
     sxy = 0;
-  for (let i = 0; i < n; i++) {
-    sxx += (x[i] - mx) ** 2;
-    sxy += (x[i] - mx) * (r[i] - mr);
+  for (const { year, ratio } of ys) {
+    sxx += (year - mx) ** 2;
+    sxy += (year - mx) * (ratio - mr);
   }
   const slope = sxy / sxx;
   let ssr = 0;
-  for (let i = 0; i < n; i++) ssr += (r[i] - (mr + slope * (x[i] - mx))) ** 2;
+  for (const { year, ratio } of ys) ssr += (ratio - (mr + slope * (year - mx))) ** 2;
   const se = Math.sqrt(ssr / (n - 2) / sxx);
-  const start = mr + slope * (x[0] - mx),
-    end = mr + slope * (x[n - 1] - mx);
+  const first = at(x, 0),
+    last = at(x, n - 1);
+  const start = mr + slope * (first - mx),
+    end = mr + slope * (last - mx);
   out.trend = {
-    from: x[0],
-    to: x[n - 1],
+    from: first,
+    to: last,
     start,
     end,
     change: end / start - 1,
@@ -109,7 +113,7 @@ export function checkHomogeneity(
     const s = Math.sqrt(ss / (n - 2));
     const t = s > 0 ? Math.abs(ma - mb) / (s * Math.sqrt(1 / k + 1 / (n - k))) : Infinity;
     if (!out.step || t > out.step.t)
-      out.step = { year: x[k], from: x[0], to: x[n - 1], before: mb, after: ma, change: ma / mb - 1, t };
+      out.step = { year: at(x, k), from: first, to: last, before: mb, after: ma, change: ma / mb - 1, t };
   }
 
   const clear = <F extends Trend | Step>(f: F | null): f is F =>

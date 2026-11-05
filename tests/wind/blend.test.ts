@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { alignStation, blendStation, shearAlpha, MIN_PAIRS, type BlendWeather } from "../../src/wind/blend.ts";
 import type { StationHours } from "../../src/data/stations.ts";
 import { close } from "../helpers.ts";
+import { at } from "../../src/util/checked.ts";
 
 /** A year of model weather with a repeating daily wind pattern; t counts UTC hours from 2020. */
 function modelYear() {
@@ -22,8 +23,9 @@ function modelYear() {
     wx.t[i] = t0 + i;
     wx.month[i] = Math.min(11, Math.floor(i / 730));
     wx.hour[i] = i % 24;
-    wx.w10[i] = 2 + ((i * 7) % 23); // 2..24 km/h, well mixed
-    wx.w100[i] = wx.w10[i] * 1.6;
+    const w10 = 2 + ((i * 7) % 23); // 2..24 km/h, well mixed
+    wx.w10[i] = w10;
+    wx.w100[i] = w10 * 1.6;
   }
   return wx;
 }
@@ -38,8 +40,8 @@ function stationFrom(
     wind: number[] = [];
   for (let i = 0; i < wx.n; i++)
     if (!skip(i)) {
-      hours.push(wx.t[i]);
-      wind.push(Math.round(f(wx.w10[i])));
+      hours.push(at(wx.t, i));
+      wind.push(Math.round(f(at(wx.w10, i))));
     }
   return { hours: Int32Array.from(hours), wind: Uint8Array.from(wind) };
 }
@@ -66,9 +68,10 @@ test("blendStation keeps readings, fills gaps on the station's scale and keeps t
   const { wx: out, stats } = blend;
   close(stats.coverage, 0.8, 0.001);
   assert.equal(stats.filled, wx.n / 5);
-  for (const i of [1, 2, 3]) assert.equal(out.w10[i], Math.round(1.5 * wx.w10[i]), "measured hours are kept");
-  for (const i of [0, 5, 500, 5000]) close(out.w10[i], 1.5 * wx.w10[i], 1.2, `filled hour ${i}`);
-  for (const i of [0, 1, 4000]) close(out.w100[i] / out.w10[i], 10 ** shearAlpha(wx.w10[i], wx.w100[i]), 1e-5, "shear");
+  for (const i of [1, 2, 3]) assert.equal(out.w10[i], Math.round(1.5 * at(wx.w10, i)), "measured hours are kept");
+  for (const i of [0, 5, 500, 5000]) close(at(out.w10, i), 1.5 * at(wx.w10, i), 1.2, `filled hour ${i}`);
+  for (const i of [0, 1, 4000])
+    close(at(out.w100, i) / at(out.w10, i), 10 ** shearAlpha(at(wx.w10, i), at(wx.w100, i)), 1e-5, "shear");
   close(stats.meanStation / stats.meanModel, 1.5, 0.05);
   close(stats.energyRatio, 1.5 ** 3, 0.2);
   assert.ok(stats.correlation > 0.99);
@@ -98,7 +101,9 @@ test("blendStation reports yearly means and the homogeneity check", () => {
   assert.ok(blend);
   const { stats } = blend;
   assert.equal(stats.yearly.length, 1);
-  assert.equal(stats.yearly[0].year, 2020);
-  close(stats.yearly[0].station / stats.yearly[0].model, 1.2, 0.02);
+  const [first] = stats.yearly;
+  assert.ok(first);
+  assert.equal(first.year, 2020);
+  close(first.station / first.model, 1.2, 0.02);
   assert.equal(stats.homogeneity.issue, null); // one year can't show a break
 });

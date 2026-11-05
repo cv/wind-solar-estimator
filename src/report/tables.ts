@@ -11,6 +11,7 @@ import type { LoadPreset } from "../model/load.ts";
 import { LOAD_PRESETS } from "../model/load.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 import type { BlendStats } from "../wind/blend.ts";
+import { at } from "../util/checked.ts";
 import { homogeneityText } from "./notes.ts";
 
 /** One row of the monthly table: a label, then kWh for wind, solar, use and the two import cases. */
@@ -30,11 +31,11 @@ export function monthlyRows(r: SimResult): MonthlyTable {
   const m = r.monthly;
   const rows = MONTHS.map((name, i): MonthlyRow => [
     name,
-    m.wind[i],
-    m.pv[i],
-    m.load[i],
-    m.importPv[i],
-    m.importBoth[i],
+    at(m.wind, i),
+    at(m.pv, i),
+    at(m.load, i),
+    at(m.importPv, i),
+    at(m.importBoth, i),
   ]);
   const total: MonthlyRow = ["Year", r.windKwh, r.pvKwh, r.loadKwh, r.pvOnly.importKwh, r.withWind.importKwh];
   return { head: ["Month", "Wind", "Solar", "Use", "Bought: solar + battery", "Bought: with wind"], rows, total };

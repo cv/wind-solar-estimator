@@ -4,6 +4,7 @@
 // Licence – Canada. Everything downloaded is cached in IndexedDB, so a site is fetched once.
 
 import { dbGet, dbPut, memory } from "./cache.ts";
+import { at } from "../util/checked.ts";
 import { rad, distanceKm, direction, type CompassPoint } from "./geo.ts";
 
 const API = "https://api.weather.gc.ca/collections";
@@ -187,7 +188,7 @@ export async function fetchStationHours({
       let part = (memory.get(key) as StationHours | undefined) || (await dbGet<StationHours>(key));
       if (!part) {
         // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
-        part = await fetchStationYear(id, years[idx], signal);
+        part = await fetchStationYear(id, at(years, idx), signal);
         dbPut(key, part); // past years never change, so they're kept for good
       }
       memory.set(key, part);
@@ -228,11 +229,11 @@ export function parseStationCsv(text: string): StationHours {
   const hours: number[] = [],
     wind: number[] = [];
   if (iT >= 0 && iW >= 0) {
-    for (let k = 1; k < lines.length; k++) {
-      const c = lines[k].split(",");
+    for (const line of lines.slice(1)) {
+      const c = line.split(",");
       const w = c[iW]?.trim();
       if (!w) continue;
-      const ms = Date.parse(`${c[iT].trim()}Z`);
+      const ms = Date.parse(`${at(c, iT).trim()}Z`);
       const v = Number(w);
       if (!Number.isFinite(ms) || !Number.isFinite(v) || v < 0) continue;
       hours.push(Math.round(ms / 3.6e6));
