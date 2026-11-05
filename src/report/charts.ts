@@ -17,6 +17,10 @@ import { betzLimitW } from "../model/physics.ts";
 import { makeCurveFn } from "../model/powerCurve.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 
+/** A plain colour (not a per-point array or a scriptable function). */
+const isColor = (v: unknown): v is Color =>
+  typeof v === "string" || v instanceof CanvasGradient || v instanceof CanvasPattern;
+
 /** A chart for drawChart: the type may be left to the datasets (mixed bar and line charts). */
 export type ChartSpec = ChartConfiguration | ChartConfigurationCustomTypesPerDataset;
 
@@ -32,8 +36,14 @@ export const legendLabels: Partial<LegendOptions<ChartType>["labels"]> = {
       const ds = chart.data.datasets[item.datasetIndex];
       if (ds === undefined) return item;
       // A live chart's config always has its type (mixed charts get the default one); these charts use plain colours.
-      return (ds.type || (chart.config as ChartConfiguration).type) === "line"
-        ? { ...item, pointStyle: "line", strokeStyle: ds.borderColor as Color, lineWidth: 2.5 }
+      const chartType = "type" in chart.config ? chart.config.type : undefined;
+      return (ds.type || chartType) === "line"
+        ? {
+            ...item,
+            pointStyle: "line",
+            ...(isColor(ds.borderColor) ? { strokeStyle: ds.borderColor } : {}),
+            lineWidth: 2.5,
+          }
         : { ...item, pointStyle: "rect", lineWidth: 0 };
     });
   },
@@ -42,7 +52,7 @@ export const legendLabels: Partial<LegendOptions<ChartType>["labels"]> = {
 export function drawChart(id: string, config: ChartSpec): void {
   if (typeof Chart === "undefined") return;
   state.charts[id]?.destroy();
-  state.charts[id] = new Chart(document.getElementById(id) as HTMLCanvasElement, {
+  state.charts[id] = new Chart($(`#${id}`, HTMLCanvasElement), {
     ...config,
     options: {
       responsive: true,
@@ -56,10 +66,15 @@ export function drawChart(id: string, config: ChartSpec): void {
 }
 
 /** A scale with a title, plus any other scale options. */
-export const axis = <T extends object = Record<never, never>>(
-  title: string,
-  extra: T = {} as T,
-): { title: { display: boolean; text: string } } & T => ({ title: { display: true, text: title }, ...extra });
+export function axis(title: string): AxisTitle;
+export function axis<T extends object>(title: string, extra: T): AxisTitle & T;
+export function axis(title: string, extra: object = {}): AxisTitle {
+  return { title: { display: true, text: title }, ...extra };
+}
+/** What axis gives every scale. */
+interface AxisTitle {
+  title: { display: boolean; text: string };
+}
 
 const round = (a: readonly number[]): number[] => a.map((x) => Math.round(x));
 const positive = (x: number): number | null => (x > 0 ? x : null);
@@ -213,7 +228,7 @@ export function renderSoc(): void {
 }
 
 function drawSoc(r: SimResult, p: ModelParams): void {
-  const mo = Number($<HTMLSelectElement>("#socMonth").value) || 0;
+  const mo = Number($("#socMonth", HTMLSelectElement).value) || 0;
   const hours = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
   drawChart("chSoc", {
     type: "line",

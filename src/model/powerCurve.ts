@@ -39,7 +39,7 @@ export function exampleCurve(): CurvePoint[] {
 /** Parses "km/h, W" lines (commas, spaces, tabs or semicolons; # starts a comment). */
 export function parseCurve(text: string): CurvePoint[] {
   const pts: CurvePoint[] = [];
-  for (const line of String(text).split(/\r?\n/)) {
+  for (const line of text.split(/\r?\n/)) {
     const s = line.replace(/#.*/, "").trim();
     if (!s) continue;
     const [v, w] = s.split(/[\s,;]+/).map(Number);

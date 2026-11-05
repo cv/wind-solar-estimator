@@ -34,11 +34,15 @@ export function loadStations(): Promise<RankedStation[] | null> {
     });
   state.stations = { key, promise };
   renderStationPicker();
-  promise.then((list): void => {
-    if (state.stations.key !== key) return;
-    state.stations.list = list;
-    renderStationPicker();
-  });
+  promise
+    .then((list): void => {
+      if (state.stations.key !== key) return;
+      state.stations.list = list;
+      renderStationPicker();
+    })
+    .catch((e: unknown) => {
+      console.error(e);
+    });
   return promise;
 }
 
@@ -58,7 +62,7 @@ export function resolveStation(
 
 /** The "Wind data" picker, its hint and the station pins on the map. */
 export function renderStationPicker(): void {
-  const sel = $<HTMLSelectElement>("#stationSelect");
+  const sel = $("#stationSelect", HTMLSelectElement);
   const hint = $("#stationHint");
   const lat = Number(form.elements.lat.value),
     lon = Number(form.elements.lon.value);

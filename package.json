@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "node scripts/build.ts --watch",
     "build": "node scripts/build.ts",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
-    "lint": "oxlint",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tests && tsc -p scripts",
+    "lint": "oxlint --type-aware",
     "fmt": "oxfmt src tests scripts",
     "fmt:check": "oxfmt --check src tests scripts",
     "test": "node --test \"tests/**/*.test.ts\"",

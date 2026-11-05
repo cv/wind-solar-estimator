@@ -117,6 +117,9 @@ export const DEFAULTS: Readonly<FormValues> = {
   omPerTurbine: "200",
 };
 
+/** A form field name, as opposed to any other string (e.g. a share-link key). */
+export const isFormKey = (k: string): k is FormKey => Object.hasOwn(DEFAULTS, k);
+
 // Share links leave out values equal to the defaults, so they carry a version: a link
 // without one was made with these earlier defaults, and keeps meaning what it meant.
 export const HASH_VERSION = "2";

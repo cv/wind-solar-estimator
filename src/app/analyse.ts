@@ -64,7 +64,7 @@ export async function analyse({ fetchIfNeeded = true }: { fetchIfNeeded?: boolea
     const token = ++runCtl.token;
     runCtl.abortCtl?.abort();
     runCtl.abortCtl = new AbortController();
-    const runBtn = $<HTMLButtonElement>("#run");
+    const runBtn = $("#run", HTMLButtonElement);
     runBtn.disabled = true;
     runBtn.textContent = "Loading weather…";
     const period = req.startYear === req.endYear ? String(req.endYear) : `${req.startYear}–${req.endYear}`;
@@ -138,6 +138,17 @@ export async function analyse({ fetchIfNeeded = true }: { fetchIfNeeded?: boolea
   }
 }
 
+/** Reports a failure nothing else caught (a bug, not bad input): logged, and shown as an error status. */
+export function showFailure(e: unknown): void {
+  console.error(e);
+  status(esc((e instanceof Error && e.message) || String(e)), "error");
+}
+
+/** Starts analyse without waiting for it (event handlers); a failure is reported by showFailure. */
+export function startAnalyse(opts?: { fetchIfNeeded?: boolean }): void {
+  analyse(opts).catch(showFailure);
+}
+
 /**
  * Uses the station's readings when it has enough of them (any amount above the minimum
  * when picked by hand); otherwise the weather model, with a note saying why.
@@ -176,7 +187,7 @@ export function onChange(name: string): void {
   clearTimeout(runCtl.debounce);
   runCtl.debounce = setTimeout(() => {
     if (name === "lat" || name === "lon" || name === "years" || name === "endYear")
-      loadStations().then(renderStationPicker);
-    analyse({ fetchIfNeeded: false });
+      loadStations().then(renderStationPicker).catch(showFailure);
+    startAnalyse({ fetchIfNeeded: false });
   }, 250);
 }

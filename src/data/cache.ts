@@ -18,13 +18,16 @@ function openDb(): Promise<IDBDatabase | null> {
   return dbPromise;
 }
 
-/** The value stored under key (the caller names its type), or null when absent or unavailable. */
-export async function dbGet<T>(key: string): Promise<T | null> {
+/** The value stored under key if it passes the guard, or null when absent, unavailable or of another shape. */
+export async function dbGet<T>(key: string, guard: (v: unknown) => v is T): Promise<T | null> {
   const db = await openDb();
   if (!db) return null;
   return new Promise<T | null>((resolve) => {
     const req = db.transaction(STORE).objectStore(STORE).get(key);
-    req.addEventListener("success", () => resolve((req.result as T | undefined) || null));
+    req.addEventListener("success", () => {
+      const value: unknown = req.result;
+      resolve(guard(value) ? value : null);
+    });
     req.addEventListener("error", () => resolve(null));
   });
 }
@@ -47,6 +50,12 @@ export async function dbClear(): Promise<void> {
 
 /**
  * In-memory cache of station lists, station years and elevations (cleared by clearStationMemory).
- * Values differ by key prefix, so readers state the type they stored.
+ * Values differ by key prefix, so readers check them with memoryGet and a guard.
  */
 export const memory = new Map<string, unknown>();
+
+/** The in-memory value under key if it passes the guard, else undefined. */
+export function memoryGet<T>(key: string, guard: (v: unknown) => v is T): T | undefined {
+  const value = memory.get(key);
+  return guard(value) ? value : undefined;
+}

@@ -1,5 +1,5 @@
 // Form <-> URL hash, input validation, and turning form values into a data request and model parameters.
-import { DEFAULTS, HASH_VERSION } from "./constants.ts";
+import { DEFAULTS, HASH_VERSION, isFormKey } from "./constants.ts";
 import type { FormInput, FormKey, FormOverrides, FormValues, StringFormKey } from "./constants.ts";
 import { $, form } from "./dom.ts";
 import type { FormField } from "./dom.ts";
@@ -13,7 +13,7 @@ import type { CurvePoint } from "../model/powerCurve.ts";
 import type { ModelParams } from "../model/simulate.ts";
 
 /** The form's field names (DEFAULTS' keys). */
-const FORM_KEYS = Object.keys(DEFAULTS) as FormKey[];
+const FORM_KEYS = Object.keys(DEFAULTS).filter(isFormKey);
 
 /** The load preset named key (any string, e.g. from a share link), if there is one. */
 export function loadPreset(key: string | undefined): LoadPreset | undefined {
@@ -25,12 +25,17 @@ export function loadPreset(key: string | undefined): LoadPreset | undefined {
 const isCheckbox = (el: FormField): el is HTMLInputElement => el.type === "checkbox";
 
 export function setForm(values: FormOverrides): void {
-  for (const [k, v] of Object.entries(values) as [string, string | boolean][]) {
-    const el: FormField | undefined = form.elements[k as FormKey];
-    if (!el) continue;
+  for (const [k, v] of Object.entries(values)) {
+    if (!isFormKey(k)) continue;
+    const el: FormField = form.elements[k];
     if (isCheckbox(el)) el.checked = v === true || v === "1";
     else el.value = String(v);
   }
+}
+
+/** Values read from the form that match DEFAULTS: a checkbox's state for each boolean field, text for the rest. */
+function isFormInput(o: Readonly<Record<string, string | boolean>>): o is FormInput & Record<string, string | boolean> {
+  return FORM_KEYS.every((k) => typeof o[k] === typeof DEFAULTS[k]) && typeof o["apiKey"] === "string";
 }
 
 export function readForm(): FormInput {
@@ -39,10 +44,12 @@ export function readForm(): FormInput {
     const el: FormField = form.elements[k];
     out[k] = isCheckbox(el) ? el.checked : el.value.trim();
   }
-  return { ...out, apiKey: form.elements.apiKey.value.trim() } as unknown as FormInput;
+  out["apiKey"] = form.elements.apiKey.value.trim();
+  if (!isFormInput(out)) throw new Error("A form field is a checkbox where text was expected, or the other way round");
+  return out;
 }
 
-export const asParam = (v: string | boolean): string => (typeof v === "boolean" ? (v ? "1" : "0") : String(v));
+export const asParam = (v: string | boolean): string => (typeof v === "boolean" ? (v ? "1" : "0") : v);
 
 export function writeHash(v: FormValues): void {
   const q = new URLSearchParams();
@@ -57,9 +64,9 @@ export function writeHash(v: FormValues): void {
 export function readHash(): FormOverrides {
   const out: Record<string, string | boolean> = {};
   for (const [k, v] of new URLSearchParams(location.hash.slice(1))) {
-    if (k in DEFAULTS) out[k] = typeof DEFAULTS[k as FormKey] === "boolean" ? v === "1" : v;
+    if (isFormKey(k)) out[k] = typeof DEFAULTS[k] === "boolean" ? v === "1" : v;
   }
-  return out as FormOverrides;
+  return out;
 }
 
 /** A form value that failed validation; field is the offending input. */
@@ -157,7 +164,7 @@ export function modelParams(v: FormInput): ModelParams {
   try {
     curvePts = parseCurve(v.curve);
   } catch (e: unknown) {
-    throw invalid("curve", (e as Error).message);
+    throw invalid("curve", e instanceof Error ? e.message : String(e));
   }
   return {
     nTurbines: Math.round(num(v, "nTurbines", "Number of turbines", { min: 1, max: 100000 })),

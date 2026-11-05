@@ -5,6 +5,8 @@
 
 import { dbGet, dbPut, dbClear } from "./cache.ts";
 import { at } from "../util/checked.ts";
+import { isArrayOf, isNumber, isNumberOrNull, isRecord, isString } from "../util/guards.ts";
+import { sleep } from "../util/sleep.ts";
 
 const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 const ARCHIVE_COMMERCIAL = "https://customer-archive-api.open-meteo.com/v1/archive";
@@ -63,22 +65,20 @@ export interface Weather {
   gti: Float32Array;
 }
 
-/** Open-Meteo archive API response (JSON, timeformat=unixtime); reason is set on errors. */
-interface ArchiveResponse {
+/** A successful Open-Meteo archive API reply (JSON, timeformat=unixtime), the fields used here. */
+interface ArchiveData {
   latitude: number;
   longitude: number;
   elevation?: number;
   timezone: string;
   utc_offset_seconds?: number;
-  hourly?: {
+  hourly: {
     time: number[];
     wind_speed_10m: (number | null)[];
     wind_speed_100m: (number | null)[];
     temperature_2m: (number | null)[];
     global_tilted_irradiance: (number | null)[];
   };
-  error?: boolean;
-  reason?: string;
 }
 
 /** One year of weather as cached in IndexedDB; missing values are NaN. */
@@ -99,22 +99,44 @@ interface YearPart {
 
 type Column = "t" | "year" | "month" | "hour" | "w10" | "w100" | "temp" | "gti";
 
-/** A reply that has the hourly data. */
-type ArchiveData = ArchiveResponse & { hourly: NonNullable<ArchiveResponse["hourly"]> };
-
 const memory = new Map<string, Weather>();
-const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
-  new Promise<void>((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(t);
-        reject(signal.reason);
-      },
-      { once: true },
-    );
-  });
+
+const optionalNumber = (v: unknown): boolean => v === undefined || isNumber(v);
+
+/** An hourly column as long as the time column. */
+const isColumn = (v: unknown, n: number): v is (number | null)[] => isArrayOf(v, isNumberOrNull) && v.length === n;
+
+/** Checks the fields of an archive reply that compactYear reads. */
+function isArchiveData(v: unknown): v is ArchiveData {
+  if (!isRecord(v) || !isNumber(v["latitude"]) || !isNumber(v["longitude"]) || !isString(v["timezone"])) return false;
+  if (!optionalNumber(v["elevation"]) || !optionalNumber(v["utc_offset_seconds"])) return false;
+  const h = v["hourly"];
+  if (!isRecord(h) || !isArrayOf(h["time"], isNumber)) return false;
+  const n = h["time"].length;
+  return (
+    isColumn(h["wind_speed_10m"], n) &&
+    isColumn(h["wind_speed_100m"], n) &&
+    isColumn(h["temperature_2m"], n) &&
+    isColumn(h["global_tilted_irradiance"], n)
+  );
+}
+
+/** One year as cached in IndexedDB (entries written by older versions may differ). */
+function isYearPart(v: unknown): v is YearPart {
+  return (
+    isRecord(v) &&
+    isNumber(v["latitude"]) &&
+    isNumber(v["longitude"]) &&
+    isNumber(v["elevation"]) &&
+    isString(v["timezone"]) &&
+    isNumber(v["offset"]) &&
+    v["time"] instanceof Float64Array &&
+    v["w10"] instanceof Float32Array &&
+    v["w100"] instanceof Float32Array &&
+    v["temp"] instanceof Float32Array &&
+    v["gti"] instanceof Float32Array
+  );
+}
 
 /**
  * Loads hourly 10 m and 100 m wind, 2 m temperature and plane-of-array irradiance
@@ -152,11 +174,11 @@ export async function fetchWeather({
       const idx = next++;
       const yearKey = ["y", lat, lon, years[idx], tilt, azimuth].join("|");
       // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
-      let part = await dbGet<YearPart>(yearKey);
+      let part = await dbGet(yearKey, isYearPart);
       if (!part) {
         // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
         part = compactYear(await fetchYear({ lat, lon, year: at(years, idx), tilt, azimuth, apiKey, signal }));
-        dbPut(yearKey, part); // best effort, not awaited
+        void dbPut(yearKey, part); // best effort, not awaited (dbPut never rejects)
       }
       parts[idx] = part;
       onProgress?.(++done, years.length);
@@ -283,15 +305,17 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: Year
         cause: e,
       });
     }
-    let json: ArchiveResponse | null = null;
+    let json: unknown = null;
     try {
-      json = JSON.parse(text) as ArchiveResponse;
+      json = JSON.parse(text);
     } catch {
       /* not JSON, e.g. a proxy error page */
     }
 
-    if (res.ok && json?.hourly?.time) return { ...json, hourly: json.hourly };
-    const reason = json?.reason || text.slice(0, 120).trim() || res.statusText;
+    if (res.ok && isArchiveData(json)) return json;
+    // Error replies are { error: true, reason: "..." }.
+    const reason =
+      (isRecord(json) && isString(json["reason"]) && json["reason"]) || text.slice(0, 120).trim() || res.statusText;
     if (res.status === 429 && /daily|hourly/i.test(reason)) {
       throw new Error(`Open-Meteo's free usage limit was reached (${reason}). Try again later, or use an API key.`);
     }

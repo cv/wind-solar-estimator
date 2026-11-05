@@ -17,7 +17,46 @@
   ],
   "rules": {
     "import/no-cycle": "error",
-    "oxc/no-map-spread": "off"
+    "oxc/no-map-spread": "off",
+    "typescript/no-floating-promises": [
+      "error",
+      {
+        "allowForKnownSafeCalls": [
+          {
+            "from": "package",
+            "package": "node:test",
+            "name": [
+              "test",
+              "describe",
+              "it",
+              "suite"
+            ]
+          }
+        ]
+      }
+    ],
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/require-await": "error",
+    "typescript/return-await": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/restrict-template-expressions": [
+      "error",
+      {
+        "allowNumber": true
+      }
+    ],
+    "typescript/restrict-plus-operands": "error",
+    "typescript/no-base-to-string": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/unbound-method": "error",
+    "typescript/no-redundant-type-constituents": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error"
   },
   "overrides": [
     {

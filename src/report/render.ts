@@ -17,8 +17,8 @@ export function render(v: FormValues, check: CurveCheck): void {
   const { result: r, params: p, req, wx, source } = a;
   $("#intro").hidden = true;
   $("#results").hidden = false;
-  $<HTMLButtonElement>("#share").disabled = false;
-  $<HTMLButtonElement>("#print").disabled = false;
+  $("#share", HTMLButtonElement).disabled = false;
+  $("#print", HTMLButtonElement).disabled = false;
 
   const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
   $("#reportHead").innerHTML =
@@ -28,7 +28,7 @@ export function render(v: FormValues, check: CurveCheck): void {
     `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString(undefined, { dateStyle: "medium" })}</p>`;
 
   renderVerdict(r, a.capped);
-  if (a.capped) $<HTMLDetailsElement>("#more").open = true; // the power-curve chart is the evidence
+  if (a.capped) $("#more", HTMLDetailsElement).open = true; // the power-curve chart is the evidence
   renderNotes(a, check);
   renderFigures(r, p, req);
   renderCharts(r, p);

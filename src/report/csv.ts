@@ -5,7 +5,7 @@ import { assumptionRows, monthlyRows } from "./tables.ts";
 
 /** One CSV cell: numbers rounded to 2 decimals, everything else quoted. */
 const q = (c: string | number): string =>
-  typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${String(c).replace(/"/g, '""')}"`;
+  typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${c.replace(/"/g, '""')}"`;
 
 export function downloadCsv(): void {
   if (!state.result) return; // nothing analysed yet

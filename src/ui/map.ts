@@ -12,7 +12,7 @@ import { searchPlaces } from "../data/places.ts";
 /** What the map calls back into: picking a station by clicking its pin. */
 export interface MapOptions {
   /** A station pin was clicked; value is the picker's option value ("eccc:<id>"). */
-  onPinClick(value: string): void;
+  onPinClick: (value: string) => void;
 }
 
 function ignorePinClick(): void {
@@ -24,27 +24,26 @@ let pinClick: (value: string) => void = ignorePinClick;
 export function renderStationPins(list: readonly RankedStation[], active: ChosenStation | null): void {
   if (!state.map) return;
   state.stationLayer?.remove();
-  state.stationLayer = L.layerGroup(
-    list.map((s): Leaflet.CircleMarker => {
-      const on = active?.id === s.id;
-      const m = L.circleMarker([s.lat, s.lon], {
-        radius: on ? 7 : 5,
-        // A pin click picks the station; without this it also bubbles to the map and moves the site.
-        bubblingMouseEvents: false,
-        color: on ? COLORS.wind : "#556074",
-        weight: on ? 2 : 1,
-        fillColor: on ? COLORS.wind : "#ffffff",
-        fillOpacity: on ? 0.9 : 0.8,
-      })
-        .bindTooltip(
-          `${s.name}: ${stationPlace(s)}${riseText(s)}, hourly records ${s.first}–${s.last}${on ? " (in use)" : ""}`,
-        )
-        .on("click", () => pinClick(`eccc:${s.id}`));
-      return m;
-    }),
-  ).addTo(state.map);
+  const pins = list.map((s): Leaflet.CircleMarker => {
+    const on = active?.id === s.id;
+    const m = L.circleMarker([s.lat, s.lon], {
+      radius: on ? 7 : 5,
+      // A pin click picks the station; without this it also bubbles to the map and moves the site.
+      bubblingMouseEvents: false,
+      color: on ? COLORS.wind : "#556074",
+      weight: on ? 2 : 1,
+      fillColor: on ? COLORS.wind : "#ffffff",
+      fillOpacity: on ? 0.9 : 0.8,
+    })
+      .bindTooltip(
+        `${s.name}: ${stationPlace(s)}${riseText(s)}, hourly records ${s.first}–${s.last}${on ? " (in use)" : ""}`,
+      )
+      .on("click", () => pinClick(`eccc:${s.id}`));
+    return m;
+  });
+  state.stationLayer = L.layerGroup(pins).addTo(state.map);
   // The picker is the keyboard route to the same choice, so the pins aren't tab stops.
-  state.stationLayer.eachLayer((m) => (m as Leaflet.CircleMarker).getElement()?.setAttribute("tabindex", "-1"));
+  for (const m of pins) m.getElement()?.setAttribute("tabindex", "-1");
 }
 
 export function initMap({ onPinClick }: MapOptions): void {
@@ -83,8 +82,8 @@ export function setLocation(lat: number, lon: number, name: string, { pan = fals
 }
 
 export async function placeSearch(): Promise<void> {
-  const q = $<HTMLInputElement>("#placeSearch").value.trim();
-  const ul = $<HTMLUListElement>("#placeResults");
+  const q = $("#placeSearch", HTMLInputElement).value.trim();
+  const ul = $("#placeResults", HTMLUListElement);
   if (!q) {
     ul.hidden = true;
     return;
@@ -112,6 +111,6 @@ export async function placeSearch(): Promise<void> {
       ul.append(li);
     }
   } catch (e) {
-    ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">${esc((e as Error).message)}</li>`;
+    ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">${esc(e instanceof Error ? e.message : String(e))}</li>`;
   }
 }

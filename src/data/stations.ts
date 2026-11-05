@@ -3,8 +3,10 @@
 // OGC API. It allows browser (CORS) requests and needs no key. Data: Open Government
 // Licence – Canada. Everything downloaded is cached in IndexedDB, so a site is fetched once.
 
-import { dbGet, dbPut, memory } from "./cache.ts";
+import { dbGet, dbPut, memory, memoryGet } from "./cache.ts";
 import { at } from "../util/checked.ts";
+import { isArrayOf, isNumber, isRecord, isString } from "../util/guards.ts";
+import { sleep } from "../util/sleep.ts";
 import { rad, distanceKm, direction, type CompassPoint } from "./geo.ts";
 
 const API = "https://api.weather.gc.ca/collections";
@@ -54,34 +56,70 @@ interface CachedStationList {
   list: StationRecord[];
 }
 
-/** One feature of the climate-stations collection (GeoJSON), with the requested properties. */
-interface ClimateStationFeature {
-  geometry?: { coordinates?: [lon: number, lat: number] } | null;
-  properties: {
-    STATION_NAME?: string | null;
-    CLIMATE_IDENTIFIER: string | number;
-    ELEVATION?: string | number | null;
-    HLY_FIRST_DATE?: string | null;
-    HLY_LAST_DATE?: string | null;
+function isStationRecord(v: unknown): v is StationRecord {
+  return (
+    isRecord(v) &&
+    isString(v["id"]) &&
+    isString(v["rawName"]) &&
+    isNumber(v["lat"]) &&
+    isNumber(v["lon"]) &&
+    isNumber(v["elevation"]) &&
+    isNumber(v["first"]) &&
+    isNumber(v["last"])
+  );
+}
+
+const isStationList = (v: unknown): v is StationRecord[] => isArrayOf(v, isStationRecord);
+
+const isCachedStationList = (v: unknown): v is CachedStationList =>
+  isRecord(v) && isNumber(v["fetchedAt"]) && isStationList(v["list"]);
+
+const isStationHours = (v: unknown): v is StationHours =>
+  isRecord(v) &&
+  v["hours"] instanceof Int32Array &&
+  v["wind"] instanceof Uint8Array &&
+  v["hours"].length === v["wind"].length;
+
+/** A property value the API gives as a string or number (null or absent: null). */
+const scalar = (v: unknown): string | number | null => (isString(v) || isNumber(v) ? v : null);
+
+/**
+ * One feature of the climate-stations collection (GeoJSON: geometry.coordinates [lon, lat] and the
+ * requested properties) as a StationRecord, or null if it has no position, identifier or hourly record.
+ */
+function stationFromFeature(f: unknown): StationRecord | null {
+  if (!isRecord(f) || !isRecord(f["properties"]) || !isRecord(f["geometry"])) return null;
+  const p = f["properties"];
+  const coords = f["geometry"]["coordinates"];
+  if (!Array.isArray(coords)) return null;
+  const lon: unknown = coords[0],
+    lat: unknown = coords[1];
+  const id = scalar(p["CLIMATE_IDENTIFIER"]);
+  const firstDate = p["HLY_FIRST_DATE"];
+  if (!isNumber(lon) || !isNumber(lat) || id === null || !isString(firstDate) || !firstDate) return null;
+  const elevation = scalar(p["ELEVATION"]);
+  return {
+    id: String(id),
+    rawName: String(scalar(p["STATION_NAME"]) || id), // labelled on use, so label fixes apply to cached lists
+    lat,
+    lon,
+    elevation: elevation === null ? NaN : Number(elevation),
+    first: Number(firstDate.slice(0, 4)),
+    last: Number(String(scalar(p["HLY_LAST_DATE"])).slice(0, 4)),
   };
 }
 
-interface ClimateStationsResponse {
-  features?: ClimateStationFeature[];
-}
-
-const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
-  new Promise<void>((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(t);
-        reject(signal.reason);
-      },
-      { once: true },
-    );
+/** The stations in a climate-stations reply ({ features?: [...] }). */
+function stationsFromResponse(json: unknown): StationRecord[] {
+  if (!isRecord(json)) throw new Error("Environment Canada's climate service sent an unreadable station list.");
+  if (json["features"] === undefined) return [];
+  if (!Array.isArray(json["features"]))
+    throw new Error("Environment Canada's climate service sent a station list in an unexpected form.");
+  return json["features"].flatMap((f: unknown): StationRecord[] => {
+    const s = stationFromFeature(f);
+    return s ? [s] : [];
   });
+}
 
 /** Rough box around Canada: outside it there are no stations to look for. */
 export const nearCanada = (lat: number, lon: number): boolean =>
@@ -114,9 +152,9 @@ export async function findStations(
   const cLat = Math.round(lat * 10) / 10,
     cLon = Math.round(lon * 10) / 10;
   const key = `stations3|${cLat}|${cLon}|${radiusKm}`; // v2: no longer trusts HAS_HOURLY_DATA; v3: raw names
-  let list = memory.get(key) as StationRecord[] | undefined;
+  let list = memoryGet(key, isStationList);
   if (!list) {
-    const cached = await dbGet<CachedStationList>(key);
+    const cached = await dbGet(key, isCachedStationList);
     if (cached && Date.now() - cached.fetchedAt < LIST_TTL_MS) list = cached.list;
   }
   if (!list) {
@@ -131,25 +169,15 @@ export async function findStations(
       bbox: [cLon - dLon, cLat - dLat, cLon + dLon, cLat + dLat].map((x) => x.toFixed(3)).join(","),
       properties: "STATION_NAME,CLIMATE_IDENTIFIER,ELEVATION,HLY_FIRST_DATE,HLY_LAST_DATE",
     });
-    const json = JSON.parse(
-      await getText(`${API}/climate-stations/items?${q}`, signal, "the station list"),
-    ) as ClimateStationsResponse;
-    list = (json.features || []).flatMap((f): StationRecord[] => {
-      const coords = f.geometry?.coordinates;
-      if (!coords || !f.properties.HLY_FIRST_DATE) return [];
-      return [
-        {
-          id: String(f.properties.CLIMATE_IDENTIFIER),
-          rawName: String(f.properties.STATION_NAME || f.properties.CLIMATE_IDENTIFIER), // labelled on use, so label fixes apply to cached lists
-          lat: coords[1],
-          lon: coords[0],
-          elevation: Number(f.properties.ELEVATION),
-          first: Number(String(f.properties.HLY_FIRST_DATE).slice(0, 4)),
-          last: Number(String(f.properties.HLY_LAST_DATE).slice(0, 4)),
-        },
-      ];
-    });
-    dbPut(key, { fetchedAt: Date.now(), list } satisfies CachedStationList);
+    const text = await getText(`${API}/climate-stations/items?${q}`, signal, "the station list");
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      throw new Error("Environment Canada's climate service sent an unreadable station list.", { cause: e });
+    }
+    list = stationsFromResponse(json);
+    void dbPut(key, { fetchedAt: Date.now(), list } satisfies CachedStationList); // best effort: dbPut never rejects
   }
   memory.set(key, list);
   return list
@@ -185,11 +213,11 @@ export async function fetchStationHours({
       const idx = next++;
       const key = `eccc|${id}|${years[idx]}`;
       // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
-      let part = (memory.get(key) as StationHours | undefined) || (await dbGet<StationHours>(key));
+      let part = memoryGet(key, isStationHours) || (await dbGet(key, isStationHours));
       if (!part) {
         // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
         part = await fetchStationYear(id, at(years, idx), signal);
-        dbPut(key, part); // past years never change, so they're kept for good
+        void dbPut(key, part); // past years never change, so they're kept for good (best effort: dbPut never rejects)
       }
       memory.set(key, part);
       parts[idx] = part;
