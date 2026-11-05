@@ -1,0 +1,43 @@
+/* Responsive and motion media queries (print lives in print.css). */
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 600px) {
+  .top {
+    flex-wrap: wrap;
+    padding: var(--s3);
+  }
+  .brand {
+    font-size: var(--t-body);
+  }
+  .actions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .actions button {
+    flex: 1;
+  }
+  .summary {
+    padding: var(--s4);
+  }
+  .figures {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s4) var(--s3);
+  }
+  .figures .value {
+    font-size: var(--t-lg);
+  }
+  .intro {
+    padding: var(--s4) var(--s1);
+  }
+  .intro h2 {
+    font-size: var(--t-lg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before {
+    transition: none !important;
+  }
+}

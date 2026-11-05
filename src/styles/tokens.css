@@ -1,0 +1,60 @@
+/* Design tokens: custom properties and root defaults. */
+
+:root {
+  /* Brand */
+  --blue: #0b2fbf;
+  --blue-dark: #071f80;
+  --green: #5fd13a;
+  /* Data series */
+  --wind: #1f77b4;
+  --solar: #f2a900;
+  --solar-text: #8a6100;
+  /* State */
+  --good: #2e7d32;
+  --good-bg: #e4f3e5;
+  --good-ink: #1d5520;
+  --warn: #a35c00;
+  --warn-bg: #fdf1df;
+  --warn-line: #f0d2a6;
+  --warn-ink: #6b3d00;
+  --bad: #c62828;
+  --bad-bg: #fde8e8;
+  --bad-line: #f3c0c0;
+  --bad-ink: #8e1b1b;
+  --info-bg: #e6ecfb;
+  /* Neutrals, tinted toward the brand blue */
+  --bg: #f3f5fa;
+  --surface: #fff;
+  --line: #dce1ec;
+  --line-strong: #c3cadb;
+  --text: #172033;
+  --muted: #556074;
+  /* Type: fixed rem scale, ~1.2 ratio */
+  --t-xs: 0.75rem;
+  --t-sm: 0.8125rem;
+  --t-body: 0.9375rem;
+  --t-prose: 1rem;
+  --t-md: 1.125rem;
+  --t-title: 1.25rem;
+  --t-lg: 1.375rem;
+  --t-xl: 1.75rem;
+  /* Space: 4px base */
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2rem;
+  --s7: 3rem;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --focus: 0 0 0 3px rgba(11, 47, 191, 0.35);
+
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 100%;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  accent-color: var(--blue);
+  -webkit-text-size-adjust: 100%;
+}

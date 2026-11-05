@@ -3,42 +3,15 @@
 // OGC API. It allows browser (CORS) requests and needs no key. Data: Open Government
 // Licence – Canada. Everything downloaded is cached in IndexedDB, so a site is fetched once.
 
-import { dbGet, dbPut } from "./cache.ts";
+import { dbGet, dbPut, memory } from "./cache.ts";
+import { rad, distanceKm, direction } from "./geo.ts";
 
 const API = "https://api.weather.gc.ca/collections";
 const LIST_TTL_MS = 30 * 86400e3; // station lists change rarely
 const CONCURRENCY = 3; // a shared public service: a few requests at a time is plenty
 const MAX_RETRIES = 3;
 export const SEARCH_RADIUS_KM = 100;
-const ELEVATION_API = "https://api.open-meteo.com/v1/elevation";
 
-/**
- * How "auto" weighs a station's drawbacks against distance when picking one: 100 m of
- * elevation difference counts like 10 km, and each year of the period the station's
- * record doesn't cover counts like 2 km. A hilltop station 18 km away then loses to one
- * on the same plain 18 km away, and of several stations in one town the one whose record
- * spans the period wins.
- */
-export const KM_PER_METRE_RISE = 0.1;
-export const KM_PER_MISSING_YEAR = 2;
-export const stationScore = (s, missingYears = 0) =>
-  s.distanceKm +
-  (Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0) +
-  Math.max(0, missingYears) * KM_PER_MISSING_YEAR;
-
-/** The station "auto" picks: lowest score among those that pass ok(s); missing(s) = years of the period it lacks. */
-export function pickStation(list, ok, missing: (s: any) => number = () => 0) {
-  let best = null,
-    bestScore = Infinity;
-  for (const s of list) {
-    if (!ok(s)) continue;
-    const score = stationScore(s, missing(s));
-    if (score < bestScore) [best, bestScore] = [s, score];
-  }
-  return best;
-}
-
-const memory = new Map();
 const sleep = (ms, signal) =>
   new Promise((resolve, reject) => {
     const t = setTimeout(resolve, ms);
@@ -54,24 +27,6 @@ const sleep = (ms, signal) =>
 
 /** Rough box around Canada: outside it there are no stations to look for. */
 export const nearCanada = (lat, lon) => lat >= 41.5 && lat <= 84 && lon >= -141.5 && lon <= -52;
-
-const rad = (d) => (d * Math.PI) / 180;
-
-export function distanceKm(lat1, lon1, lat2, lon2) {
-  const a =
-    Math.sin(rad(lat2 - lat1) / 2) ** 2 +
-    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(a)));
-}
-
-/** Compass direction from the first point to the second, e.g. "SW". */
-export function direction(lat1, lon1, lat2, lon2) {
-  const y = Math.sin(rad(lon2 - lon1)) * Math.cos(rad(lat2));
-  const x =
-    Math.cos(rad(lat1)) * Math.sin(rad(lat2)) - Math.sin(rad(lat1)) * Math.cos(rad(lat2)) * Math.cos(rad(lon2 - lon1));
-  const deg = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-  return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
-}
 
 const KEEP_UPPER = new Set(["AAFC", "CDA", "AUT", "AWOS", "RCS", "CS", "MCS", "EPF", "UA"]);
 /** "PINCHER CREEK A" -> "Pincher Creek A" (station codes and suffixes stay as they are). */
@@ -141,25 +96,6 @@ export async function findStations(
     }))
     .filter((s) => s.distanceKm <= radiusKm)
     .sort((a, b) => a.distanceKm - b.distanceKm);
-}
-
-/** Ground elevation (m) at a point from Open-Meteo's 90 m terrain model, or null if unavailable. */
-export async function siteElevation(lat, lon, signal) {
-  const key = `elev|${lat.toFixed(3)}|${lon.toFixed(3)}`;
-  if (memory.has(key)) return memory.get(key);
-  let elevation = await dbGet(key);
-  if (!Number.isFinite(elevation)) {
-    try {
-      const res = await fetch(`${ELEVATION_API}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`, { signal });
-      elevation = res.ok ? Number((await res.json()).elevation?.[0]) : NaN;
-    } catch {
-      elevation = NaN;
-    }
-    if (!Number.isFinite(elevation)) return null; // not cached: try again next time
-    dbPut(key, elevation);
-  }
-  memory.set(key, elevation);
-  return elevation;
 }
 
 /**

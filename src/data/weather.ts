@@ -1,5 +1,5 @@
-// Historical hourly weather from Open-Meteo (ERA5 reanalysis) and place search.
-// Both APIs allow browser (CORS) requests, so no server is needed.
+// Historical hourly weather from Open-Meteo (ERA5 reanalysis) for a site.
+// The API allows browser (CORS) requests, so no server is needed.
 // Free tier: non-commercial use only, ~10,000 weighted calls per day per IP;
 // 20 years for one site costs about 500 of those. Commercial use needs an API key.
 
@@ -7,7 +7,6 @@ import { dbGet, dbPut, dbClear } from "./cache.ts";
 
 const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 const ARCHIVE_COMMERCIAL = "https://customer-archive-api.open-meteo.com/v1/archive";
-const GEOCODE = "https://geocoding-api.open-meteo.com/v1/search";
 const CONCURRENCY = 4;
 const MAX_RETRIES = 4;
 
@@ -179,17 +178,6 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }) {
     }
     throw new Error(`Weather data for ${year} failed (${res.status}): ${reason}. Press Analyse again to resume.`);
   }
-}
-
-export async function searchPlaces(name, signal) {
-  const res = await fetch(`${GEOCODE}?${new URLSearchParams({ name, count: "6", language: "en" })}`, { signal });
-  if (!res.ok) throw new Error(`Place search failed (${res.status})`);
-  const json = await res.json();
-  return (json.results || []).map((r) => ({
-    name: [r.name, r.admin1, r.country].filter(Boolean).join(", "),
-    lat: r.latitude,
-    lon: r.longitude,
-  }));
 }
 
 export async function clearWeatherCache() {

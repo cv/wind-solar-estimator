@@ -43,3 +43,6 @@ export async function dbClear() {
   const db = await openDb();
   if (db) db.transaction(STORE, "readwrite").objectStore(STORE).clear();
 }
+
+/** In-memory cache of station lists, station years and elevations (cleared by clearStationMemory). */
+export const memory = new Map();

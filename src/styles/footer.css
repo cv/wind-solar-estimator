@@ -1,0 +1,8 @@
+/* Page footer. */
+
+.foot {
+  padding: var(--s4) var(--s5);
+  font-size: var(--t-xs);
+  color: var(--muted);
+  text-align: center;
+}

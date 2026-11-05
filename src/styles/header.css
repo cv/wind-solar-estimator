@@ -1,0 +1,38 @@
+/* App bar: brand, badge, header actions. */
+
+/* ---------- Header ---------- */
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s5);
+  background: linear-gradient(90deg, var(--blue-dark), var(--blue));
+  color: #fff;
+}
+.brand {
+  font-size: var(--t-md);
+  font-weight: 400;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+.logo {
+  font-weight: 800;
+  color: var(--green);
+  letter-spacing: 0.01em;
+}
+.badge {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 99px;
+  padding: 0.05rem 0.5rem;
+}
+.actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--s2);
+}

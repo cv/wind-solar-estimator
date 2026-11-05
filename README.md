@@ -130,15 +130,16 @@ browsers never mix cached files from different releases.
 | Path | Contents |
 | --- | --- |
 | `index.html` | Page template; the build adds the hashed asset tags |
-| `src/main.ts` | Form, URL state, map, rendering |
-| `src/weather.ts` | Open-Meteo downloads, retries and caching; place search |
-| `src/stations.ts` | Environment Canada station search and hourly wind downloads |
-| `src/blend.ts` | Station + ERA5 combination: alignment, quantile-mapped gap filling (pure) |
-| `src/cache.ts` | Shared IndexedDB cache |
-| `src/model.ts` | Hourly simulation (pure functions, no DOM) |
-| `src/styles/style.css` | Styles |
+| `src/main.ts` | Entry point |
+| `src/app/` | Defaults, shared state, formatting, DOM helpers, form and URL state, the analysis run |
+| `src/ui/` | Map, place search and the station picker |
+| `src/report/` | Report rendering: verdict, notes, figures, charts, tables, CSV |
+| `src/model/` | Hourly simulation: physics, power curve, load shapes, battery (pure, no DOM) |
+| `src/wind/` | Station + ERA5 combination, quantile mapping, record checks, station choice (pure) |
+| `src/data/` | Downloads and caching: Open-Meteo weather and elevation, place search, Environment Canada stations |
+| `src/styles/` | Styles, one file per concern, imported in order by `style.css` |
 | `scripts/build.ts` | esbuild bundle into `dist/` |
-| `tests/*.test.ts` | Model, blending and station-parsing tests (`npm test`) |
+| `tests/` | Tests mirroring `src/` (`npm test`) |
 
 ## Limitations
 

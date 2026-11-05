@@ -1,0 +1,224 @@
+/* Form: groups, disclosures, inputs, hints, errors, place search, map. */
+
+.group {
+  padding: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.group.location {
+  border-top: 0;
+  padding-bottom: var(--s5);
+}
+details.group {
+  padding-block: var(--s2);
+}
+.group h2 {
+  font-size: var(--t-body);
+  font-weight: 650;
+  color: var(--blue-dark);
+}
+.group.location h2 {
+  margin-bottom: var(--s3);
+}
+.panel-note {
+  padding: var(--s2) var(--s4);
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  font-size: var(--t-xs);
+  color: var(--muted);
+}
+
+details.group > summary,
+details.more > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 2.75rem;
+  border-radius: var(--radius-sm);
+}
+details.group > summary::-webkit-details-marker,
+details.more > summary::-webkit-details-marker {
+  display: none;
+}
+details.group > summary::before,
+details.more > summary::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: none;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 150ms ease-out;
+  margin-right: 0.15rem;
+}
+details[open].group > summary::before,
+details[open].more > summary::before {
+  transform: rotate(45deg);
+}
+/* Report sections that hold supporting detail: closed by default, opened for print. */
+details.more > summary h3 {
+  font-size: var(--t-title);
+}
+details.more > summary:hover h3 {
+  color: var(--blue);
+}
+details[open].more > summary {
+  margin-bottom: var(--s3);
+}
+details[open].group > summary {
+  margin-bottom: var(--s1);
+}
+details.group > summary:hover h2 {
+  color: var(--blue);
+}
+
+label {
+  display: block;
+  font-size: var(--t-sm);
+  color: var(--muted);
+  margin-bottom: var(--s3);
+}
+label.check {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  color: var(--text);
+}
+label.check input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0.1rem 0 0;
+  flex: none;
+}
+.hint.clamp-status {
+  margin: calc(-1 * var(--s2)) 0 var(--s3) calc(1rem + var(--s2));
+}
+.clamp-status:empty {
+  display: none;
+}
+input,
+select,
+textarea {
+  font: inherit;
+}
+input[type="number"],
+input[type="text"],
+input[type="search"],
+input[type="password"],
+select,
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: var(--s1);
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--t-body);
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: #9ea8bf;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: var(--focus);
+}
+input::placeholder {
+  color: var(--muted);
+}
+textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  resize: vertical;
+}
+input.invalid,
+textarea.invalid {
+  border-color: var(--bad);
+  background: var(--bad-bg);
+}
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  align-items: end;
+}
+.hint {
+  font-size: var(--t-sm);
+  color: var(--muted);
+  margin: 0 0 var(--s3);
+  line-height: 1.45;
+}
+.form-error {
+  margin: 0 0 var(--s3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--bad-ink);
+}
+.location .hint {
+  margin: var(--s3) 0 0;
+}
+
+.search {
+  display: flex;
+  gap: var(--s2);
+  margin-bottom: var(--s2);
+}
+.search input {
+  margin-top: 0;
+}
+.place-results {
+  list-style: none;
+  margin: 0 0 var(--s3);
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.place-results li button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  padding: 0.5rem 0.65rem;
+  color: var(--text);
+  font-weight: 400;
+  font-size: var(--t-sm);
+  background: var(--surface);
+}
+.place-results li + li button {
+  border-top: 1px solid var(--line);
+}
+.place-results li button:hover,
+.place-results li button:focus-visible {
+  background: var(--bg);
+  box-shadow: none;
+}
+.place-results .hint {
+  padding: 0.5rem 0.65rem;
+  margin: 0;
+}
+
+.map {
+  height: 200px;
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--s3);
+  z-index: 0;
+}
+.leaflet-container {
+  font: inherit;
+  font-size: var(--t-xs);
+}

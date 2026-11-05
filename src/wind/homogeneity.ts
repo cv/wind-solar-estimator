@@ -1,0 +1,65 @@
+// Checks a station record for breaks (moves, new instruments, sheltering) against the weather model.
+
+/**
+ * Looks for a break in a station record by comparing it with the weather model year by
+ * year: the ratio of their annual means cancels windy and calm years, so what's left is
+ * a change at the instrument (moved, raised, replaced, or sheltered by trees and
+ * buildings). yearly is [{ year, coverage, station, model }] (means over shared hours).
+ *
+ * Tests a straight-line trend in the ratio and the best single step (at least minSide
+ * years on each side). Either counts as an issue when it changes the ratio by at least
+ * minChange and is clear of year-to-year noise (t >= minT); the clearer one wins.
+ * Checked on real records: Claresholm (+63% step in 2008) and Salmon Arm (-31% trend)
+ * are flagged; Calgary, Lethbridge, Revelstoke and Vernon (a 9% step) are not.
+ */
+export function checkHomogeneity(yearly, { minYears = 5, minChange = 0.15, minT = 3, minSide = 2 } = {}) {
+  const ys = yearly
+    .filter((y) => y.coverage >= 0.5 && y.model > 0)
+    .map((y) => ({ year: y.year, ratio: y.station / y.model }));
+  const n = ys.length;
+  const out = { years: n, ratios: ys, trend: null, step: null, issue: null };
+  if (n < minYears) return out;
+  const avg = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+  const r = ys.map((y) => y.ratio),
+    x = ys.map((y) => y.year);
+  const mr = avg(r),
+    mx = avg(x);
+
+  let sxx = 0,
+    sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sxx += (x[i] - mx) ** 2;
+    sxy += (x[i] - mx) * (r[i] - mr);
+  }
+  const slope = sxy / sxx;
+  let ssr = 0;
+  for (let i = 0; i < n; i++) ssr += (r[i] - (mr + slope * (x[i] - mx))) ** 2;
+  const se = Math.sqrt(ssr / (n - 2) / sxx);
+  const start = mr + slope * (x[0] - mx),
+    end = mr + slope * (x[n - 1] - mx);
+  out.trend = {
+    from: x[0],
+    to: x[n - 1],
+    start,
+    end,
+    change: end / start - 1,
+    t: se > 0 ? Math.abs(slope) / se : Infinity,
+  };
+
+  for (let k = minSide; k <= n - minSide; k++) {
+    const b = r.slice(0, k),
+      a = r.slice(k);
+    const mb = avg(b),
+      ma = avg(a);
+    const ss = b.reduce((s, v) => s + (v - mb) ** 2, 0) + a.reduce((s, v) => s + (v - ma) ** 2, 0);
+    const s = Math.sqrt(ss / (n - 2));
+    const t = s > 0 ? Math.abs(ma - mb) / (s * Math.sqrt(1 / k + 1 / (n - k))) : Infinity;
+    if (!out.step || t > out.step.t)
+      out.step = { year: x[k], from: x[0], to: x[n - 1], before: mb, after: ma, change: ma / mb - 1, t };
+  }
+
+  const clear = (f) => f && Math.abs(f.change) >= minChange && f.t >= minT;
+  if (clear(out.step) && (!clear(out.trend) || out.step.t >= out.trend.t)) out.issue = "step";
+  else if (clear(out.trend)) out.issue = "trend";
+  return out;
+}
