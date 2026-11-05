@@ -53,8 +53,14 @@
           <label>Number of turbines <input name="nTurbines" type="number" min="1" step="1"></label>
           <label>Hub height (m) <input name="hubHeight" type="number" min="1" max="200" step="0.5"></label>
         </div>
-        <label>Power curve: wind km/h, watts per turbine
-          <textarea name="curve" rows="7" spellcheck="false"></textarea>
+        <p class="curve-caption" id="curveCaption">Power curve against the physical limit for the capture area below</p>
+        <div class="curve-editor">
+          <canvas id="curveEditor" tabindex="0" role="application" aria-labelledby="curveCaption" aria-describedby="curveReadout curveKeys"></canvas>
+        </div>
+        <p class="hint curve-readout" id="curveReadout" aria-live="polite"></p>
+        <p class="visually-hidden" id="curveKeys">Left and right arrows pick a point, up and down change its output (Shift for larger steps), Delete removes it.</p>
+        <label>Power curve as text: wind km/h, watts per turbine
+          <textarea name="curve" rows="5" spellcheck="false"></textarea>
         </label>
         <p class="hint">The default is an illustrative 3.5&nbsp;kW turbine with a 6&nbsp;m rotor. Paste the real turbine's independently measured curve. <button type="button" class="link" id="resetCurve">Restore default</button></p>
         <label>Capture opening

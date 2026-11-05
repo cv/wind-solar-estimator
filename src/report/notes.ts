@@ -1,7 +1,7 @@
 // Report notes: power-curve, wind data and station-quality caveats.
 import { ELEVATION_NOTE_M } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
-import { esc, fmt, pct, span } from "../app/format.ts";
+import { esc, fmt, pct, span, speed, times } from "../app/format.ts";
 import { state } from "../app/state.ts";
 import type { Analysis, DataRequest, WindSource } from "../app/state.ts";
 import { autoEligible, fromSite, missingYears } from "../app/stationText.ts";
@@ -31,7 +31,7 @@ export function renderNotes(a: Analysis): void {
     } else {
       items.push([
         "bad",
-        `<strong>Power curve:</strong> at ${fmt(check.atKmh)} km/h it is ${fmt(check.worstRatio)}× the most the wind through ${area} can deliver (the Betz limit${aug}). ` +
+        `<strong>Power curve:</strong> at ${speed(check.atKmh)} km/h it is ${times(check.worstRatio)} the most the wind through ${area} can deliver (the Betz limit${aug}). ` +
           `Even a perfect device this size could capture at most ${fmt(r.physicsCapKwh)} kWh a year here, before losses. Shapes inside the device, such as scoops, spirals or torque-multiplying coils, can redirect that energy but not add to it. ` +
           `Before quoting customers, measure the electrical output against the free wind speed, and enter the device's full frontal outline as the capture area.`,
       ]);

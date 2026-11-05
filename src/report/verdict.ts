@@ -1,6 +1,6 @@
 // The headline verdict and the physical-limit (Betz cap) status line.
 import { $ } from "../app/dom.ts";
-import { esc, fmt, pct, capitalize } from "../app/format.ts";
+import { esc, fmt, pct, capitalize, speed, times } from "../app/format.ts";
 import type { Analysis, PhysicsLimit } from "../app/state.ts";
 import type { SimResult } from "../model/simulate.ts";
 
@@ -56,5 +56,5 @@ function clampStatusText(r: SimResult, limit: PhysicsLimit): string {
     return `This curve stays within the limit at every wind speed (at most ${pct(limit.check.worstRatio)} of it), so capping changes nothing.`;
   if (limit.kind === "capped")
     return `Capped, wind makes ${fmt(r.windKwh)} kWh a year instead of the ${fmt(limit.uncapped.windKwh)} the curve as entered would give.`;
-  return `This curve is ${fmt(limit.check.worstRatio)}× the limit at ${fmt(limit.check.atKmh)} km/h. Capped, wind would make ${fmt(limit.capped.windKwh)} kWh a year instead of ${fmt(r.windKwh)}.`;
+  return `This curve is ${times(limit.check.worstRatio)} the limit at ${speed(limit.check.atKmh)} km/h. Capped, wind would make ${fmt(limit.capped.windKwh)} kWh a year instead of ${fmt(r.windKwh)}.`;
 }

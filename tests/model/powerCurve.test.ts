@@ -1,7 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { circleArea, betzLimitW } from "../../src/model/physics.ts";
-import { EXAMPLE_ROTOR_M, exampleCurve, parseCurve, makeCurveFn, checkCurve } from "../../src/model/powerCurve.ts";
+import {
+  EXAMPLE_ROTOR_M,
+  exampleCurve,
+  parseCurve,
+  makeCurveFn,
+  checkCurve,
+  movePoint,
+  insertPoint,
+  removePoint,
+} from "../../src/model/powerCurve.ts";
+import type { CurvePoint } from "../../src/model/powerCurve.ts";
 import { kmh, metres, squareMetres, watts } from "../../src/model/units.ts";
 import { close } from "../helpers.ts";
 
@@ -41,4 +51,27 @@ test("Betz limit flags a curve that claims too much for its capture area", () =>
   assert.ok(check.exceeds);
   assert.equal(check.atKmh, 30);
   close(check.worstRatio, 228, 1);
+});
+
+const pts = (...xs: Array<[number, number]>): CurvePoint[] => xs.map(([v, w]) => [kmh(v), watts(w)]);
+
+test("movePoint keeps a dragged point between its neighbours and its output non-negative", () => {
+  const curve = pts([0, 0], [10, 100], [20, 400]);
+  assert.deepEqual(movePoint(curve, 1, 12.34, 250), pts([0, 0], [12.3, 250], [20, 400]));
+  assert.deepEqual(movePoint(curve, 1, 25, -5), pts([0, 0], [19.9, 0], [20, 400]));
+  assert.deepEqual(movePoint(curve, 0, -3, 10), pts([0, 10], [10, 100], [20, 400]));
+  assert.deepEqual(movePoint(curve, 2, 80, 500), pts([0, 0], [10, 100], [80, 500]));
+  // Neighbours closer than the minimum gap: the speed stays put, the output still moves.
+  assert.deepEqual(movePoint(pts([5.9, 0], [6, 50], [6.1, 80]), 1, 9, 60), pts([5.9, 0], [6, 60], [6.1, 80]));
+});
+
+test("insertPoint adds in speed order and skips a duplicate speed", () => {
+  const curve = pts([0, 0], [20, 400]);
+  assert.deepEqual(insertPoint(curve, 10.04, 120), pts([0, 0], [10, 120], [20, 400]));
+  assert.deepEqual(insertPoint(curve, 20.04, 120), curve);
+});
+
+test("removePoint never leaves fewer than two points", () => {
+  assert.deepEqual(removePoint(pts([0, 0], [10, 100], [20, 400]), 1), pts([0, 0], [20, 400]));
+  assert.deepEqual(removePoint(pts([0, 0], [20, 400]), 1), pts([0, 0], [20, 400]));
 });

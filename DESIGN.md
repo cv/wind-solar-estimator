@@ -311,6 +311,13 @@ Quiet and exact: small radii, hairlines, colour reserved for meaning.
 - **Error:** Problem Red border on the Problem Wash, marked `aria-invalid`. The message (label size, 600, Problem Ink) appears directly under the field or field row at fault, or under the Analyse button for non-field errors; on submit the field's group opens and the field takes focus.
 - **Disabled:** 50% opacity, not-allowed cursor.
 
+### Power curve editor
+The power curve is edited where it can be seen: a 200px chart at the top of the Wind turbines group, above the curve's text area. It plots the curve in Wind Blue with draggable points (white-ringed, 4px, 6px when active) against the physical (Betz) limit for the capture area, a Problem Red dashed line with the region above it in Problem Wash and labelled "Beyond the physical limit" in Problem Ink. A point above the limit turns Problem Red.
+- **Direct manipulation:** drag a point to change its output (snapped to about 1/400 of the axis); it moves sideways in 0.5 km/h steps only after a few pixels of sideways travel, so an up-or-down drag keeps its speed, and never past its neighbours. Double-click adds a point, or removes the one under the pointer. The axes hold still during a drag and refit when it ends.
+- **Readout:** one line under the chart (label size, Muted Ink, tabular figures, height reserved so nothing jumps) names the point under the pointer: speed, output and its share of the physical limit, or how many times over it. At rest it says how to edit.
+- **Keyboard:** the chart is a tab stop with the focus ring; Left and Right pick a point, Up and Down change its output (Shift for ten steps), Delete removes it.
+- **One source of truth:** the editor writes the text area and the text area redraws the editor, as do the capture area and duct augmentation. While the text can't be read the chart fades to 40% and the readout says what's wrong.
+
 ### Navigation
 - **App bar:** slim, Night Grid Blue blending to Grid Blue left to right; the wordmark in Signal Green (800 weight), the product title in white, a "Prototype" pill badge, and on-dark buttons pushed right. On small screens the buttons wrap below and share the width.
 - **Sidebar groups:** each assumption group is a disclosure with a small chevron and a Night Grid Blue heading that turns Grid Blue on hover; groups are separated by hairlines. The Site group is always open and holds search, map, coordinates and the Wind data picker (weather model or a nearby measured station, with a one-line hint saying which is in use). Stations show on the map as small hollow circles; the one in use is filled Wind Blue. The picker is the keyboard route; the pins aren't tab stops. Disclosure rows are at least 44px tall.

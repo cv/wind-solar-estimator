@@ -147,6 +147,14 @@ export function captureParams(v: FormInput): Pick<ModelParams, "captureAreaM2" |
   return { captureAreaM2: circleArea(metres(d)), captureDesc: `${fmt(d, 2)} m diameter` };
 }
 
+/** The capture area (m²) the form describes, read leniently (NaN or 0 while a field is unfinished). */
+export function enteredCaptureArea(): number {
+  const el = form.elements;
+  return el.captureShape.value === "rect"
+    ? Number(el.captureW.value) * Number(el.captureH.value)
+    : circleArea(metres(Number(el.captureM.value)));
+}
+
 /** Shows the diameter or width × height fields to match the opening shape, and the area they give. */
 export function syncCapture(): void {
   const el = form.elements;
@@ -156,9 +164,7 @@ export function syncCapture(): void {
     el.captureW.value = el.captureH.value = el.captureM.value;
   $("#captureRound").hidden = rect;
   $("#captureRect").hidden = !rect;
-  const area = rect
-    ? Number(el.captureW.value) * Number(el.captureH.value)
-    : circleArea(metres(Number(el.captureM.value)));
+  const area = enteredCaptureArea();
   $("#captureArea").textContent = area > 0 ? `Capture area ${fmt(area, area < 10 ? 2 : 1)} m².` : "";
 }
 

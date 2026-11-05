@@ -155,11 +155,40 @@ textarea.invalid {
   gap: var(--s3);
   align-items: end;
 }
+.row[hidden] {
+  display: none;
+}
 .hint {
   font-size: var(--t-sm);
   color: var(--muted);
   margin: 0 0 var(--s3);
   line-height: 1.45;
+}
+/* Power curve editor: the curve against the physical limit, its points dragged to edit it. */
+.curve-caption {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--muted);
+}
+.curve-editor {
+  position: relative;
+  height: 200px;
+  margin: var(--s1) 0;
+}
+.curve-editor canvas {
+  touch-action: none;
+  border-radius: var(--radius-sm);
+}
+.curve-editor canvas:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+.curve-editor.stale canvas {
+  opacity: 0.4;
+}
+.hint.curve-readout {
+  min-height: 2.9em;
+  font-variant-numeric: tabular-nums;
 }
 .form-error {
   margin: 0 0 var(--s3);

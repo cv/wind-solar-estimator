@@ -14,7 +14,9 @@ the map) and it:
 3. reports wind energy, capacity factor, grid purchases, self-sufficiency, savings and
    simple payback, with charts, a monthly table, CSV export and a printable report.
 
-All assumptions are editable and update the results instantly. The URL holds the
+All assumptions are editable and update the results instantly. The power curve can be typed
+or pasted, or edited by dragging its points on a chart that shows the physical limit for
+the capture area, so a curve that claims too much is visible as you draw it. The URL holds the
 inputs, so a link reproduces a report.
 
 ## Physical sanity check
@@ -147,7 +149,7 @@ browsers never mix cached files from different releases.
 | `index.html` | Page template; the build adds the hashed asset tags |
 | `src/main.ts` | Entry point |
 | `src/app/` | Defaults, shared state, formatting, DOM helpers, form and URL state, the analysis run |
-| `src/ui/` | Map, place search and the station picker |
+| `src/ui/` | Map, place search, the station picker and the power curve editor |
 | `src/report/` | Report rendering: verdict, notes, figures, charts, tables, CSV |
 | `src/model/` | Hourly simulation: physics, power curve, load shapes, battery (pure, no DOM) |
 | `src/wind/` | Station + ERA5 combination, quantile mapping, record checks, station choice (pure) |

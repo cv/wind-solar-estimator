@@ -11,6 +11,7 @@ import { clearWeatherCache } from "../data/weather.ts";
 import { LOAD_PRESETS } from "../model/load.ts";
 import { renderSoc } from "../report/charts.ts";
 import { downloadCsv } from "../report/csv.ts";
+import { initCurveEditor, syncCurveEditor } from "../ui/curveEditor.ts";
 import { initMap, setLocation, placeSearch } from "../ui/map.ts";
 import { loadStations, renderStationPicker, chooseWindSource } from "../ui/stationPicker.ts";
 
@@ -29,6 +30,7 @@ export function init(): void {
   wireReport();
   wirePrint();
   setChartDefaults();
+  initCurveEditor();
   if ("lat" in fromHash) startAnalyse(); // opened from a shared link
 }
 
@@ -68,7 +70,7 @@ function initSite(): void {
   void loadStations(); // never rejects: a failed search resolves to null
 }
 
-/** Submitting and editing the form, and resetting the power curve. */
+/** Submitting and editing the form (keeping the power curve editor in step), and resetting the power curve. */
 function wireForm(): void {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -82,10 +84,13 @@ function wireForm(): void {
       form.elements.windSource.value = "auto";
     }
     if (target.name.startsWith("capture")) syncCapture();
+    if (target.name === "curve" || target.name === "augmentation" || target.name.startsWith("capture"))
+      syncCurveEditor();
     onChange(target.name);
   });
   $("#resetCurve").addEventListener("click", () => {
     form.elements.curve.value = DEFAULTS.curve;
+    syncCurveEditor();
     onChange("curve");
   });
 }

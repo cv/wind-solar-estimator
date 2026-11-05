@@ -67,6 +67,37 @@ export function parseCurve(text: string): CurvePoint[] {
 
 export const formatCurve = (pts: readonly CurvePoint[]): string => pts.map(([v, w]) => `${v}, ${w}`).join("\n");
 
+/** Closest two points of an edited curve may be, in km/h. */
+export const MIN_GAP_KMH = 0.1;
+
+/** Speeds to one decimal, so dragged values don't carry float noise into the text. */
+const tenth = (v: number): number => Math.round(v * 10) / 10;
+
+/**
+ * The curve with point i moved to (v, w): its speed kept between its neighbours' (so the order
+ * never changes; if they're too close it keeps its speed) and its output never negative.
+ */
+export function movePoint(pts: readonly CurvePoint[], i: number, v: number, w: number): CurvePoint[] {
+  const cur = at(pts, i);
+  const lo = i > 0 ? at(pts, i - 1)[0] + MIN_GAP_KMH : 0;
+  const hi = i < pts.length - 1 ? at(pts, i + 1)[0] - MIN_GAP_KMH : Infinity;
+  const speed = lo > hi ? cur[0] : tenth(Math.min(hi, Math.max(lo, v)));
+  return pts.map((p, j): CurvePoint => (j === i ? [kmh(speed), watts(Math.max(0, w))] : p));
+}
+
+/** The curve with a point added at (v, w) in speed order, or unchanged if one is within MIN_GAP_KMH of v. */
+export function insertPoint(pts: readonly CurvePoint[], v: number, w: number): CurvePoint[] {
+  const speed = tenth(Math.max(0, v));
+  if (pts.some(([x]) => Math.abs(x - speed) < MIN_GAP_KMH)) return [...pts];
+  const p: CurvePoint = [kmh(speed), watts(Math.max(0, w))];
+  return [...pts, p].toSorted((a, b) => a[0] - b[0]);
+}
+
+/** The curve without point i, or unchanged if that would leave fewer than two points. */
+export function removePoint(pts: readonly CurvePoint[], i: number): CurvePoint[] {
+  return pts.length <= 2 ? [...pts] : pts.filter((_, j) => j !== i);
+}
+
 /** Linear interpolation of the curve; 0 above its last point (cut-out). */
 export function makeCurveFn(pts: readonly CurvePoint[]): (v: Kmh) => Watts {
   const first = at(pts, 0);
