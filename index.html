@@ -114,15 +114,18 @@
       </details>
 
       <details class="group">
-        <summary><h2>Battery</h2></summary>
+        <summary><h2>Battery and inverter</h2></summary>
         <div class="row">
           <label>Capacity (kWh) <input name="battKwh" type="number" min="0" step="1"></label>
           <label>Max power (kW) <input name="battKw" type="number" min="0" step="0.5"></label>
         </div>
         <div class="row">
-          <label>Minimum charge (%) <input name="battMinSoc" type="number" min="0" max="100" step="1"></label>
+          <label>Minimum charge (%) <input name="battMinSoc" type="number" min="0" max="100" step="1" aria-describedby="socHint"></label>
           <label>Round-trip efficiency (%) <input name="battRte" type="number" min="50" max="100" step="1"></label>
         </div>
+        <p class="hint" id="socHint">A battery with only half its capacity usable has a minimum charge of 50%.</p>
+        <label>Inverter limit, wind and solar together (kW) <input name="inverterKw" type="number" min="0" step="0.5" placeholder="none" aria-describedby="invHint"></label>
+        <p class="hint" id="invHint">When wind and solar feed one inverter, anything above its rating is lost. Leave empty if each has its own, or the inverter is large enough.</p>
       </details>
 
       <details class="group">

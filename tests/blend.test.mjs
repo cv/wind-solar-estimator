@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { alignStation, fitQuantileMap, applyQuantileMap, blendStation, shearAlpha, checkHomogeneity, MIN_PAIRS } from "../js/blend.js";
-import { parseStationCsv, stationLabel, distanceKm, direction } from "../js/stations.js";
+import { parseStationCsv, stationLabel, distanceKm, direction, pickStation } from "../js/stations.js";
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} expected ${b} ± ${tol}, got ${a}`);
 
@@ -120,4 +120,16 @@ test("blendStation reports yearly means and the homogeneity check", () => {
   assert.equal(stats.yearly[0].year, 2020);
   close(stats.yearly[0].station / stats.yearly[0].model, 1.2, 0.02);
   assert.equal(stats.homogeneity.issue, null); // one year can't show a break
+});
+
+test("auto station choice weighs elevation difference against distance", () => {
+  const ok = () => true;
+  const hilltop = { id: "hill", distanceKm: 17.9, rise: 330 };
+  const plain = { id: "plain", distanceKm: 18.1, rise: -25 };
+  const far = { id: "far", distanceKm: 45, rise: 0 };
+  assert.equal(pickStation([hilltop, plain, far], ok).id, "plain");
+  assert.equal(pickStation([hilltop, far], ok).id, "far"); // 17.9 + 33 > 45
+  assert.equal(pickStation([{ id: "x", distanceKm: 5, rise: NaN }, plain], ok).id, "x"); // unknown elevation: distance only
+  assert.equal(pickStation([hilltop, plain], (s) => s.id !== "plain").id, "hill");
+  assert.equal(stationLabel("STAVELY AAFC"), "Stavely AAFC");
 });

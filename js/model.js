@@ -179,6 +179,9 @@ export function simulate(wx, p) {
   const soc = { pvOnly: zeros(288), withWind: zeros(288), count: zeros(288) };
   let wind = 0, pv = 0, loadTot = 0, physicsCap = 0, sumV = 0, genHours = 0, clipped = 0;
   const windLoss = 1 - p.windLossPct / 100;
+  // A shared inverter caps what wind and solar together can deliver; the rest is lost.
+  const inverter = p.inverterKw > 0 ? p.inverterKw : Infinity;
+  let invLostPv = 0, invLostBoth = 0;
   const pvLoss = 1 - p.pvLossPct / 100;
 
   for (let i = 0; i < n; i++) {
@@ -196,8 +199,12 @@ export function simulate(wx, p) {
     const pvKw = Math.max(0, (p.pvKwp * g / 1000) * pvLoss * (1 + (p.tempCoeffPct / 100) * (cellT - 25)));
     const L = load[i] * loadScale;
 
-    const gridPv = pvOnly.step(pvKw - L);
-    const gridBoth = withWind.step(pvKw + windKw - L);
+    const outPv = Math.min(pvKw, inverter);
+    const outBoth = Math.min(pvKw + windKw, inverter);
+    invLostPv += pvKw - outPv;
+    invLostBoth += pvKw + windKw - outBoth;
+    const gridPv = pvOnly.step(outPv - L);
+    const gridBoth = withWind.step(outBoth - L);
 
     const mo = wx.month[i];
     const slot = mo * 24 + wx.hour[i];
@@ -254,6 +261,7 @@ export function simulate(wx, p) {
     generatingShare: genHours / n,
     physicsCapKwh: perYear(physicsCap),
     clippedKwh: perYear(clipped),
+    inverterLostKwh: { pvOnly: perYear(invLostPv), withWind: perYear(invLostBoth) },
     pvKwh: perYear(pv),
     loadKwh: perYear(loadTot),
     pvOnly: A,

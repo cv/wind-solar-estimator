@@ -10,6 +10,23 @@ const LIST_TTL_MS = 30 * 86400e3; // station lists change rarely
 const CONCURRENCY = 3; // a shared public service: a few requests at a time is plenty
 const MAX_RETRIES = 3;
 export const SEARCH_RADIUS_KM = 100;
+const ELEVATION_API = "https://api.open-meteo.com/v1/elevation";
+
+/**
+ * How "auto" weighs height against distance when picking a station: 100 m of elevation
+ * difference counts like 10 km of distance. A hilltop station 18 km away then loses to
+ * one on the same plain 18 km away, but a nearby station wins over a distant one at
+ * the same height.
+ */
+export const KM_PER_METRE_RISE = 0.1;
+export const stationScore = (s) => s.distanceKm + (Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0);
+
+/** The station "auto" picks from a list: lowest score among those that pass ok(s). */
+export function pickStation(list, ok) {
+  let best = null;
+  for (const s of list) if (ok(s) && (!best || stationScore(s) < stationScore(best))) best = s;
+  return best;
+}
 
 const memory = new Map();
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
@@ -35,7 +52,7 @@ export function direction(lat1, lon1, lat2, lon2) {
   return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
 }
 
-const KEEP_UPPER = new Set(["CDA", "AUT", "AWOS", "RCS", "CS", "MCS", "EPF", "UA"]);
+const KEEP_UPPER = new Set(["AAFC", "CDA", "AUT", "AWOS", "RCS", "CS", "MCS", "EPF", "UA"]);
 /** "PINCHER CREEK A" -> "Pincher Creek A" (station codes and suffixes stay as they are). */
 export const stationLabel = (name) => name.split(/\s+/).map((w) => {
   const bare = w.replace(/[^A-Z]/g, "");
@@ -52,7 +69,7 @@ export async function findStations(lat, lon, { radiusKm = SEARCH_RADIUS_KM, sign
   if (!nearCanada(lat, lon)) return [];
   // Lists are fetched and cached per 0.1° tile, so small moves of the pin reuse them.
   const cLat = Math.round(lat * 10) / 10, cLon = Math.round(lon * 10) / 10;
-  const key = `stations|${cLat}|${cLon}|${radiusKm}`;
+  const key = `stations3|${cLat}|${cLon}|${radiusKm}`; // v2: no longer trusts HAS_HOURLY_DATA; v3: raw names
   let list = memory.get(key);
   if (!list) {
     const cached = await dbGet(key);
@@ -62,14 +79,16 @@ export async function findStations(lat, lon, { radiusKm = SEARCH_RADIUS_KM, sign
     const r = radiusKm + 10;
     const dLat = r / 111, dLon = r / (111 * Math.max(0.1, Math.cos(rad(cLat))));
     const q = new URLSearchParams({
-      f: "json", HAS_HOURLY_DATA: "Y", limit: "500",
+      // Not HAS_HOURLY_DATA=Y: that flag is "N" for some stations with decades of hourly
+      // records (e.g. Stavely AAFC), so keep every station that has hourly dates instead.
+      f: "json", limit: "5000",
       bbox: [cLon - dLon, cLat - dLat, cLon + dLon, cLat + dLat].map((x) => x.toFixed(3)).join(","),
       properties: "STATION_NAME,CLIMATE_IDENTIFIER,ELEVATION,HLY_FIRST_DATE,HLY_LAST_DATE",
     });
     const json = JSON.parse(await getText(`${API}/climate-stations/items?${q}`, signal, "the station list"));
-    list = (json.features || []).filter((f) => f.geometry?.coordinates).map((f) => ({
+    list = (json.features || []).filter((f) => f.geometry?.coordinates && f.properties.HLY_FIRST_DATE).map((f) => ({
       id: String(f.properties.CLIMATE_IDENTIFIER),
-      name: stationLabel(String(f.properties.STATION_NAME || f.properties.CLIMATE_IDENTIFIER)),
+      rawName: String(f.properties.STATION_NAME || f.properties.CLIMATE_IDENTIFIER), // labelled on use, so label fixes apply to cached lists
       lat: f.geometry.coordinates[1],
       lon: f.geometry.coordinates[0],
       elevation: Number(f.properties.ELEVATION),
@@ -80,9 +99,26 @@ export async function findStations(lat, lon, { radiusKm = SEARCH_RADIUS_KM, sign
   }
   memory.set(key, list);
   return list
-    .map((s) => ({ ...s, distanceKm: distanceKm(lat, lon, s.lat, s.lon), direction: direction(lat, lon, s.lat, s.lon) }))
+    .map((s) => ({ ...s, name: stationLabel(s.rawName), distanceKm: distanceKm(lat, lon, s.lat, s.lon), direction: direction(lat, lon, s.lat, s.lon) }))
     .filter((s) => s.distanceKm <= radiusKm)
     .sort((a, b) => a.distanceKm - b.distanceKm);
+}
+
+/** Ground elevation (m) at a point from Open-Meteo's 90 m terrain model, or null if unavailable. */
+export async function siteElevation(lat, lon, signal) {
+  const key = `elev|${lat.toFixed(3)}|${lon.toFixed(3)}`;
+  if (memory.has(key)) return memory.get(key);
+  let elevation = await dbGet(key);
+  if (!Number.isFinite(elevation)) {
+    try {
+      const res = await fetch(`${ELEVATION_API}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`, { signal });
+      elevation = res.ok ? Number((await res.json()).elevation?.[0]) : NaN;
+    } catch { elevation = NaN; }
+    if (!Number.isFinite(elevation)) return null; // not cached: try again next time
+    dbPut(key, elevation);
+  }
+  memory.set(key, elevation);
+  return elevation;
 }
 
 /**

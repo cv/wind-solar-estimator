@@ -88,3 +88,14 @@ test("a lossless battery shifts surplus to deficit hours", () => {
   close(r.pvKwh, 8760, 1e-3); // 2 kW × 12 h × 365
   assert.ok(r.pvOnly.importKwh < 1, `import ${r.pvOnly.importKwh}`); // sun covers the night through the battery
 });
+
+test("a shared inverter limit caps wind and solar together and counts what's lost", () => {
+  // Rated wind (3.5 kW) every hour, no sun: a 2 kW inverter loses 1.5 kW every hour.
+  const r = simulate(syntheticYear(), { ...base, inverterKw: 2 });
+  close(r.windKwh, 3.5 * 8760, 1e-6); // generation itself is unchanged
+  close(r.inverterLostKwh.withWind, 1.5 * 8760, 1e-6);
+  close(r.inverterLostKwh.pvOnly, 0, 1e-9);
+  close(r.withWind.exportKwh, 2 * 8760, 1e-6); // no load or battery: everything delivered is exported
+  const open = simulate(syntheticYear(), base); // no limit
+  close(open.inverterLostKwh.withWind, 0, 1e-9);
+});

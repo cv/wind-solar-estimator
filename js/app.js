@@ -1,7 +1,7 @@
 // UI: form <-> URL hash, map, data loading, rendering. Chart.js and Leaflet are loaded as globals.
 import { EXAMPLE_ROTOR_M, circleArea, exampleCurve, parseCurve, formatCurve, checkCurve, betzLimitW, makeCurveFn, LOAD_PRESETS, simulate } from "./model.js";
 import { fetchWeather, searchPlaces, clearWeatherCache } from "./weather.js";
-import { findStations, fetchStationHours, nearCanada, clearStationMemory, SEARCH_RADIUS_KM } from "./stations.js";
+import { findStations, fetchStationHours, siteElevation, pickStation, nearCanada, clearStationMemory, SEARCH_RADIUS_KM } from "./stations.js";
 import { blendStation, POOR_CORRELATION } from "./blend.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -12,6 +12,8 @@ const COLORS = { wind: "#1f77b4", solar: "#f2a900", load: "#444", grey: "#9aa3b5
 const ERA5_CELL_DEG = 0.25;
 const AUTO_STATION_KM = 50; // "auto" uses the nearest station with hourly records within this distance
 const MIN_AUTO_COVERAGE = 0.5; // ...if it has wind readings for at least this share of the hours
+const ELEVATION_NOTE_M = 150; // a station this much higher or lower than the site gets a caution note
+const ELEVATION_SAY_M = 50; // below this, the picker doesn't mention the height difference
 
 const DEFAULTS = {
   place: "Amarillo, Texas, United States",
@@ -23,7 +25,7 @@ const DEFAULTS = {
   loadKwh: "15000", loadProfile: "residential",
   loadHourly: LOAD_PRESETS.residential.hourly.join(", "),
   loadMonthly: LOAD_PRESETS.residential.monthly.join(", "),
-  battKwh: "20", battKw: "5", battMinSoc: "20", battRte: "90",
+  battKwh: "20", battKw: "5", battMinSoc: "20", battRte: "90", inverterKw: "",
   currency: "$", price: "0.20", exportCredit: "0.08", turbineCost: "25000", omPerTurbine: "250",
 };
 
@@ -127,7 +129,10 @@ function loadStations() {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90) return Promise.resolve([]);
   const key = `${lat.toFixed(3)}|${lon.toFixed(3)}`;
   if (state.stations.key === key) return state.stations.promise;
-  const promise = findStations(lat, lon).catch((e) => { console.warn(e); return null; });
+  // Each station's height above (+) or below (−) the site; "auto" weighs it against distance.
+  const promise = Promise.all([findStations(lat, lon), siteElevation(lat, lon)])
+    .then(([list, elevation]) => list.map((s) => ({ ...s, rise: elevation === null || !Number.isFinite(s.elevation) ? NaN : s.elevation - elevation })))
+    .catch((e) => { console.warn(e); return null; });
   state.stations = { key, promise, list: undefined };
   renderStationPicker();
   promise.then((list) => {
@@ -147,11 +152,16 @@ function resolveStation(choice, list, req) {
     const picked = list.find((s) => s.id === choice.slice(5));
     if (picked) return { ...picked, explicit: true };
   }
-  const need = Math.min(5, req.endYear - req.startYear + 1);
-  return list.find((s) => s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= need) || null;
+  return pickStation(list, autoEligible(req));
 }
 
-const stationPlace = (s) => `${fmt(s.distanceKm)} km ${s.direction}`;
+/** Stations "auto" may use: close enough, with enough years of records in the period. */
+const autoEligible = (req) => (s) => s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= Math.min(5, req.endYear - req.startYear + 1);
+
+const stationPlace = (s) => (s.distanceKm < 1 ? "at the site" : `${fmt(s.distanceKm)} km ${s.direction}`);
+const fromSite = (s) => (s.distanceKm < 1 ? "at the site" : `${stationPlace(s)} of the site`);
+/** ", 330 m higher" when the height difference is worth mentioning. */
+const riseText = (s, joiner = ", ") => (Math.abs(s.rise) >= ELEVATION_SAY_M ? `${joiner}${fmt(Math.abs(s.rise))} m ${s.rise > 0 ? "higher" : "lower"}` : "");
 
 /** The "Wind data" picker, its hint and the station pins on the map. */
 function renderStationPicker() {
@@ -178,7 +188,11 @@ function renderStationPicker() {
   else if (list === undefined) text = "Looking for nearby weather stations…";
   else if (list === null) text = "Couldn't load the list of weather stations, so the weather model is used.";
   else if (!list.length) text = `No Environment Canada station with hourly records within ${SEARCH_RADIUS_KM} km, so the weather model is used.`;
-  else if (active) text = `Hourly wind measured at ${active.name}, ${stationPlace(active)} of the site. Hours the station missed are filled from the weather model.`;
+  else if (active) {
+    text = `Hourly wind measured at ${active.name}, ${fromSite(active)}${riseText(active, " and ")}. Hours the station missed are filled from the weather model.`;
+    const nearest = active.explicit ? null : list.find(autoEligible(req));
+    if (nearest && nearest.id !== active.id) text += ` Chosen over ${nearest.name}, which is closer but ${fmt(Math.abs(nearest.rise))} m ${nearest.rise > 0 ? "higher" : "lower"}.`;
+  }
   else text = "Pick a station to use its measured wind instead of the weather model's.";
   hint.textContent = text;
   renderStationPins(list || [], active);
@@ -190,7 +204,7 @@ function renderStationPins(list, active) {
   state.stationLayer = L.layerGroup(list.map((s) => {
     const on = active?.id === s.id;
     const m = L.circleMarker([s.lat, s.lon], { radius: on ? 7 : 5, color: on ? COLORS.wind : "#556074", weight: on ? 2 : 1, fillColor: on ? COLORS.wind : "#ffffff", fillOpacity: on ? 0.9 : 0.8 })
-      .bindTooltip(`${s.name}: ${stationPlace(s)}, hourly records ${s.first}–${s.last}${on ? " (in use)" : ""}`)
+      .bindTooltip(`${s.name}: ${stationPlace(s)}${riseText(s)}, hourly records ${s.first}–${s.last}${on ? " (in use)" : ""}`)
       .on("click", () => chooseWindSource(`eccc:${s.id}`));
     return m;
   })).addTo(state.map);
@@ -252,6 +266,7 @@ function modelParams(v) {
     battKw: num(v, "battKw", "Battery power", { min: 0 }),
     battMinSoc: num(v, "battMinSoc", "Minimum charge", { min: 0, max: 100 }) / 100,
     battRte: num(v, "battRte", "Round-trip efficiency", { min: 50, max: 100 }) / 100,
+    inverterKw: num(v, "inverterKw", "Inverter limit", { min: 0.1, optional: true }) ?? 0,
     currency: v.currency || "$",
     price: num(v, "price", "Grid price", { min: 0 }),
     exportCredit: num(v, "exportCredit", "Export credit", { min: 0 }),
@@ -471,10 +486,10 @@ function renderNotes(r, p, check) {
   const src = state.source;
   if (src?.stats) {
     const st = src.stats;
-    items.push(["info", `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${stationPlace(src.station)} of the site, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
+    items.push(["info", `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${fromSite(src.station)}, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
       `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
       `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`]);
-    items.push(...stationChecks(src.station, st));
+    items.push(...stationChecks(src.station, st, state.wx.elevation));
   } else if (src?.error) {
     items.push(["warn", `<strong>Station data:</strong> couldn't load readings from ${esc(src.station.name)} (${esc(src.error)}), so this report uses the weather model. Press <em>Analyse this site</em> to try again.`]);
   } else if (src) {
@@ -525,6 +540,7 @@ function renderFigures(r, p, req) {
     stat("Solar energy", fmt(r.pvKwh), "kWh/yr", `${fmt(p.pvKwp, 1)} kWp, tilt ${req.tilt}°, facing ${req.compass}°`),
     stat("Self-sufficiency", pct(B.selfSufficiency), "", `${pct(A.selfSufficiency)} without wind`),
     stat("Surplus exported", fmt(B.exportKwh), "kWh/yr", `${fmt(A.exportKwh)} without wind`),
+    p.inverterKw > 0 ? stat("Lost to the inverter limit", fmt(r.inverterLostKwh.withWind), "kWh/yr", `${fmt(r.inverterLostKwh.pvOnly)} without wind`) : "",
   ].join("");
 }
 
@@ -689,6 +705,9 @@ function assumptionRows(r, p, req, wx) {
     ["Solar", `${p.pvKwp} kWp, tilt ${req.tilt}°, facing ${req.compass}°; ${p.pvLossPct}% losses; ${p.tempCoeffPct}%/°C`],
     ["Electricity use", `${fmt(p.loadKwh)} kWh/yr, ${LOAD_PRESETS[p.loadProfile]?.label ?? "custom profile"}`],
     ["Battery", `${p.battKwh} kWh, ${p.battKw} kW, kept above ${fmt(p.battMinSoc * 100)}%, ${fmt(p.battRte * 100)}% round trip; charged from surplus, then surplus exported`],
+    ["Inverter", p.inverterKw > 0
+      ? `${fmt(p.inverterKw, 1)} kW shared by wind and solar; output above it is lost (${fmt(r.inverterLostKwh.withWind)} kWh/yr, ${fmt(r.inverterLostKwh.pvOnly)} without wind)`
+      : "no shared limit"],
     ["Economics", `grid ${money(p.price, 2)}/kWh, export credit ${money(p.exportCredit, 2)}/kWh, ${money(p.turbineCost)} installed and ${money(p.omPerTurbine)}/yr maintenance per turbine; no inflation, discounting or incentives`],
   ];
 }
@@ -696,9 +715,20 @@ function assumptionRows(r, p, req, wx) {
 const span = (a, b) => (a === b ? String(a) : `${a}–${b}`);
 
 /** Notes on how far the station can be trusted: hour-by-hour agreement, and breaks in its record. */
-function stationChecks(station, st) {
+function stationChecks(station, st, siteElevationM) {
   const out = [];
   const name = esc(station.name);
+  const rise = station.elevation - siteElevationM;
+  if (Math.abs(rise) >= ELEVATION_NOTE_M) {
+    const req = state.req;
+    const better = state.stations.list && req
+      ? pickStation(state.stations.list.filter((s) => s.id !== station.id && Math.abs(s.rise) < ELEVATION_NOTE_M), autoEligible(req))
+      : null;
+    out.push(["warn", `<strong>Station elevation:</strong> ${name} is ${fmt(Math.abs(rise))} m ${rise > 0 ? "higher" : "lower"} than the site ` +
+      `(${fmt(station.elevation)} m against ${fmt(siteElevationM)} m). Stations on hills and ridges usually measure stronger wind than lower ground nearby, and stations in valleys weaker, ` +
+      `so the wind at the site may be well ${rise > 0 ? "below" : "above"} what was measured.` +
+      (better ? ` ${esc(better.name)}, ${fromSite(better)}, is closer to the site's elevation; pick it under <em>Wind data</em> to compare.` : "")]);
+  }
   if (st.correlation < POOR_CORRELATION) {
     out.push(["warn", `<strong>Station match:</strong> the station and the weather model agree poorly hour by hour (correlation ${fmt(st.correlation, 2)}). ` +
       `Wind at ${name} follows its own local pattern, such as a valley or lake breeze, so it may not represent the site either. Use a closer or more similar station if there is one.`]);
@@ -732,7 +762,7 @@ function homogeneityText(h) {
 }
 
 function windDataText({ station: s, stats: st }) {
-  return `measured hourly at ${s.name} (Environment and Climate Change Canada, climate ID ${s.id}), ${stationPlace(s)} of the site, ` +
+  return `measured hourly at ${s.name} (Environment and Climate Change Canada, climate ID ${s.id}), ${fromSite(s)}, ` +
     `elevation ${fmt(s.elevation)} m, 10 m mast; ${pct(st.coverage, 1)} of hours measured, the rest filled from ERA5 at the site ` +
     `through a seasonal quantile mapping fitted on ${fmt(st.measured)} shared hours (correlation ${fmt(st.correlation, 2)})${homogeneityText(st.homogeneity)}`;
 }

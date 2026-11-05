@@ -6,11 +6,11 @@ the map) and it:
 
 1. downloads hourly 10 m and 100 m wind, temperature and sunlight on the panels for
    every hour of up to 40 years (ERA5 reanalysis via [Open-Meteo](https://open-meteo.com/)),
-   and for sites in Canada, measured hourly wind from the nearest Environment Canada
+   and for sites in Canada, measured hourly wind from a nearby Environment Canada
    station;
 2. simulates every hour: turbine output from the power curve (at hub height, corrected
-   for air density), solar output, the site's electricity use and the battery, with and
-   without the turbines;
+   for air density), solar output, the site's electricity use, an optional inverter limit
+   shared by wind and solar, and the battery, with and without the turbines;
 3. reports wind energy, capacity factor, grid purchases, self-sufficiency, savings and
    simple payback, with charts, a monthly table, CSV export and a printable report.
 
@@ -42,9 +42,14 @@ speed³), because ERA5 smooths away gusts.
 
 For sites in Canada the tool therefore looks for Environment and Climate Change Canada
 stations with hourly records within 100 km (the station archive behind the Canadian
-Centre for Climate Services) and, by default, uses the nearest one within 50 km that has
-wind readings for at least half of the period. Any station in the list can be picked
-under *Wind data*, or on the map.
+Centre for Climate Services). By default it uses a station within 50 km with at least
+five years of records in the period, preferring one that is both close and at a similar
+height: 100 m of elevation difference counts like 10 km of distance (site elevation from
+Open-Meteo's terrain model), so a hilltop station doesn't stand in for a site on the plain
+below. If that station has wind readings for less than half of the period, the weather
+model is used instead. (The station list ignores the archive's "has hourly data" flag,
+which is wrong for some long hourly records, such as Stavely AAFC's.) Any station in the
+list can be picked under *Wind data*, or on the map.
 
 - **Measured hours** use the station's reading (10 m, a 2-minute mean at the top of the hour).
 - **Missing hours** are filled from ERA5 at the site through a seasonal quantile mapping
@@ -53,7 +58,10 @@ under *Wind data*, or on the map.
 - **Hub height** comes from the station's 10 m wind with ERA5's hour-by-hour 10–100 m
   shear exponent.
 
-Two checks say how far a station can be trusted:
+Three checks say how far a station can be trusted:
+
+- **Station elevation:** a station 150 m or more above or below the site gets a note, since
+  hilltop stations read stronger wind than lower ground nearby and valley stations weaker.
 
 - **Station match:** if the station and ERA5 correlate below 0.5 hour by hour, the
   station follows its own local winds (valley or lake breezes) and may not represent
