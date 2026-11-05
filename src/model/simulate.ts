@@ -239,10 +239,14 @@ const scenarioOf = (b: Battery, nYears: number, loadTot: number): Scenario => ({
   selfSufficiency: fraction(loadTot > 0 ? 1 - b.imported / loadTot : 0),
 });
 
+/** What one turbine costs installed: the turbine, and its tower by the metre when that is priced separately. */
+export const turbineCapex = (p: Pick<ModelParams, "turbineCost" | "towerCostPerM" | "hubHeight">): number =>
+  p.turbineCost + p.towerCostPerM * p.hubHeight;
+
 /** Yearly savings from the turbines against PV only, and what the turbines cost. */
 function economics(p: ModelParams, A: Scenario, B: Scenario, windKwh: Kwh): SimResult["econ"] {
   const savings = (A.importKwh - B.importKwh) * p.price + (B.exportKwh - A.exportKwh) * p.exportCredit;
-  const capex = p.turbineCost * p.nTurbines;
+  const capex = turbineCapex(p) * p.nTurbines;
   const om = p.omPerTurbine * p.nTurbines;
   const netSavings = savings - om;
   return {

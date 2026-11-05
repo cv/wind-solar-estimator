@@ -49,6 +49,7 @@ const p: ModelParams = {
   price: 0.2,
   exportCredit: 0.08,
   turbineCost: 20_000,
+  towerCostPerM: 0,
   omPerTurbine: 200,
 };
 const obs = {

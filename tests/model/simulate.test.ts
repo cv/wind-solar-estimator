@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { circleArea, betzLimitW } from "../../src/model/physics.ts";
 import { exampleCurve } from "../../src/model/powerCurve.ts";
-import { simulate, type ModelParams, type SimWeather } from "../../src/model/simulate.ts";
+import { simulate, turbineCapex, type ModelParams, type SimWeather } from "../../src/model/simulate.ts";
 import { fraction, kmh, kw, kwh, metres, percent } from "../../src/model/units.ts";
 import type { Weather } from "../../src/data/weather.ts";
 import { at } from "../../src/util/checked.ts";
@@ -57,6 +57,7 @@ const base: ModelParams = {
   price: 0.2,
   exportCredit: 0,
   turbineCost: 25_000,
+  towerCostPerM: 0,
   omPerTurbine: 0,
 };
 
@@ -115,4 +116,11 @@ test("a shared inverter limit caps wind and solar together and counts what's los
   close(r.withWind.exportKwh, 2 * 8760, 1e-6); // no load or battery: everything delivered is exported
   const open = simulate(syntheticYear(), base); // no limit
   close(open.inverterLostKwh.withWind, 0, 1e-9);
+});
+
+test("a tower priced by the metre adds to each turbine's cost, so taller costs more", () => {
+  assert.equal(turbineCapex({ turbineCost: 20_000, towerCostPerM: 0, hubHeight: metres(16) }), 20_000);
+  assert.equal(turbineCapex({ turbineCost: 20_000, towerCostPerM: 300, hubHeight: metres(16) }), 24_800);
+  const r = simulate(syntheticYear(), { ...base, nTurbines: 2, towerCostPerM: 300, hubHeight: metres(20) });
+  assert.equal(r.econ.capex, 2 * (25_000 + 300 * 20));
 });

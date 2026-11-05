@@ -47,6 +47,8 @@ export interface ModelParams {
   price: number;
   exportCredit: number;
   turbineCost: number;
+  /** Cost per metre of hub height, per turbine, added to turbineCost; 0 = the tower is in turbineCost. */
+  towerCostPerM: number;
   omPerTurbine: number;
 }
 

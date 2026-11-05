@@ -62,6 +62,7 @@ export interface FormValues {
   price: string;
   exportCredit: string;
   turbineCost: string;
+  towerCostPerM: string;
   omPerTurbine: string;
 }
 
@@ -114,6 +115,7 @@ export const DEFAULTS: Readonly<FormValues> = {
   price: "0.20",
   exportCredit: "0.08",
   turbineCost: "20000",
+  towerCostPerM: "0",
   omPerTurbine: "200",
 };
 

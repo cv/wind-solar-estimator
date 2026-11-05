@@ -99,7 +99,7 @@ export function assumptionRows(
     ],
     [
       "Economics",
-      `grid ${money(p.price, 2)}/kWh, export credit ${money(p.exportCredit, 2)}/kWh, ${money(p.turbineCost)} installed and ${money(p.omPerTurbine)}/yr maintenance per turbine; no inflation, discounting or incentives`,
+      `grid ${money(p.price, 2)}/kWh, export credit ${money(p.exportCredit, 2)}/kWh, ${money(p.turbineCost)} installed${p.towerCostPerM > 0 ? ` plus ${money(p.towerCostPerM)} a metre of tower` : ""} and ${money(p.omPerTurbine)}/yr maintenance per turbine; no inflation, discounting or incentives`,
     ],
   ];
 }

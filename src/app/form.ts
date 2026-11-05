@@ -203,6 +203,7 @@ export function modelParams(v: FormInput): ModelParams {
     price: num(v, "price", "Grid price", { min: 0 }),
     exportCredit: num(v, "exportCredit", "Export credit", { min: 0 }),
     turbineCost: num(v, "turbineCost", "Installed cost", { min: 0 }),
+    towerCostPerM: num(v, "towerCostPerM", "Tower cost per metre", { min: 0, optional: true }) ?? 0,
     omPerTurbine: num(v, "omPerTurbine", "Maintenance", { min: 0 }),
   };
 }

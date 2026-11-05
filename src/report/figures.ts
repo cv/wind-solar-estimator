@@ -25,9 +25,14 @@ export const figure = (label: string, value: string, unit: string, sub: Sub, cls
 const stat = (label: string, value: string, unit: string, sub: string): string =>
   `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unitSpan(unit)}</dd>${subLine(sub)}</div>`;
 
-/** "on $20,000 installed", the cost per turbine draggable (with the total when there are several). */
+/** "on $20,000 installed", the cost per turbine draggable (with the tower and the total when there are). */
 function installed(p: ModelParams, capex: number): Sub {
   const each = scrubbable("turbineCost", p.turbineCost, money(p.turbineCost));
+  const tower = p.towerCostPerM * p.hubHeight;
+  if (tower > 0) {
+    const parts = `${each} + ${esc(money(tower))} of tower${p.nTurbines === 1 ? "" : " each"}`;
+    return { html: `on ${esc(money(capex))} installed (${parts})` };
+  }
   return { html: p.nTurbines === 1 ? `on ${each} installed` : `on ${esc(money(capex))} installed (${each} each)` };
 }
 

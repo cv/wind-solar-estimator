@@ -20,9 +20,12 @@ const turbines = (n: number): string => `${n} turbine${n === 1 ? "" : "s"}`;
 /** The sentence: which setup pays back soonest, and why taller ones read as optimistic. */
 function setupsText(a: Analysis, pts: readonly SetupPoint[]): string {
   const best = pts.filter((s) => Number.isFinite(s.payback)).toSorted((x, y) => x.payback - y.payback)[0];
+  const perM = a.params.towerCostPerM;
   const caveat =
-    ` Every height is costed at ${money(a.params.turbineCost)} a turbine installed; ` +
-    "taller towers usually cost more, so read the taller options as optimistic.";
+    perM > 0
+      ? ` Each metre of tower is costed at ${money(perM)} a turbine.`
+      : ` Every height is costed at ${money(a.params.turbineCost)} a turbine installed; taller towers usually cost more, ` +
+        "so read the taller options as optimistic, or enter a tower cost per metre under Costs.";
   if (!best) return `None of these setups pays back.${caveat}`;
   const lead = isEntered(a.params, best)
     ? `Of these, the setup entered pays back soonest, in about ${years(best.payback)}.`
