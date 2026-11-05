@@ -17,6 +17,6 @@ export function betzLimitW(vKmh: number, areaM2: number, rho: number = STD_RHO):
 
 /** Air density from site elevation (standard atmosphere pressure) and air temperature. */
 export function airDensity(elevationM: number, tempC: number): number {
-  const pressure = 101325 * Math.pow(1 - 2.25577e-5 * elevationM, 5.25588);
+  const pressure = 101_325 * Math.pow(1 - 2.25577e-5 * elevationM, 5.25588);
   return pressure / (287.05 * (tempC + 273.15));
 }

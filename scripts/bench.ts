@@ -36,10 +36,10 @@ const p: ModelParams = {
   pvKwp: 3,
   pvLossPct: 14,
   tempCoeffPct: -0.4,
-  loadKwh: 11800,
+  loadKwh: 11_800,
   loadProfile: "residential",
-  loadHourly: Array(24).fill(1),
-  loadMonthly: Array(12).fill(1),
+  loadHourly: Array.from({ length: 24 }, () => 1),
+  loadMonthly: Array.from({ length: 12 }, () => 1),
   battKwh: 48,
   battMinSoc: 0.5,
   battRte: 0.82,
@@ -47,7 +47,7 @@ const p: ModelParams = {
   inverterKw: 6,
   price: 0.2,
   exportCredit: 0.08,
-  turbineCost: 20000,
+  turbineCost: 20_000,
   omPerTurbine: 200,
 };
 const obs = {

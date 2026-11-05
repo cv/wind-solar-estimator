@@ -39,10 +39,10 @@ export function exampleCurve(): CurvePoint[] {
 /** Parses "km/h, W" lines (commas, spaces, tabs or semicolons; # starts a comment). */
 export function parseCurve(text: string): CurvePoint[] {
   const pts: CurvePoint[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const s = line.replace(/#.*/, "").trim();
+  for (const line of text.split(/\r?\n/u)) {
+    const s = line.replace(/#.*/u, "").trim();
     if (!s) continue;
-    const [v, w] = s.split(/[\s,;]+/).map(Number);
+    const [v, w] = s.split(/[\s,;]+/u).map(Number);
     if (v === undefined || w === undefined || !Number.isFinite(v) || !Number.isFinite(w) || v < 0 || w < 0) {
       throw new Error(`Power curve: can't read "${line.trim()}" (expected "km/h, W")`);
     }

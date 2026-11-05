@@ -17,9 +17,9 @@ export async function siteElevation(lat: number, lon: number, signal?: AbortSign
         `${ELEVATION_API}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`,
         signal ? { signal } : {},
       );
-      elevation = res.ok ? firstElevation(await res.json()) : NaN;
+      elevation = res.ok ? firstElevation(await res.json()) : Number.NaN;
     } catch {
-      elevation = NaN;
+      elevation = Number.NaN;
     }
     if (!Number.isFinite(elevation)) return null; // not cached: try again next time
     void dbPut(key, elevation); // best effort: dbPut never rejects
@@ -30,7 +30,7 @@ export async function siteElevation(lat: number, lon: number, signal?: AbortSign
 
 /** The value from Open-Meteo's elevation reply ({ elevation: [metres] }, one per point), or NaN. */
 function firstElevation(json: unknown): number {
-  if (!isRecord(json) || !Array.isArray(json["elevation"])) return NaN;
+  if (!isRecord(json) || !Array.isArray(json["elevation"])) return Number.NaN;
   const value: unknown = json["elevation"][0];
-  return isNumber(value) ? value : NaN;
+  return isNumber(value) ? value : Number.NaN;
 }

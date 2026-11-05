@@ -1,20 +1,13 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "unicorn",
-    "oxc",
-    "import"
-  ],
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
-    "perf": "error"
+    "perf": "error",
+    "pedantic": "error"
   },
-  "ignorePatterns": [
-    "dist",
-    "node_modules"
-  ],
+  "ignorePatterns": ["dist", "node_modules"],
   "rules": {
     "import/no-cycle": "error",
     "oxc/no-map-spread": "off",
@@ -25,12 +18,7 @@
           {
             "from": "package",
             "package": "node:test",
-            "name": [
-              "test",
-              "describe",
-              "it",
-              "suite"
-            ]
+            "name": ["test", "describe", "it", "suite"]
           }
         ]
       }
@@ -70,10 +58,7 @@
         "allowHigherOrderFunctions": true
       }
     ],
-    "typescript/consistent-type-definitions": [
-      "error",
-      "interface"
-    ],
+    "typescript/consistent-type-definitions": ["error", "interface"],
     "typescript/array-type": [
       "error",
       {
@@ -104,26 +89,88 @@
     "typescript/non-nullable-type-assertion-style": "error",
     "typescript/prefer-return-this-type": "error",
     "typescript/no-unnecessary-qualifier": "error",
-    "typescript/related-getter-setter-pairs": "error"
+    "typescript/related-getter-setter-pairs": "error",
+    "eslint/no-inline-comments": "off",
+    "eslint/sort-vars": "off",
+    "eslint/require-await": "off",
+    "eslint/no-negated-condition": "off",
+    "eslint/eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
+    "eslint/max-lines-per-function": [
+      "error",
+      {
+        "max": 90,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "eslint/max-lines": [
+      "error",
+      {
+        "max": 260,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "import/max-dependencies": [
+      "error",
+      {
+        "max": 15,
+        "ignoreTypeImports": true
+      }
+    ],
+    "eslint/complexity": [
+      "error",
+      {
+        "max": 20
+      }
+    ],
+    "eslint/max-params": [
+      "error",
+      {
+        "max": 5
+      }
+    ],
+    "eslint/max-depth": [
+      "error",
+      {
+        "max": 4
+      }
+    ],
+    "eslint/no-param-reassign": "error",
+    "eslint/prefer-template": "error",
+    "eslint/no-console": [
+      "error",
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+    "unicorn/no-nested-ternary": "error",
+    "unicorn/prefer-number-properties": "error",
+    "unicorn/no-array-for-each": "error",
+    "unicorn/prefer-modern-math-apis": "error",
+    "unicorn/numeric-separators-style": "error",
+    "unicorn/no-zero-fractions": "error",
+    "unicorn/prefer-global-this": "error",
+    "typescript/prefer-readonly-parameter-types": "off",
+    "typescript/strict-boolean-expressions": "off",
+    "typescript/strict-void-return": "off"
   },
   "overrides": [
     {
-      "files": [
-        "src/model/**",
-        "src/wind/**",
-        "src/data/**"
-      ],
+      "files": ["src/model/**", "src/wind/**", "src/data/**"],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "group": [
-                  "**/app/*",
-                  "**/ui/*",
-                  "**/report/*"
-                ],
+                "group": ["**/app/*", "**/ui/*", "**/report/*"],
                 "message": "Library code (model, wind, data) must not depend on the UI."
               }
             ]
@@ -132,20 +179,14 @@
       }
     },
     {
-      "files": [
-        "src/report/**"
-      ],
+      "files": ["src/report/**"],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "group": [
-                  "**/ui/*",
-                  "**/app/analyse*",
-                  "**/app/init*"
-                ],
+                "group": ["**/ui/*", "**/app/analyse*", "**/app/init*"],
                 "message": "The report renders an Analysis; it must not depend on the UI controls or the run."
               }
             ]
@@ -154,24 +195,25 @@
       }
     },
     {
-      "files": [
-        "src/ui/**"
-      ],
+      "files": ["src/ui/**"],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "group": [
-                  "**/app/analyse*",
-                  "**/app/init*"
-                ],
+                "group": ["**/app/analyse*", "**/app/init*"],
                 "message": "UI controls report changes through callbacks wired in app/init.ts, not by importing the run."
               }
             ]
           }
         ]
+      }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "eslint/no-console": "off"
       }
     }
   ]

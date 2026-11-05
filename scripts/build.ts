@@ -17,7 +17,7 @@ const writeIndex: esbuild.Plugin = {
   name: "index-html",
   setup(build) {
     build.onEnd(async (result) => {
-      if (result.errors.length || !result.metafile) return;
+      if (result.errors.length > 0 || !result.metafile) return;
       const outputs = Object.entries(result.metafile.outputs);
       const find = (entry: string): string | undefined => outputs.find(([, o]) => o.entryPoint === entry)?.[0];
       const js = find("src/main.ts");

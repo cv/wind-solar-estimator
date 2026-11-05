@@ -71,13 +71,13 @@ export function initMap({ onPinClick }: MapOptions): void {
 }
 
 export function setLocation(lat: number, lon: number, name: string, { pan = false }: { pan?: boolean } = {}): void {
-  lon = ((((lon + 180) % 360) + 360) % 360) - 180;
+  const wrapped = ((((lon + 180) % 360) + 360) % 360) - 180;
   form.elements.lat.value = lat.toFixed(4);
-  form.elements.lon.value = lon.toFixed(4);
+  form.elements.lon.value = wrapped.toFixed(4);
   form.elements.place.value = name;
   form.elements.windSource.value = "auto"; // a station picked for the old spot may not suit the new one
-  state.marker?.setLatLng([lat, lon]);
-  if (pan) state.map?.setView([lat, lon], 8);
+  state.marker?.setLatLng([lat, wrapped]);
+  if (pan) state.map?.setView([lat, wrapped], 8);
   hooks.onChange("lat");
 }
 
@@ -92,7 +92,7 @@ export async function placeSearch(): Promise<void> {
   ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">Searching…</li>`;
   try {
     const places = await searchPlaces(q);
-    if (!places.length) {
+    if (places.length === 0) {
       ul.innerHTML = `<li class="hint" style="padding:0.4rem 0.6rem">No places found.</li>`;
       return;
     }

@@ -7,9 +7,7 @@ import type { ModelParams, SimResult } from "../model/simulate.ts";
 
 /** One figure: label, value (with optional unit) and a supporting line. */
 export const figure = (label: string, value: string, unit: string, sub: string, cls = ""): string =>
-  `<div><dt>${esc(label)}</dt><dd class="value ${cls}">${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>` +
-  (sub ? `<dd class="sub">${esc(sub)}</dd>` : "") +
-  `</div>`;
+  `<div><dt>${esc(label)}</dt><dd class="value ${cls}">${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
 
 /** One supporting statistic: label, value (with optional unit) and a supporting line. */
 const stat = (label: string, value: string, unit: string, sub: string): string =>

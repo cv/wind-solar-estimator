@@ -25,10 +25,11 @@ export async function loadStations(): Promise<RankedStation[] | null> {
     .then(([list, elevation]) =>
       list.map((s): RankedStation => ({
         ...s,
-        rise: elevation === null || !Number.isFinite(s.elevation) ? NaN : s.elevation - elevation,
+        rise: elevation === null || !Number.isFinite(s.elevation) ? Number.NaN : s.elevation - elevation,
       })),
     )
     .catch((e: unknown): null => {
+      // eslint-disable-next-line no-console -- intended: the picker falls back to the weather model; the cause is for developers
       console.warn(e);
       return null;
     });
@@ -41,6 +42,7 @@ export async function loadStations(): Promise<RankedStation[] | null> {
       renderStationPicker();
     })
     .catch((e: unknown) => {
+      // eslint-disable-next-line no-console -- intended: a bug while rendering the picker has no other place to surface
       console.error(e);
     });
   return promise;
@@ -62,21 +64,32 @@ export function resolveStation(
 
 /** The "Wind data" picker, its hint and the station pins on the map. */
 export function renderStationPicker(): void {
-  const sel = $("#stationSelect", HTMLSelectElement);
-  const hint = $("#stationHint");
   const lat = Number(form.elements.lat.value),
     lon = Number(form.elements.lon.value);
   const { list } = state.stations;
-  const choice = form.elements.windSource.value;
-  // The period, read leniently: validation messages belong to Analyse, not to this picker.
+  const req = pickerPeriod();
+  const active = list && req ? resolveStation(form.elements.windSource.value, list, req) : null;
+  fillStationOptions($("#stationSelect", HTMLSelectElement), list ?? [], req, active);
+  $("#stationHint").textContent = stationHint(nearCanada(lat, lon), list, req, active);
+  renderStationPins(list ?? [], active);
+}
+
+/** The period, read leniently: validation messages belong to Analyse, not to this picker. */
+function pickerPeriod(): Period | null {
   const years = Number(form.elements.years.value),
     endYear = Number(form.elements.endYear.value);
-  const req: Period | null =
-    years >= 1 && endYear > 1900 ? { startYear: endYear - Math.round(years) + 1, endYear } : null;
-  const active = list && req ? resolveStation(choice, list, req) : null;
+  return years >= 1 && endYear > 1900 ? { startYear: endYear - Math.round(years) + 1, endYear } : null;
+}
 
+/** The picker's options (stations without records for the period disabled), with active selected. */
+function fillStationOptions(
+  sel: HTMLSelectElement,
+  list: readonly RankedStation[],
+  req: Period | null,
+  active: ChosenStation | null,
+): void {
   sel.replaceChildren(new Option("Weather model only (ERA5)", "model"));
-  for (const s of list ?? []) {
+  for (const s of list) {
     const o = new Option(`${s.name}, ${stationPlace(s)} · ${s.first}–${s.last}`, `eccc:${s.id}`);
     if (req && yearsOverlap(s, req) < 1) {
       o.disabled = true;
@@ -85,31 +98,40 @@ export function renderStationPicker(): void {
     sel.add(o);
   }
   sel.value = active ? `eccc:${active.id}` : "model";
+}
 
-  let text: string;
-  if (!nearCanada(lat, lon))
-    text = "Measured station data is available for sites in Canada. Elsewhere the tool uses the weather model.";
-  else if (list === undefined) text = "Looking for nearby weather stations…";
-  else if (list === null) text = "Couldn't load the list of weather stations, so the weather model is used.";
-  else if (!list.length)
-    text = `No Environment Canada station with hourly records within ${SEARCH_RADIUS_KM} km, so the weather model is used.`;
+/** The hint under the picker: where the wind comes from, or why there is no station to use. */
+function stationHint(
+  inCanada: boolean,
+  list: readonly RankedStation[] | null | undefined,
+  req: Period | null,
+  active: ChosenStation | null,
+): string {
+  if (!inCanada)
+    return "Measured station data is available for sites in Canada. Elsewhere the tool uses the weather model.";
+  if (list === undefined) return "Looking for nearby weather stations…";
+  if (list === null) return "Couldn't load the list of weather stations, so the weather model is used.";
+  if (list.length === 0)
+    return `No Environment Canada station with hourly records within ${SEARCH_RADIUS_KM} km, so the weather model is used.`;
   // active implies req (it is resolved from it above).
-  else if (active && req) {
-    text = `Hourly wind measured at ${active.name}, ${fromSite(active)}${riseText(active, " and ")}. Hours the station missed are filled from the weather model.`;
-    const nearest = active.explicit ? null : list.find(autoEligible(req));
-    if (nearest && nearest.id !== active.id) {
-      const gap = missingYears(req)(nearest) - missingYears(req)(active);
-      const why =
-        Math.abs(nearest.rise) - Math.abs(active.rise) >= ELEVATION_SAY_M
-          ? `${fmt(Math.abs(nearest.rise))} m ${nearest.rise > 0 ? "higher" : "lower"}`
-          : gap > 0
-            ? `its records cover ${gap} fewer year${gap === 1 ? "" : "s"} of the period`
-            : "a weaker match";
-      text += ` Chosen over ${nearest.name}, which is ${nearest.distanceKm < active.distanceKm - 0.5 ? "closer" : "as close"} but ${why}.`;
-    }
-  } else text = "Pick a station to use its measured wind instead of the weather model's.";
-  hint.textContent = text;
-  renderStationPins(list ?? [], active);
+  if (!active || !req) return "Pick a station to use its measured wind instead of the weather model's.";
+  return `Hourly wind measured at ${active.name}, ${fromSite(active)}${riseText(active, " and ")}. Hours the station missed are filled from the weather model.${chosenOver(list, req, active)}`;
+}
+
+/** For a station chosen automatically over the nearest eligible one, why it was preferred ("" otherwise). */
+function chosenOver(list: readonly RankedStation[], req: Period, active: ChosenStation): string {
+  const nearest = active.explicit ? null : list.find(autoEligible(req));
+  if (!nearest || nearest.id === active.id) return "";
+  return ` Chosen over ${nearest.name}, which is ${nearest.distanceKm < active.distanceKm - 0.5 ? "closer" : "as close"} but ${whyNotNearest(nearest, active, req)}.`;
+}
+
+/** What made the nearest station a worse choice than active: its elevation, fewer years, or a weaker match overall. */
+function whyNotNearest(nearest: RankedStation, active: ChosenStation, req: Period): string {
+  if (Math.abs(nearest.rise) - Math.abs(active.rise) >= ELEVATION_SAY_M)
+    return `${fmt(Math.abs(nearest.rise))} m ${nearest.rise > 0 ? "higher" : "lower"}`;
+  const gap = missingYears(req)(nearest) - missingYears(req)(active);
+  if (gap > 0) return `its records cover ${gap} fewer year${gap === 1 ? "" : "s"} of the period`;
+  return "a weaker match";
 }
 
 export function chooseWindSource(value: string): void {

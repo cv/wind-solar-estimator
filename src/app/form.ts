@@ -13,7 +13,7 @@ import type { CurvePoint } from "../model/powerCurve.ts";
 import type { ModelParams } from "../model/simulate.ts";
 
 /** The form's field names (DEFAULTS' keys). */
-const FORM_KEYS = Object.keys(DEFAULTS).filter(isFormKey);
+const FORM_KEYS = Object.keys(DEFAULTS).filter((k) => isFormKey(k));
 
 /** The load preset named key (any string, e.g. from a share link), if there is one. */
 export function loadPreset(key: string | undefined): LoadPreset | undefined {
@@ -90,6 +90,12 @@ export function invalid(key: FormKey, message: string): InputError {
   return err;
 }
 
+/** The allowed range for a number's error message ("" when it is unbounded below). */
+function rangeText(min: number, max: number): string {
+  if (!Number.isFinite(min)) return "";
+  return Number.isFinite(max) ? ` between ${min} and ${max}` : ` of at least ${min}`;
+}
+
 export function num(v: FormInput, key: StringFormKey, label: string, opts?: NumOptions & { optional?: false }): number;
 export function num(v: FormInput, key: StringFormKey, label: string, opts: NumOptions): number | null;
 export function num(
@@ -101,20 +107,14 @@ export function num(
   if (v[key] === "" && optional) return null;
   const x = Number(v[key]);
   if (v[key] === "" || !Number.isFinite(x) || x < min || x > max) {
-    const range =
-      Number.isFinite(min) && Number.isFinite(max)
-        ? ` between ${min} and ${max}`
-        : Number.isFinite(min)
-          ? ` of at least ${min}`
-          : "";
-    throw invalid(key, `${label}: enter a number${range}.`);
+    throw invalid(key, `${label}: enter a number${rangeText(min, max)}.`);
   }
   return x;
 }
 
 export function list(v: FormInput, key: StringFormKey, label: string, n: number): number[] {
   const xs = v[key]
-    .split(/[\s,;]+/)
+    .split(/[\s,;]+/u)
     .filter(Boolean)
     .map(Number);
   if (xs.length !== n || xs.some((x) => !Number.isFinite(x) || x < 0))
@@ -167,7 +167,7 @@ export function modelParams(v: FormInput): ModelParams {
     throw invalid("curve", e instanceof Error ? e.message : String(e));
   }
   return {
-    nTurbines: Math.round(num(v, "nTurbines", "Number of turbines", { min: 1, max: 100000 })),
+    nTurbines: Math.round(num(v, "nTurbines", "Number of turbines", { min: 1, max: 100_000 })),
     hubHeight: num(v, "hubHeight", "Hub height", { min: 1, max: 200 }),
     curvePts,
     ...captureParams(v),

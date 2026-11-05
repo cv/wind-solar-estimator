@@ -42,13 +42,15 @@ export function renderNotes(a: Analysis, check: CurveCheck): void {
   }
   if (src?.stats) {
     const st = src.stats;
-    items.push([
-      "info",
-      `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${fromSite(src.station)}, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
-        `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
-        `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`,
-    ]);
-    items.push(...stationChecks(src.station, st, wx.elevation));
+    items.push(
+      [
+        "info",
+        `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${fromSite(src.station)}, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
+          `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
+          `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`,
+      ],
+      ...stationChecks(src.station, st, wx.elevation),
+    );
   } else if (src?.error) {
     items.push([
       "warn",
@@ -102,10 +104,11 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
       "warn",
       `<strong>Station elevation:</strong> ${name} is ${fmt(Math.abs(rise))} m ${rise > 0 ? "higher" : "lower"} than the site ` +
         `(${fmt(station.elevation)} m against ${fmt(siteElevationM)} m). Stations on hills and ridges usually measure stronger wind than lower ground nearby, and stations in valleys weaker, ` +
-        `so the wind at the site may be well ${rise > 0 ? "below" : "above"} what was measured.` +
-        (better
-          ? ` ${esc(better.name)}, ${fromSite(better)}, is closer to the site's elevation; pick it under <em>Wind data</em> to compare.`
-          : ""),
+        `so the wind at the site may be well ${rise > 0 ? "below" : "above"} what was measured.${
+          better
+            ? ` ${esc(better.name)}, ${fromSite(better)}, is closer to the site's elevation; pick it under <em>Wind data</em> to compare.`
+            : ""
+        }`,
     ]);
   }
   if (st.correlation < POOR_CORRELATION) {

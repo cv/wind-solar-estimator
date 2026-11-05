@@ -21,11 +21,11 @@ export function render(v: FormValues, check: CurveCheck): void {
   $("#print", HTMLButtonElement).disabled = false;
 
   const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
+  const measured = source?.stats
+    ? `, wind measured at ${esc(source.station.name)} (${stationPlace(source.station)})`
+    : "";
   $("#reportHead").innerHTML =
-    `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} year${wx.years === 1 ? "" : "s"} of hourly weather (${wx.startYear === wx.endYear ? wx.endYear : `${wx.startYear}–${wx.endYear}`})` +
-    (source?.stats ? `, wind measured at ${esc(source.station.name)} (${stationPlace(source.station)})` : "") +
-    ` · ` +
-    `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString(undefined, { dateStyle: "medium" })}</p>`;
+    `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} year${wx.years === 1 ? "" : "s"} of hourly weather (${wx.startYear === wx.endYear ? wx.endYear : `${wx.startYear}–${wx.endYear}`})${measured} · ${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString(undefined, { dateStyle: "medium" })}</p>`;
 
   renderVerdict(r, a.capped);
   if (a.capped) $("#more", HTMLDetailsElement).open = true; // the power-curve chart is the evidence

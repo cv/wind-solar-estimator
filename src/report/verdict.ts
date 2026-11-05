@@ -44,8 +44,7 @@ export function renderVerdict(r: SimResult, capped: SimResult | null): void {
     ];
   }
   $("#verdict").innerHTML =
-    `<h3 id="verdictHead" class="verdict-head"><span class="tag ${tag.cls}">${esc(tag.label)}</span> ${esc(head)}</h3>` +
-    lines.map((l) => `<p class="verdict-detail">${esc(l)}</p>`).join("");
+    `<h3 id="verdictHead" class="verdict-head"><span class="tag ${tag.cls}">${esc(tag.label)}</span> ${esc(head)}</h3>${lines.map((l) => `<p class="verdict-detail">${esc(l)}</p>`).join("")}`;
 }
 
 /** Says what the Betz cap does for the current curve, next to the checkbox, so toggling it never looks inert. */

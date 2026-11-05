@@ -11,7 +11,7 @@ test("auto station choice weighs elevation difference against distance", () => {
   const far = { id: "far", distanceKm: 45, rise: 0 };
   assert.equal(pickStation([hilltop, plain, far], ok)?.id, "plain");
   assert.equal(pickStation([hilltop, far], ok)?.id, "far"); // 17.9 + 33 > 45
-  assert.equal(pickStation([{ id: "x", distanceKm: 5, rise: NaN }, plain], ok)?.id, "x"); // unknown elevation: distance only
+  assert.equal(pickStation([{ id: "x", distanceKm: 5, rise: Number.NaN }, plain], ok)?.id, "x"); // unknown elevation: distance only
   assert.equal(pickStation([hilltop, plain], (s) => s.id !== "plain")?.id, "hill");
   assert.equal(stationLabel("STAVELY AAFC"), "Stavely AAFC");
 });

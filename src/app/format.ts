@@ -9,7 +9,7 @@ const ENTITIES: Readonly<Record<string, string>> = {
   "'": "&#39;",
 };
 export const esc = (s: string | number): string =>
-  String(s).replace(/[&<>"']/g, (c) => {
+  String(s).replaceAll(/[&<>"']/gu, (c) => {
     // The pattern only matches characters with an entity.
     const e = ENTITIES[c];
     if (e === undefined) throw new Error(`no entity for ${c}`);

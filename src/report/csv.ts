@@ -5,7 +5,7 @@ import { assumptionRows, monthlyRows } from "./tables.ts";
 
 /** One CSV cell: numbers rounded to 2 decimals, everything else quoted. */
 const q = (c: string | number): string =>
-  typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${c.replace(/"/g, '""')}"`;
+  typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${c.replaceAll('"', '""')}"`;
 
 export function downloadCsv(): void {
   if (!state.result) return; // nothing analysed yet
@@ -30,7 +30,7 @@ export function downloadCsv(): void {
     ...rows,
     total,
   ];
-  const blob = new Blob([lines.map((l) => l.map(q).join(",")).join("\n")], { type: "text/csv" });
+  const blob = new Blob([lines.map((l) => l.map((c) => q(c)).join(",")).join("\n")], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `site-estimate-${req.lat.toFixed(3)}_${req.lon.toFixed(3)}.csv`;

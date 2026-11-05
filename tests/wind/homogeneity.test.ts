@@ -36,7 +36,7 @@ test("checkHomogeneity finds a steady drift (trees growing around the mast)", ()
 });
 
 test("checkHomogeneity ignores small changes, short records and thin years", () => {
-  assert.equal(checkHomogeneity(yearlyRecord((y) => (y < 2016 ? 1.1 : 1.0), 0.01)).issue, null); // 9% step
+  assert.equal(checkHomogeneity(yearlyRecord((y) => (y < 2016 ? 1.1 : 1), 0.01)).issue, null); // 9% step
   assert.equal(checkHomogeneity(yearlyRecord((y) => (y < 2008 ? 0.85 : 1.4)).slice(0, 4)).issue, null);
   const thin = yearlyRecord((y) => (y < 2008 ? 0.85 : 1.4)).map((r) => (r.year < 2008 ? { ...r, coverage: 0.2 } : r));
   assert.equal(checkHomogeneity(thin).issue, null);

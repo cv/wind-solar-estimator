@@ -1,14 +1,5 @@
 // Chart.js charts: wind distribution, monthly energy, imports, battery charge, yearly wind and power curve.
 import { at } from "../util/checked.ts";
-import type {
-  Chart as ChartJs,
-  ChartConfiguration,
-  ChartConfigurationCustomTypesPerDataset,
-  ChartType,
-  Color,
-  LegendItem,
-  LegendOptions,
-} from "chart.js";
 import { MONTHS, COLORS } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { fmt } from "../app/format.ts";
@@ -16,65 +7,7 @@ import { analysis, state } from "../app/state.ts";
 import { betzLimitW } from "../model/physics.ts";
 import { makeCurveFn } from "../model/powerCurve.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
-
-/** A plain colour (not a per-point array or a scriptable function). */
-const isColor = (v: unknown): v is Color =>
-  typeof v === "string" || v instanceof CanvasGradient || v instanceof CanvasPattern;
-
-/** A chart for drawChart: the type may be left to the datasets (mixed bar and line charts). */
-export type ChartSpec = ChartConfiguration | ChartConfigurationCustomTypesPerDataset;
-
-// Legend keys match the marks: a swatch for bars, a short line (dashed if the series is) for lines.
-export const legendLabels: Partial<LegendOptions<ChartType>["labels"]> = {
-  usePointStyle: true,
-  boxHeight: 8,
-  pointStyleWidth: 16,
-  generateLabels(chart: ChartJs): LegendItem[] {
-    return Chart.defaults.plugins.legend.labels.generateLabels(chart).map((item): LegendItem => {
-      // Legend items for these charts are per dataset, so datasetIndex is always set; leave any other as is.
-      if (item.datasetIndex === undefined) return item;
-      const ds = chart.data.datasets[item.datasetIndex];
-      if (ds === undefined) return item;
-      // A live chart's config always has its type (mixed charts get the default one); these charts use plain colours.
-      const chartType = "type" in chart.config ? chart.config.type : undefined;
-      return (ds.type ?? chartType) === "line"
-        ? {
-            ...item,
-            pointStyle: "line",
-            ...(isColor(ds.borderColor) ? { strokeStyle: ds.borderColor } : {}),
-            lineWidth: 2.5,
-          }
-        : { ...item, pointStyle: "rect", lineWidth: 0 };
-    });
-  },
-};
-
-export function drawChart(id: string, config: ChartSpec): void {
-  if (typeof Chart === "undefined") return;
-  state.charts[id]?.destroy();
-  state.charts[id] = new Chart($(`#${id}`, HTMLCanvasElement), {
-    ...config,
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      interaction: { mode: "index", intersect: false },
-      plugins: { legend: { labels: legendLabels }, ...config.options?.plugins },
-      ...config.options,
-    },
-  });
-}
-
-/** A scale with a title, plus any other scale options. */
-export function axis(title: string): AxisTitle;
-export function axis<T extends object>(title: string, extra: T): AxisTitle & T;
-export function axis(title: string, extra: object = {}): AxisTitle {
-  return { title: { display: true, text: title }, ...extra };
-}
-/** What axis gives every scale. */
-interface AxisTitle {
-  title: { display: boolean; text: string };
-}
+import { axis, drawChart } from "./chartKit.ts";
 
 const round = (a: readonly number[]): number[] => a.map((x) => Math.round(x));
 const positive = (x: number): number | null => (x > 0 ? x : null);
@@ -83,7 +16,16 @@ const asPct = (a: ReadonlyArray<number | null>): Array<number | null> =>
   a.map((x) => (x == null ? null : Math.round(x * 1000) / 10));
 
 export function renderCharts(r: SimResult, p: ModelParams): void {
-  // Wind speed distribution and energy by speed
+  drawDistribution(r);
+  drawMonthly(r);
+  drawImports(r);
+  drawSoc(r, p);
+  drawYearly(r);
+  drawCurve(p);
+}
+
+/** Wind speed distribution and energy by speed, up to the last bin with an hour or a kWh in it. */
+function drawDistribution(r: SimResult): void {
   let last = r.hist.hours.length - 1;
   while (last > 0 && at(r.hist.hours, last) < 1 && at(r.hist.energy, last) < 1) last--;
   const bins = r.hist.hours.slice(0, last + 1).map((_, i) => `${i * r.hist.binKmh}`);
@@ -118,7 +60,10 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
       },
     },
   });
+}
 
+/** Wind and solar generation stacked by month, against electricity use. */
+function drawMonthly(r: SimResult): void {
   drawChart("chMonthly", {
     data: {
       labels: [...MONTHS],
@@ -137,7 +82,10 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
     },
     options: { scales: { x: { stacked: true }, y: axis("kWh per month", { stacked: true, beginAtZero: true }) } },
   });
+}
 
+/** Electricity bought each month, without and with wind. */
+function drawImports(r: SimResult): void {
   drawChart("chImport", {
     type: "bar",
     data: {
@@ -149,9 +97,10 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
     },
     options: { scales: { y: axis("kWh bought per month", { beginAtZero: true }) } },
   });
+}
 
-  drawSoc(r, p);
-
+/** Wind energy in each weather year, against the average. */
+function drawYearly(r: SimResult): void {
   const mean = r.windKwh;
   drawChart("chYearly", {
     data: {
@@ -175,7 +124,19 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
     },
     options: { scales: { y: axis("kWh per year", { beginAtZero: true }) } },
   });
+}
 
+/** Powers of ten labelled on the power curve's log axis. */
+const LOG_TICKS = new Set([0.1, 1, 10, 100, 1000, 10_000, 100_000]);
+
+/** A log-axis tick label: powers of ten only, thousands as "k". */
+function logTick(v: string | number): string {
+  if (typeof v !== "number" || !LOG_TICKS.has(v)) return "";
+  return v >= 1000 ? `${v / 1000}k` : String(v);
+}
+
+/** The entered power curve against the physical limit for the capture area, on a log scale. */
+function drawCurve(p: ModelParams): void {
   const curve = makeCurveFn(p.curvePts);
   const speeds = Array.from({ length: 61 }, (_, i) => i);
   drawChart("chCurve", {
@@ -203,18 +164,7 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
     options: {
       scales: {
         x: axis("Wind speed (km/h)", { ticks: { maxTicksLimit: 13 } }),
-        y: axis("Watts (log scale)", {
-          type: "logarithmic" as const,
-          min: 0.1,
-          ticks: {
-            callback: (v: string | number): string =>
-              typeof v === "number" && [0.1, 1, 10, 100, 1000, 10000, 100000].includes(v)
-                ? v >= 1000
-                  ? `${v / 1000}k`
-                  : String(v)
-                : "",
-          },
-        }),
+        y: axis("Watts (log scale)", { type: "logarithmic" as const, min: 0.1, ticks: { callback: logTick } }),
       },
     },
   });

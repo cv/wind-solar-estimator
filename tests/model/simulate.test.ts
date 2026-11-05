@@ -46,15 +46,15 @@ const base = {
   tempCoeffPct: 0,
   loadKwh: 0,
   loadProfile: "flat",
-  loadHourly: Array(24).fill(1),
-  loadMonthly: Array(12).fill(1),
+  loadHourly: Array.from({ length: 24 }, () => 1),
+  loadMonthly: Array.from({ length: 12 }, () => 1),
   battKwh: 0,
   battMinSoc: 0,
   battRte: 1,
   battKw: 0,
   price: 0.2,
   exportCredit: 0,
-  turbineCost: 25000,
+  turbineCost: 25_000,
   omPerTurbine: 0,
 };
 
@@ -85,11 +85,11 @@ test("energy balance without a battery: import − export = load − generation"
   const r = simulate(wx, {
     ...base,
     pvKwp: 2,
-    loadKwh: 20000,
+    loadKwh: 20_000,
     loadProfile: "x",
     loadHourly: Array.from({ length: 24 }, (_, h) => 1 + (h % 5)),
   });
-  close(r.loadKwh, 20000, 1e-3);
+  close(r.loadKwh, 20_000, 1e-3);
   const b = r.withWind;
   close(b.importKwh - b.exportKwh, r.loadKwh - r.pvKwh - r.windKwh, 1e-3);
   close(r.pvOnly.importKwh - r.pvOnly.exportKwh, r.loadKwh - r.pvKwh, 1e-3);

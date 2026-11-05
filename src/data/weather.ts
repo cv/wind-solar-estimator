@@ -5,13 +5,10 @@
 
 import { dbGet, dbPut, dbClear } from "./cache.ts";
 import { at } from "../util/checked.ts";
-import { isArrayOf, isNumber, isNumberOrNull, isRecord, isString } from "../util/guards.ts";
-import { sleep } from "../util/sleep.ts";
+import { isNumber, isRecord, isString } from "../util/guards.ts";
+import { fetchYear, type ArchiveData } from "./archive.ts";
 
-const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
-const ARCHIVE_COMMERCIAL = "https://customer-archive-api.open-meteo.com/v1/archive";
 const CONCURRENCY = 4;
-const MAX_RETRIES = 4;
 
 /** What fetchWeather loads: a site, whole calendar years and the PV panel orientation. */
 export interface WeatherRequest {
@@ -65,22 +62,6 @@ export interface Weather {
   gti: Float32Array;
 }
 
-/** A successful Open-Meteo archive API reply (JSON, timeformat=unixtime), the fields used here. */
-interface ArchiveData {
-  latitude: number;
-  longitude: number;
-  elevation?: number;
-  timezone: string;
-  utc_offset_seconds?: number;
-  hourly: {
-    time: number[];
-    wind_speed_10m: Array<number | null>;
-    wind_speed_100m: Array<number | null>;
-    temperature_2m: Array<number | null>;
-    global_tilted_irradiance: Array<number | null>;
-  };
-}
-
 /** One year of weather as cached in IndexedDB; missing values are NaN. */
 interface YearPart {
   latitude: number;
@@ -100,26 +81,6 @@ interface YearPart {
 type Column = "t" | "year" | "month" | "hour" | "w10" | "w100" | "temp" | "gti";
 
 const memory = new Map<string, Weather>();
-
-const optionalNumber = (v: unknown): boolean => v === undefined || isNumber(v);
-
-/** An hourly column as long as the time column. */
-const isColumn = (v: unknown, n: number): v is Array<number | null> => isArrayOf(v, isNumberOrNull) && v.length === n;
-
-/** Checks the fields of an archive reply that compactYear reads. */
-function isArchiveData(v: unknown): v is ArchiveData {
-  if (!isRecord(v) || !isNumber(v["latitude"]) || !isNumber(v["longitude"]) || !isString(v["timezone"])) return false;
-  if (!optionalNumber(v["elevation"]) || !optionalNumber(v["utc_offset_seconds"])) return false;
-  const h = v["hourly"];
-  if (!isRecord(h) || !isArrayOf(h["time"], isNumber)) return false;
-  const n = h["time"].length;
-  return (
-    isColumn(h["wind_speed_10m"], n) &&
-    isColumn(h["wind_speed_100m"], n) &&
-    isColumn(h["temperature_2m"], n) &&
-    isColumn(h["global_tilted_irradiance"], n)
-  );
-}
 
 /** One year as cached in IndexedDB (entries written by older versions may differ). */
 function isYearPart(v: unknown): v is YearPart {
@@ -145,8 +106,8 @@ function isYearPart(v: unknown): v is YearPart {
  * azimuth uses Open-Meteo's convention: 0 = south, −90 = east, 90 = west, 180 = north.
  */
 export async function fetchWeather({
-  lat,
-  lon,
+  lat: siteLat,
+  lon: siteLon,
   startYear,
   endYear,
   tilt,
@@ -155,8 +116,8 @@ export async function fetchWeather({
   onProgress,
   signal,
 }: WeatherRequest): Promise<Weather> {
-  lat = Math.round(lat * 1e4) / 1e4;
-  lon = Math.round(lon * 1e4) / 1e4;
+  const lat = Math.round(siteLat * 1e4) / 1e4;
+  const lon = Math.round(siteLon * 1e4) / 1e4;
   const key = [lat, lon, startYear, endYear, tilt, azimuth].join("|");
   const cached = memory.get(key);
   if (cached) return cached;
@@ -212,7 +173,7 @@ export async function fetchWeather({
       cols.gti.push(g);
     }
   }
-  if (!cols.w10.length) throw new Error("No weather data returned for this location and period");
+  if (cols.w10.length === 0) throw new Error("No weather data returned for this location and period");
 
   const wx: Weather = {
     n: cols.w10.length,
@@ -237,7 +198,7 @@ export async function fetchWeather({
   return wx;
 }
 
-const col = (a: Array<number | null>): Float32Array => Float32Array.from(a, (x) => x ?? NaN);
+const col = (a: Array<number | null>): Float32Array => Float32Array.from(a, (x) => x ?? Number.NaN);
 
 /** Typed arrays keep the IndexedDB cache small; missing values become NaN. */
 function compactYear(json: ArchiveData): YearPart {
@@ -254,80 +215,6 @@ function compactYear(json: ArchiveData): YearPart {
     temp: col(h.temperature_2m),
     gti: col(h.global_tilted_irradiance),
   };
-}
-
-interface YearRequest {
-  lat: number;
-  lon: number;
-  year: number;
-  tilt: number;
-  azimuth: number;
-  /** Passed through from fetchWeather: undefined uses the free API. */
-  apiKey: string | undefined;
-  /** Passed through from fetchWeather: undefined means not abortable. */
-  signal: AbortSignal | undefined;
-}
-
-async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: YearRequest): Promise<ArchiveData> {
-  const q = new URLSearchParams({
-    latitude: String(lat),
-    longitude: String(lon),
-    start_date: `${year}-01-01`,
-    end_date: `${year}-12-31`,
-    hourly: "wind_speed_10m,wind_speed_100m,temperature_2m,global_tilted_irradiance",
-    tilt: String(tilt),
-    azimuth: String(azimuth),
-    models: "era5",
-    wind_speed_unit: "kmh",
-    timezone: "auto",
-    timeformat: "unixtime",
-  });
-  if (apiKey) q.set("apikey", apiKey);
-  const url = `${apiKey ? ARCHIVE_COMMERCIAL : ARCHIVE}?${q}`;
-
-  for (let attempt = 0; ; attempt++) {
-    const retry = attempt < MAX_RETRIES;
-    const wait = async (): Promise<void> => sleep(10000 * (attempt + 1), signal);
-    let res: Response, text: string;
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-      res = await fetch(url, signal ? { signal } : {});
-      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-      text = await res.text();
-    } catch (e) {
-      if (signal?.aborted) throw e;
-      if (retry) {
-        // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-        await wait();
-        continue;
-      } // network hiccup
-      throw new Error(`Couldn't reach the weather service for ${year}: ${e instanceof Error ? e.message : String(e)}`, {
-        cause: e,
-      });
-    }
-    let json: unknown = null;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      /* not JSON, e.g. a proxy error page */
-    }
-
-    if (res.ok && isArchiveData(json)) return json;
-    // Error replies are { error: true, reason: "..." }.
-    const reason =
-      (isRecord(json) && isString(json["reason"]) && json["reason"]) || text.slice(0, 120).trim() || res.statusText;
-    if (res.status === 429 && /daily|hourly/i.test(reason)) {
-      throw new Error(`Open-Meteo's free usage limit was reached (${reason}). Try again later, or use an API key.`);
-    }
-    // Retry rate limits, server errors and garbled replies; a 400 means a bad request, so don't.
-    if (retry && (res.ok || res.status === 429 || res.status >= 500)) {
-      const after = Number(res.headers.get("retry-after"));
-      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-      await (after > 0 ? sleep(after * 1000, signal) : wait());
-      continue;
-    }
-    throw new Error(`Weather data for ${year} failed (${res.status}): ${reason}. Press Analyse again to resume.`);
-  }
 }
 
 export async function clearWeatherCache(): Promise<void> {

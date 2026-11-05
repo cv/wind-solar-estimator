@@ -2,150 +2,70 @@
 // Units: wind speed km/h, power W (turbine curve) or kW (system), energy kWh.
 
 import { STD_RHO, betzLimitW, airDensity } from "./physics.ts";
-import { makeCurveFn, type CurvePoint } from "./powerCurve.ts";
+import { makeCurveFn } from "./powerCurve.ts";
 import { battery, type Battery } from "./battery.ts";
-import type { Weather } from "../data/weather.ts";
+import { f32, f64, num, u16, u8 } from "./checkedArrays.ts";
+import type { ModelParams, MonthlySeries, Scenario, SimResult, SimWeather, SocDay } from "./simTypes.ts";
+
+export type { ModelParams, MonthlySeries, Scenario, SimResult, SimWeather, SocDay } from "./simTypes.ts";
 
 export const HOURS_PER_YEAR = 8766;
 
-/** The weather fields simulate reads. */
-export type SimWeather = Pick<
-  Weather,
-  "n" | "years" | "elevation" | "year" | "month" | "hour" | "w10" | "w100" | "temp" | "gti"
->;
+const BIN = 2;
+const NBINS = 50;
 
-/** Simulation inputs. Units: km/h, m, m², kW, kWh, %, fractions (0–1) where noted. */
-export interface ModelParams {
-  nTurbines: number;
-  hubHeight: number;
-  curvePts: readonly CurvePoint[];
-  captureAreaM2: number;
-  /** Readable description of the capture area (display only). */
-  captureDesc?: string;
-  augmentation: number;
-  clampPhysics: boolean;
-  densityCorrection: boolean;
-  windLossPct: number;
-  /** Measured mean wind at hub height; 0 = use windScale instead. */
-  siteMeanKmh: number;
-  windScale: number;
-  pvKwp: number;
-  pvLossPct: number;
-  tempCoeffPct: number;
-  loadKwh: number;
-  /** A LoadProfileKey, or another name (e.g. "custom") for a hand-entered shape. */
-  loadProfile: string;
-  loadHourly: readonly number[];
-  loadMonthly: readonly number[];
-  battKwh: number;
-  battKw: number;
-  /** Fraction 0–1. */
-  battMinSoc: number;
-  /** Round-trip efficiency, fraction 0–1. */
-  battRte: number;
-  /** Shared inverter limit (kW); 0 or absent = no limit. */
-  inverterKw?: number;
-  /** Currency symbol (display only). */
-  currency?: string;
-  price: number;
-  exportCredit: number;
-  turbineCost: number;
-  omPerTurbine: number;
-}
+const zeros = (n: number): Float64Array => new Float64Array(n);
 
-/** Grid exchange per year for one system (PV only, or PV with the turbines). */
-export interface Scenario {
-  importKwh: number;
-  exportKwh: number;
-  selfSufficiency: number;
-}
-
-export type MonthlySeries = "wind" | "pv" | "load" | "importPv" | "importBoth";
-
-/** Average state of charge (0–1) by month (12) and hour (24); null where there are no hours. */
-export type SocDay = Array<Array<number | null>>;
-
-export interface SimResult {
-  hours: number;
-  years: number;
+/** Hub-height wind (model scale) and the means it was derived from. */
+interface HubWind {
+  hub: Float32Array;
   meanW10: number;
   meanW100: number;
   meanAlpha: number;
   modelHubMean: number;
+  /** Factor from model hub wind to site hub wind. */
   scale: number;
-  meanHub: number;
-  ratedKw: number;
-  windKwh: number;
-  windKwhPerTurbine: number;
-  capacityFactor: number;
-  generatingShare: number;
-  physicsCapKwh: number;
-  clippedKwh: number;
-  inverterLostKwh: { pvOnly: number; withWind: number };
-  pvKwh: number;
-  loadKwh: number;
-  pvOnly: Scenario;
-  withWind: Scenario;
-  /** kWh per calendar month (12 values each), per year. */
-  monthly: Record<MonthlySeries, number[]>;
-  yearly: Array<{ year: number; kwh: number }>;
-  /** Hours and wind energy per year by hub wind speed bin. */
-  hist: { binKmh: number; hours: number[]; energy: number[] };
-  socDay: { pvOnly: SocDay; withWind: SocDay };
-  econ: {
-    savings: number;
-    om: number;
-    capex: number;
-    netSavings: number;
-    payback: number;
-    costPerKwh20: number;
-  };
 }
 
-// Checked reads for the hourly loops. Same contract as at() in ../util/checked.ts, but one
-// function per element kind: the shared at() sees every array type in the app, so V8 can't
-// inline its load (simulate() took ~28 ms instead of ~17 ms in scripts/bench.ts).
-const outOfRange = (i: number, length: number): RangeError =>
-  new RangeError(`index ${i} out of range (length ${length})`);
-function f32(arr: Float32Array, i: number): number {
-  const v = arr[i];
-  if (v === undefined) throw outOfRange(i, arr.length);
-  return v;
-}
-function u8(arr: Uint8Array, i: number): number {
-  const v = arr[i];
-  if (v === undefined) throw outOfRange(i, arr.length);
-  return v;
-}
-function u16(arr: Uint16Array, i: number): number {
-  const v = arr[i];
-  if (v === undefined) throw outOfRange(i, arr.length);
-  return v;
-}
-function f64(arr: Float64Array, i: number): number {
-  const v = arr[i];
-  if (v === undefined) throw outOfRange(i, arr.length);
-  return v;
-}
-function num(arr: readonly number[], i: number): number {
-  const v = arr[i];
-  if (v === undefined) throw outOfRange(i, arr.length);
-  return v;
+/** The hourly loop's inputs: hub wind and load shape, each with its scale factor. */
+interface HourlyInputs {
+  hub: Float32Array;
+  scale: number;
+  load: Float32Array;
+  loadScale: number;
 }
 
-const zeros = (n: number): Float64Array => new Float64Array(n);
+interface Batteries {
+  pvOnly: Battery;
+  withWind: Battery;
+}
 
-/**
- * Hour-by-hour simulation of PV + battery, with and without the turbines.
- * wx: { n, years, elevation, year, month, hour, w10, w100, temp, gti } (dense arrays, local time)
- */
-export function simulate(wx: SimWeather, p: ModelParams): SimResult {
+/** Per-month, per-bin, per-year and per-slot sums filled by the hourly loop. */
+interface Tallies {
+  m: Record<MonthlySeries, Float64Array>;
+  histHours: Float64Array;
+  histEnergy: Float64Array;
+  byYear: Map<number, number>;
+  /** Sums by month × 24 + hour. */
+  soc: { pvOnly: Float64Array; withWind: Float64Array; count: Float64Array };
+}
+
+/** Whole-period sums from the hourly loop (kWh, except sumV and genHours). */
+interface Totals {
+  wind: number;
+  pv: number;
+  load: number;
+  physicsCap: number;
+  sumV: number;
+  genHours: number;
+  clipped: number;
+  invLostPv: number;
+  invLostBoth: number;
+}
+
+/** Wind at hub height: per-hour shear exponent from the 10 m and 100 m winds. */
+function hubWind(wx: SimWeather, p: ModelParams): HubWind {
   const { n } = wx;
-  const curve = makeCurveFn(p.curvePts);
-  const ratedW = Math.max(...p.curvePts.map((q) => q[1]));
-  const nYears = wx.years;
-
-  // 1. Wind at hub height: per-hour shear exponent from the 10 m and 100 m winds.
   const hub = new Float32Array(n);
   const lnH = Math.log(p.hubHeight / 10);
   let sum10 = 0,
@@ -156,7 +76,7 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
     const a = f32(wx.w10, i);
     const b = f32(wx.w100, i);
     let alpha = 1 / 7;
-    if (a > 1 && b > 0) alpha = Math.min(0.6, Math.max(0, Math.log(b / a) / Math.LN10));
+    if (a > 1 && b > 0) alpha = Math.min(0.6, Math.max(0, Math.log10(b / a)));
     const h = a * Math.exp(alpha * lnH);
     hub[i] = h;
     sum10 += a;
@@ -165,9 +85,19 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
     sumAlpha += alpha;
   }
   const modelHubMean = sumHub / n;
-  const scale = p.siteMeanKmh > 0 ? p.siteMeanKmh / modelHubMean : p.windScale;
+  return {
+    hub,
+    meanW10: sum10 / n,
+    meanW100: sum100 / n,
+    meanAlpha: sumAlpha / n,
+    modelHubMean,
+    scale: p.siteMeanKmh > 0 ? p.siteMeanKmh / modelHubMean : p.windScale,
+  };
+}
 
-  // 2. Load shape, scaled so the yearly total matches the input.
+/** Load shape per hour, and the factor that makes its yearly total match the input. */
+function loadShape(wx: SimWeather, p: ModelParams): { load: Float32Array; loadScale: number } {
+  const { n } = wx;
   const load = new Float32Array(n);
   let loadRaw = 0;
   for (let i = 0; i < n; i++) {
@@ -175,43 +105,44 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
     load[i] = l;
     loadRaw += l;
   }
-  const loadScale = loadRaw > 0 ? (p.loadKwh * nYears) / loadRaw : 0;
+  return { load, loadScale: loadRaw > 0 ? (p.loadKwh * wx.years) / loadRaw : 0 };
+}
 
-  const pvOnly = battery(p.battKwh, p.battMinSoc, p.battRte, p.battKw);
-  const withWind = battery(p.battKwh, p.battMinSoc, p.battRte, p.battKw);
-
-  const BIN = 2,
-    NBINS = 50;
-  const histHours = zeros(NBINS),
-    histEnergy = zeros(NBINS);
-  const m: Record<MonthlySeries, Float64Array> = {
-    wind: zeros(12),
-    pv: zeros(12),
-    load: zeros(12),
-    importPv: zeros(12),
-    importBoth: zeros(12),
+function newTallies(): Tallies {
+  return {
+    m: { wind: zeros(12), pv: zeros(12), load: zeros(12), importPv: zeros(12), importBoth: zeros(12) },
+    histHours: zeros(NBINS),
+    histEnergy: zeros(NBINS),
+    byYear: new Map<number, number>(),
+    soc: { pvOnly: zeros(288), withWind: zeros(288), count: zeros(288) },
   };
-  const byYear = new Map<number, number>();
-  const soc = { pvOnly: zeros(288), withWind: zeros(288), count: zeros(288) };
+}
+
+/** The hot loop: wind and PV output, both batteries, and the tallies, hour by hour. */
+function runHours(wx: SimWeather, p: ModelParams, inp: HourlyInputs, bat: Batteries, t: Tallies): Totals {
+  const { hub, scale, load, loadScale } = inp;
+  const { pvOnly, withWind } = bat;
+  const { m, histHours, histEnergy, byYear, soc } = t;
+  const curve = makeCurveFn(p.curvePts);
   let wind = 0,
     pv = 0,
     loadTot = 0,
     physicsCap = 0,
     sumV = 0,
     genHours = 0,
-    clipped = 0;
+    clipped = 0,
+    invLostPv = 0,
+    invLostBoth = 0;
   const windLoss = 1 - p.windLossPct / 100;
   // A shared inverter caps what wind and solar together can deliver; the rest is lost.
   const inverterKw = p.inverterKw ?? 0;
   const inverter = inverterKw > 0 ? inverterKw : Infinity;
-  let invLostPv = 0,
-    invLostBoth = 0;
   const pvLoss = 1 - p.pvLossPct / 100;
 
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < wx.n; i++) {
     const v = f32(hub, i) * scale;
-    const t = f32(wx.temp, i);
-    const rho = airDensity(wx.elevation, t);
+    const temp = f32(wx.temp, i);
+    const rho = airDensity(wx.elevation, temp);
     let w = curve(v);
     if (p.densityCorrection) w *= rho / STD_RHO;
     const limit = betzLimitW(v, p.captureAreaM2, rho) * p.augmentation;
@@ -222,7 +153,7 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
     const windKw = ((w * p.nTurbines) / 1000) * windLoss;
 
     const g = f32(wx.gti, i);
-    const cellT = t + (g * 25) / 800;
+    const cellT = temp + (g * 25) / 800;
     const pvKw = Math.max(0, ((p.pvKwp * g) / 1000) * pvLoss * (1 + (p.tempCoeffPct / 100) * (cellT - 25)));
     const L = f32(load, i) * loadScale;
 
@@ -262,70 +193,105 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
     }
     soc.count[slot] = f64(soc.count, slot) + 1;
   }
+  return { wind, pv, load: loadTot, physicsCap, sumV, genHours, clipped, invLostPv, invLostBoth };
+}
 
+/** Average of a month × hour sum over its hour count; null where there are no hours. */
+const socDayOf = (arr: Float64Array, count: Float64Array): SocDay =>
+  Array.from({ length: 12 }, (_, mo) =>
+    Array.from({ length: 24 }, (_slot, h) => {
+      const c = f64(count, mo * 24 + h);
+      return c ? f64(arr, mo * 24 + h) / c : null;
+    }),
+  );
+
+/** The tallies as per-year series. */
+function perYearSeries(t: Tallies, nYears: number): Pick<SimResult, "monthly" | "yearly" | "hist" | "socDay"> {
   const perYear = (x: number): number => x / nYears;
-  const monthly: Record<MonthlySeries, number[]> = {
-    wind: Array.from(m.wind, perYear),
-    pv: Array.from(m.pv, perYear),
-    load: Array.from(m.load, perYear),
-    importPv: Array.from(m.importPv, perYear),
-    importBoth: Array.from(m.importBoth, perYear),
+  const { m, soc } = t;
+  return {
+    monthly: {
+      wind: Array.from(m.wind, perYear),
+      pv: Array.from(m.pv, perYear),
+      load: Array.from(m.load, perYear),
+      importPv: Array.from(m.importPv, perYear),
+      importBoth: Array.from(m.importBoth, perYear),
+    },
+    yearly: [...t.byYear.entries()].toSorted((a, b) => a[0] - b[0]).map(([year, kwh]) => ({ year, kwh })),
+    hist: { binKmh: BIN, hours: Array.from(t.histHours, perYear), energy: Array.from(t.histEnergy, perYear) },
+    socDay: { pvOnly: socDayOf(soc.pvOnly, soc.count), withWind: socDayOf(soc.withWind, soc.count) },
   };
-  const hist = { binKmh: BIN, hours: Array.from(histHours, perYear), energy: Array.from(histEnergy, perYear) };
-  const socDay = (arr: Float64Array): SocDay =>
-    Array.from({ length: 12 }, (_, mo) =>
-      Array.from({ length: 24 }, (_slot, h) => {
-        const count = f64(soc.count, mo * 24 + h);
-        return count ? f64(arr, mo * 24 + h) / count : null;
-      }),
-    );
+}
 
-  const scenario = (b: Battery): Scenario => ({
-    importKwh: perYear(b.imported),
-    exportKwh: perYear(b.exported),
-    selfSufficiency: loadTot > 0 ? 1 - b.imported / loadTot : 0,
-  });
-  const A = scenario(pvOnly);
-  const B = scenario(withWind);
-  const windKwh = perYear(wind);
+const scenarioOf = (b: Battery, nYears: number, loadTot: number): Scenario => ({
+  importKwh: b.imported / nYears,
+  exportKwh: b.exported / nYears,
+  selfSufficiency: loadTot > 0 ? 1 - b.imported / loadTot : 0,
+});
 
+/** Yearly savings from the turbines against PV only, and what the turbines cost. */
+function economics(p: ModelParams, A: Scenario, B: Scenario, windKwh: number): SimResult["econ"] {
   const savings = (A.importKwh - B.importKwh) * p.price + (B.exportKwh - A.exportKwh) * p.exportCredit;
   const capex = p.turbineCost * p.nTurbines;
   const om = p.omPerTurbine * p.nTurbines;
   const netSavings = savings - om;
+  return {
+    savings,
+    om,
+    capex,
+    netSavings,
+    payback: netSavings > 0 ? capex / netSavings : Infinity,
+    costPerKwh20: windKwh > 0 ? (capex + om * 20) / (windKwh * 20) : Infinity,
+  };
+}
 
+/**
+ * Hour-by-hour simulation of PV + battery, with and without the turbines.
+ * wx: { n, years, elevation, year, month, hour, w10, w100, temp, gti } (dense arrays, local time)
+ */
+export function simulate(wx: SimWeather, p: ModelParams): SimResult {
+  const { n, years: nYears } = wx;
+  const ratedW = Math.max(...p.curvePts.map((q) => q[1]));
+  const hw = hubWind(wx, p);
+  const { load, loadScale } = loadShape(wx, p);
+  const bat: Batteries = {
+    pvOnly: battery(p.battKwh, p.battMinSoc, p.battRte, p.battKw),
+    withWind: battery(p.battKwh, p.battMinSoc, p.battRte, p.battKw),
+  };
+  const tallies = newTallies();
+  const tot = runHours(wx, p, { hub: hw.hub, scale: hw.scale, load, loadScale }, bat, tallies);
+
+  const perYear = (x: number): number => x / nYears;
+  const A = scenarioOf(bat.pvOnly, nYears, tot.load);
+  const B = scenarioOf(bat.withWind, nYears, tot.load);
+  const windKwh = perYear(tot.wind);
+  const ratedKw = (ratedW * p.nTurbines) / 1000;
+  const series = perYearSeries(tallies, nYears);
   return {
     hours: n,
     years: nYears,
-    meanW10: sum10 / n,
-    meanW100: sum100 / n,
-    meanAlpha: sumAlpha / n,
-    modelHubMean,
-    scale,
-    meanHub: sumV / n,
-    ratedKw: (ratedW * p.nTurbines) / 1000,
+    meanW10: hw.meanW10,
+    meanW100: hw.meanW100,
+    meanAlpha: hw.meanAlpha,
+    modelHubMean: hw.modelHubMean,
+    scale: hw.scale,
+    meanHub: tot.sumV / n,
+    ratedKw,
     windKwh,
     windKwhPerTurbine: windKwh / p.nTurbines,
-    capacityFactor: ratedW > 0 ? wind / (((ratedW * p.nTurbines) / 1000) * n) : 0,
-    generatingShare: genHours / n,
-    physicsCapKwh: perYear(physicsCap),
-    clippedKwh: perYear(clipped),
-    inverterLostKwh: { pvOnly: perYear(invLostPv), withWind: perYear(invLostBoth) },
-    pvKwh: perYear(pv),
-    loadKwh: perYear(loadTot),
+    capacityFactor: ratedW > 0 ? tot.wind / (ratedKw * n) : 0,
+    generatingShare: tot.genHours / n,
+    physicsCapKwh: perYear(tot.physicsCap),
+    clippedKwh: perYear(tot.clipped),
+    inverterLostKwh: { pvOnly: perYear(tot.invLostPv), withWind: perYear(tot.invLostBoth) },
+    pvKwh: perYear(tot.pv),
+    loadKwh: perYear(tot.load),
     pvOnly: A,
     withWind: B,
-    monthly,
-    yearly: [...byYear.entries()].toSorted((a, b) => a[0] - b[0]).map(([year, kwh]) => ({ year, kwh })),
-    hist,
-    socDay: { pvOnly: socDay(soc.pvOnly), withWind: socDay(soc.withWind) },
-    econ: {
-      savings,
-      om,
-      capex,
-      netSavings,
-      payback: netSavings > 0 ? capex / netSavings : Infinity,
-      costPerKwh20: windKwh > 0 ? (capex + om * 20) / (windKwh * 20) : Infinity,
-    },
+    monthly: series.monthly,
+    yearly: series.yearly,
+    hist: series.hist,
+    socDay: series.socDay,
+    econ: economics(p, A, B, windKwh),
   };
 }

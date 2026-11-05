@@ -6,13 +6,14 @@
 import { dbGet, dbPut, memory, memoryGet } from "./cache.ts";
 import { at } from "../util/checked.ts";
 import { isArrayOf, isNumber, isRecord, isString } from "../util/guards.ts";
-import { sleep } from "../util/sleep.ts";
 import { rad, distanceKm, direction, type CompassPoint } from "./geo.ts";
+import { errorMessage, fetchOnce, succeeded, tryAgain, withRetries } from "./retry.ts";
 
 const API = "https://api.weather.gc.ca/collections";
-const LIST_TTL_MS = 30 * 86400e3; // station lists change rarely
+const LIST_TTL_MS = 30 * 86_400e3; // station lists change rarely
 const CONCURRENCY = 3; // a shared public service: a few requests at a time is plenty
 const MAX_RETRIES = 3;
+const BACKOFF_MS = 5000;
 export const SEARCH_RADIUS_KM = 100;
 
 /** A station as listed (and cached): no site-dependent fields. */
@@ -105,7 +106,7 @@ function stationFromFeature(f: unknown): StationRecord | null {
     rawName: String(name === null || name === "" || name === 0 ? id : name),
     lat,
     lon,
-    elevation: elevation === null ? NaN : Number(elevation),
+    elevation: elevation === null ? Number.NaN : Number(elevation),
     first: Number(firstDate.slice(0, 4)),
     last: Number(String(scalar(p["HLY_LAST_DATE"])).slice(0, 4)),
   };
@@ -131,11 +132,11 @@ const KEEP_UPPER = new Set(["AAFC", "CDA", "AUT", "AWOS", "RCS", "CS", "MCS", "E
 /** "PINCHER CREEK A" -> "Pincher Creek A" (station codes and suffixes stay as they are). */
 export const stationLabel = (name: string): string =>
   name
-    .split(/\s+/)
+    .split(/\s+/u)
     .map((w) => {
-      const bare = w.replace(/[^A-Z]/g, "");
-      if (bare.length <= 1 || KEEP_UPPER.has(bare) || !/[AEIOUY]/.test(bare)) return w;
-      const i = w.search(/[A-Z]/); // keep leading punctuation, e.g. "(AUT)"
+      const bare = w.replaceAll(/[^A-Z]/gu, "");
+      if (bare.length <= 1 || KEEP_UPPER.has(bare) || !/[AEIOUY]/u.test(bare)) return w;
+      const i = w.search(/[A-Z]/u); // keep leading punctuation, e.g. "(AUT)"
       return w.slice(0, i + 1) + w.slice(i + 1).toLowerCase();
     })
     .join(" ");
@@ -252,7 +253,7 @@ async function fetchStationYear(id: string, year: number, signal?: AbortSignal):
 
 /** Parses the API's CSV (x, y, UTC_DATE, WIND_SPEED); rows without a wind reading are skipped. */
 export function parseStationCsv(text: string): StationHours {
-  const lines = text.split(/\r?\n/).filter(Boolean);
+  const lines = text.split(/\r?\n/u).filter(Boolean);
   const head = (lines[0] ?? "").split(",").map((s) => s.trim());
   const iT = head.indexOf("UTC_DATE"),
     iW = head.indexOf("WIND_SPEED");
@@ -273,31 +274,26 @@ export function parseStationCsv(text: string): StationHours {
   return { hours: Int32Array.from(hours), wind: Uint8Array.from(wind) };
 }
 
+/** A reply's body, retrying network hiccups, rate limits and server errors; what names the data in messages. */
 async function getText(url: string, signal: AbortSignal | undefined, what: string): Promise<string> {
-  for (let attempt = 0; ; attempt++) {
-    const retry = attempt < MAX_RETRIES;
+  return withRetries({ maxRetries: MAX_RETRIES, backoffMs: BACKOFF_MS, signal }, async (retryAllowed) => {
     let res: Response | undefined;
     try {
-      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-      res = await fetch(url, signal ? { signal } : {});
-      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-      if (res.ok) return await res.text();
+      res = await fetchOnce(url, signal);
+      if (res.ok) return succeeded(await res.text());
     } catch (e) {
       if (signal?.aborted) throw e;
-      if (!retry)
-        throw new Error(
-          `Couldn't reach Environment Canada's climate service for ${what}: ${e instanceof Error ? e.message : String(e)}`,
-          { cause: e },
-        );
+      if (!retryAllowed)
+        throw new Error(`Couldn't reach Environment Canada's climate service for ${what}: ${errorMessage(e)}`, {
+          cause: e,
+        });
     }
     if (res && !(res.status === 429 || res.status >= 500))
       throw new Error(`Environment Canada's climate service refused ${what} (${res.status}).`);
-    if (!retry)
+    if (!retryAllowed)
       throw new Error(`Environment Canada's climate service is busy (${res?.status}). Press Analyse again to resume.`);
-    const after = Number(res?.headers.get("retry-after"));
-    // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
-    await sleep(after > 0 ? after * 1000 : 5000 * (attempt + 1), signal);
-  }
+    return tryAgain(res);
+  });
 }
 
 export function clearStationMemory(): void {
