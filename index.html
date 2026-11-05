@@ -181,9 +181,14 @@
 
       <section class="block hinge" id="hinge" aria-labelledby="secHinge" hidden>
         <h3 id="secHinge">What the result hinges on</h3>
-        <figure class="card">
+        <figure class="card" id="hingeCard">
           <figcaption id="hingeText" class="hinge-text"></figcaption>
           <div class="chart"><canvas id="chHinge" role="img" aria-label="Simple payback if the wind at the turbine is weaker or stronger than the data says"></canvas></div>
+        </figure>
+        <figure class="card" id="setupsCard" hidden>
+          <figcaption id="setupsText" class="hinge-text"></figcaption>
+          <div class="chart"><canvas id="chSetups" role="img" aria-label="Simple payback by hub height for each number of turbines"></canvas></div>
+          <p class="hint screen-only">Click a point to try that setup.</p>
         </figure>
       </section>
 

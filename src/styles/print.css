@@ -62,6 +62,9 @@
     border-bottom: 0;
     background: none;
   }
+  .screen-only {
+    display: none !important;
+  }
   .tag,
   .notes li {
     -webkit-print-color-adjust: exact;

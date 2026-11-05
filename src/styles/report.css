@@ -352,7 +352,10 @@ html.scrubbing * {
 .hinge .card {
   transition: opacity 150ms ease-out;
 }
+.hinge .card + .card {
+  margin-top: var(--s3);
+}
 /* Being worked out again for new inputs: the old answer stays, faded. */
-.hinge.pending .card {
+.hinge .card.pending {
   opacity: 0.5;
 }

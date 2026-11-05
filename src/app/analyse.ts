@@ -184,7 +184,7 @@ async function fetchStationObs(
 /** Simulates with these parameters (and the capped or uncapped variant the power-curve check calls for), then renders. */
 function simulateAndRender({ wx, req, source }: LoadedWeather, v: FormInput, params: ModelParams): void {
   const result = simulate(wx, params);
-  const a = { wx, req, source, params, result, limit: physicsLimit(wx, params), sensitivity: null };
+  const a = { wx, req, source, params, result, limit: physicsLimit(wx, params), sensitivity: null, setups: null };
   state.analysis = a;
   status("");
   render(v);
