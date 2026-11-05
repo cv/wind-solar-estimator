@@ -111,7 +111,8 @@ export function checkHomogeneity(
       out.step = { year: x[k], from: x[0], to: x[n - 1], before: mb, after: ma, change: ma / mb - 1, t };
   }
 
-  const clear = (f: Trend | Step | null): boolean => f && Math.abs(f.change) >= minChange && f.t >= minT;
+  const clear = <F extends Trend | Step>(f: F | null): f is F =>
+    f !== null && Math.abs(f.change) >= minChange && f.t >= minT;
   if (clear(out.step) && (!clear(out.trend) || out.step.t >= out.trend.t)) out.issue = "step";
   else if (clear(out.trend)) out.issue = "trend";
   return out;

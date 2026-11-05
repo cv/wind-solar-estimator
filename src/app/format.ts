@@ -1,5 +1,5 @@
 // Text formatting: HTML escaping, numbers, percentages, money and year spans.
-import { state } from "./state.ts";
+import { analysis } from "./state.ts";
 
 const ENTITIES: Readonly<Record<string, string>> = {
   "&": "&amp;",
@@ -13,7 +13,7 @@ export const fmt = (x: number, d: number = 0): string =>
   Number.isFinite(x) ? x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : "—";
 export const pct = (x: number, d: number = 0): string => `${fmt(x * 100, d)}%`;
 export const money = (x: number, d: number = 0): string =>
-  Number.isFinite(x) ? `${x < 0 ? "−" : ""}${state.params.currency}${fmt(Math.abs(x), d)}` : "—";
+  Number.isFinite(x) ? `${x < 0 ? "−" : ""}${analysis().params.currency}${fmt(Math.abs(x), d)}` : "—";
 
 export const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 

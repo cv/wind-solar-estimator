@@ -99,16 +99,15 @@ export async function analyse({ fetchIfNeeded = true }: { fetchIfNeeded?: boolea
               onProgress: showProgress("station"),
             }).catch((e: unknown): StationObs => {
               if (signal.aborted) throw e;
-              return { error: (e as Error).message || String(e) };
+              return { error: (e instanceof Error && e.message) || String(e) };
             })
           : null,
       ]);
       if (token !== runCtl.token) return;
       Object.assign(state, { ...combineWind(wx, obs, req.station), wxKey: requestKey(req), req });
     } catch (e: unknown) {
-      const err = e as Error | null;
-      if (token !== runCtl.token || err?.name === "AbortError") return;
-      status(esc(err.message || String(e)), "error");
+      if (token !== runCtl.token || (e instanceof Error && e.name === "AbortError")) return;
+      status(esc((e instanceof Error && e.message) || String(e)), "error");
       return;
     } finally {
       if (token === runCtl.token) {
@@ -119,14 +118,16 @@ export async function analyse({ fetchIfNeeded = true }: { fetchIfNeeded?: boolea
     }
   }
 
+  // Past the block above, wx was loaded for this request (wxKey matches), so this never returns.
+  const { wx } = state;
+  if (!wx) return;
   state.params = params;
-  state.result = simulate(state.wx, params);
+  state.result = simulate(wx, params);
   const check = checkCurve(params.curvePts, params.captureAreaM2, params.augmentation);
-  state.capped =
-    check.worstRatio > 1 && !params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: true }) : null;
+  state.capped = check.worstRatio > 1 && !params.clampPhysics ? simulate(wx, { ...params, clampPhysics: true }) : null;
   // With the cap on, the uncapped run says what the cap took away (after losses, so it matches the figures).
   state.uncapped =
-    check.worstRatio > 1 && params.clampPhysics ? simulate(state.wx, { ...params, clampPhysics: false }) : null;
+    check.worstRatio > 1 && params.clampPhysics ? simulate(wx, { ...params, clampPhysics: false }) : null;
   status("");
   render(v, check);
   if (fetchIfNeeded && matchMedia("(max-width: 960px)").matches) {
@@ -146,7 +147,8 @@ export function combineWind(
   obs: StationObs | null,
   station: ChosenStation | null | undefined,
 ): CombinedWind {
-  if (!station) return { wx, source: null };
+  // obs is null only when there was no station to read.
+  if (!station || !obs) return { wx, source: null };
   if ("error" in obs) return { wx, source: { station, error: obs.error } };
   const blended = blendStation(wx, obs);
   if (!blended || (!station.explicit && blended.stats.coverage < MIN_AUTO_COVERAGE)) {

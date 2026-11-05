@@ -81,7 +81,11 @@ export function blendStation<W extends BlendWeather = Weather>(wx: W, obs: Stati
     cy = 0;
   const years = new Map<number, [number, number, number, number]>(); // year -> [hours, shared hours, station sum, model sum]
   for (let i = 0; i < n; i++) {
-    const yr = years.get(wx.year[i]) ?? years.set(wx.year[i], [0, 0, 0, 0]).get(wx.year[i]);
+    let yr = years.get(wx.year[i]);
+    if (!yr) {
+      yr = [0, 0, 0, 0];
+      years.set(wx.year[i], yr);
+    }
     yr[0]++;
     const y = st[i];
     if (Number.isNaN(y)) continue;

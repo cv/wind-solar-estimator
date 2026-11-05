@@ -165,7 +165,8 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
     clipped = 0;
   const windLoss = 1 - p.windLossPct / 100;
   // A shared inverter caps what wind and solar together can deliver; the rest is lost.
-  const inverter = p.inverterKw > 0 ? p.inverterKw : Infinity;
+  const inverterKw = p.inverterKw ?? 0;
+  const inverter = inverterKw > 0 ? inverterKw : Infinity;
   let invLostPv = 0,
     invLostBoth = 0;
   const pvLoss = 1 - p.pvLossPct / 100;

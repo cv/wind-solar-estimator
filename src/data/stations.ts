@@ -133,17 +133,21 @@ export async function findStations(
     const json = JSON.parse(
       await getText(`${API}/climate-stations/items?${q}`, signal, "the station list"),
     ) as ClimateStationsResponse;
-    list = (json.features || [])
-      .filter((f) => f.geometry?.coordinates && f.properties.HLY_FIRST_DATE)
-      .map((f): StationRecord => ({
-        id: String(f.properties.CLIMATE_IDENTIFIER),
-        rawName: String(f.properties.STATION_NAME || f.properties.CLIMATE_IDENTIFIER), // labelled on use, so label fixes apply to cached lists
-        lat: f.geometry.coordinates[1],
-        lon: f.geometry.coordinates[0],
-        elevation: Number(f.properties.ELEVATION),
-        first: Number(String(f.properties.HLY_FIRST_DATE).slice(0, 4)),
-        last: Number(String(f.properties.HLY_LAST_DATE).slice(0, 4)),
-      }));
+    list = (json.features || []).flatMap((f): StationRecord[] => {
+      const coords = f.geometry?.coordinates;
+      if (!coords || !f.properties.HLY_FIRST_DATE) return [];
+      return [
+        {
+          id: String(f.properties.CLIMATE_IDENTIFIER),
+          rawName: String(f.properties.STATION_NAME || f.properties.CLIMATE_IDENTIFIER), // labelled on use, so label fixes apply to cached lists
+          lat: coords[1],
+          lon: coords[0],
+          elevation: Number(f.properties.ELEVATION),
+          first: Number(String(f.properties.HLY_FIRST_DATE).slice(0, 4)),
+          last: Number(String(f.properties.HLY_LAST_DATE).slice(0, 4)),
+        },
+      ];
+    });
     dbPut(key, { fetchedAt: Date.now(), list } satisfies CachedStationList);
   }
   memory.set(key, list);
@@ -245,7 +249,10 @@ async function getText(url: string, signal: AbortSignal | undefined, what: strin
       if (res.ok) return await res.text();
     } catch (e) {
       if (signal?.aborted) throw e;
-      if (!retry) throw new Error(`Couldn't reach Environment Canada's climate service for ${what}: ${e.message}`);
+      if (!retry)
+        throw new Error(
+          `Couldn't reach Environment Canada's climate service for ${what}: ${e instanceof Error ? e.message : String(e)}`,
+        );
     }
     if (res && !(res.status === 429 || res.status >= 500))
       throw new Error(`Environment Canada's climate service refused ${what} (${res.status}).`);

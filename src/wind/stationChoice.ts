@@ -17,7 +17,7 @@ export const KM_PER_METRE_RISE = 0.1;
 export const KM_PER_MISSING_YEAR = 2;
 export const stationScore = (s: Candidate, missingYears: number = 0): number =>
   s.distanceKm +
-  (Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0) +
+  (s.rise !== undefined && Number.isFinite(s.rise) ? Math.abs(s.rise) * KM_PER_METRE_RISE : 0) +
   Math.max(0, missingYears) * KM_PER_MISSING_YEAR;
 
 /** The station "auto" picks: lowest score among those that pass ok(s); missing(s) = years of the period it lacks. */

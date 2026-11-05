@@ -61,7 +61,9 @@ test("blendStation keeps readings, fills gaps on the station's scale and keeps t
     (v) => 1.5 * v,
     (i) => i % 5 === 0,
   ); // 20% of hours missing
-  const { wx: out, stats } = blendStation(wx, obs);
+  const blend = blendStation(wx, obs);
+  assert.ok(blend);
+  const { wx: out, stats } = blend;
   close(stats.coverage, 0.8, 0.001);
   assert.equal(stats.filled, wx.n / 5);
   for (const i of [1, 2, 3]) assert.equal(out.w10[i], Math.round(1.5 * wx.w10[i]), "measured hours are kept");
@@ -89,10 +91,12 @@ test("blendStation declines a station with too few readings", () => {
 
 test("blendStation reports yearly means and the homogeneity check", () => {
   const wx = modelYear();
-  const { stats } = blendStation(
+  const blend = blendStation(
     wx,
     stationFrom(wx, (v) => v * 1.2),
   );
+  assert.ok(blend);
+  const { stats } = blend;
   assert.equal(stats.yearly.length, 1);
   assert.equal(stats.yearly[0].year, 2020);
   close(stats.yearly[0].station / stats.yearly[0].model, 1.2, 0.02);

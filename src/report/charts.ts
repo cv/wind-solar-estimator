@@ -11,7 +11,7 @@ import type {
 import { MONTHS, COLORS } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { fmt } from "../app/format.ts";
-import { state } from "../app/state.ts";
+import { analysis, state } from "../app/state.ts";
 import { betzLimitW } from "../model/physics.ts";
 import { makeCurveFn } from "../model/powerCurve.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
@@ -26,6 +26,8 @@ export const legendLabels: Partial<LegendOptions<ChartType>["labels"]> = {
   pointStyleWidth: 16,
   generateLabels(chart: ChartJs): LegendItem[] {
     return Chart.defaults.plugins.legend.labels.generateLabels(chart).map((item): LegendItem => {
+      // Legend items for these charts are per dataset, so datasetIndex is always set; leave any other as is.
+      if (item.datasetIndex === undefined) return item;
       const ds = chart.data.datasets[item.datasetIndex];
       // A live chart's config always has its type (mixed charts get the default one); these charts use plain colours.
       return (ds.type || (chart.config as ChartConfiguration).type) === "line"
@@ -126,7 +128,7 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
     options: { scales: { y: axis("kWh bought per month", { beginAtZero: true }) } },
   });
 
-  renderSoc();
+  drawSoc(r, p);
 
   const mean = r.windKwh;
   drawChart("chYearly", {
@@ -181,7 +183,7 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
       scales: {
         x: axis("Wind speed (km/h)", { ticks: { maxTicksLimit: 13 } }),
         y: axis("Watts (log scale)", {
-          type: "logarithmic",
+          type: "logarithmic" as const,
           min: 0.1,
           ticks: {
             callback: (v: string | number): string =>
@@ -197,9 +199,14 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
   });
 }
 
+/** Redraws the battery-charge chart for the month picked in #socMonth (its change handler). */
 export function renderSoc(): void {
-  const r = state.result;
-  if (!r) return;
+  if (!state.result) return; // nothing analysed yet
+  const { result, params } = analysis();
+  drawSoc(result, params);
+}
+
+function drawSoc(r: SimResult, p: ModelParams): void {
   const mo = Number($<HTMLSelectElement>("#socMonth").value) || 0;
   const hours = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
   const asPct = (a: readonly (number | null)[]): (number | null)[] =>
@@ -228,7 +235,7 @@ export function renderSoc(): void {
         },
         {
           label: "Minimum charge",
-          data: hours.map(() => state.params.battMinSoc * 100),
+          data: hours.map(() => p.battMinSoc * 100),
           borderColor: COLORS.limit,
           borderWidth: 1,
           borderDash: [2, 3],

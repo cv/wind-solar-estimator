@@ -91,6 +91,28 @@ export const state: AppState = {
   cell: null,
 };
 
+/** Everything one completed analysis produced: what the report renders. */
+export interface Analysis {
+  wx: Weather;
+  req: DataRequest;
+  params: ModelParams;
+  result: SimResult;
+  capped: SimResult | null;
+  uncapped: SimResult | null;
+  /** null when the run used the weather model alone. */
+  source: WindSource | null;
+}
+
+/**
+ * The latest completed analysis. Rendering only happens after one, so a missing piece is a
+ * programming error: this throws rather than letting every renderer handle null.
+ */
+export function analysis(): Analysis {
+  const { wx, req, params, result } = state;
+  if (!wx || !req || !params || !result) throw new Error("analysis(): nothing has been analysed yet");
+  return { wx, req, params, result, capped: state.capped, uncapped: state.uncapped ?? null, source: state.source };
+}
+
 /** Values several modules reassign (ES module bindings can't be assigned from outside). */
 export interface RunControl {
   /** Increments with each download, so a superseded one can tell it's stale. */

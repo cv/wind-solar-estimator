@@ -98,6 +98,9 @@ interface YearPart {
 
 type Column = "t" | "year" | "month" | "hour" | "w10" | "w100" | "temp" | "gti";
 
+/** A reply that has the hourly data. */
+type ArchiveData = ArchiveResponse & { hourly: NonNullable<ArchiveResponse["hourly"]> };
+
 const memory = new Map<string, Weather>();
 const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
   new Promise<void>((resolve, reject) => {
@@ -132,7 +135,8 @@ export async function fetchWeather({
   lat = Math.round(lat * 1e4) / 1e4;
   lon = Math.round(lon * 1e4) / 1e4;
   const key = [lat, lon, startYear, endYear, tilt, azimuth].join("|");
-  if (memory.has(key)) return memory.get(key);
+  const cached = memory.get(key);
+  if (cached) return cached;
 
   // Each year is cached on its own, so a failed or interrupted download resumes where it stopped.
   const years: number[] = [];
@@ -207,7 +211,7 @@ export async function fetchWeather({
 }
 
 /** Typed arrays keep the IndexedDB cache small; missing values become NaN. */
-function compactYear(json: ArchiveResponse): YearPart {
+function compactYear(json: ArchiveData): YearPart {
   const h = json.hourly;
   const col = (a: (number | null)[]) => Float32Array.from(a, (x) => (x == null ? NaN : x));
   return {
@@ -234,7 +238,7 @@ interface YearRequest {
   signal?: AbortSignal;
 }
 
-async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: YearRequest): Promise<ArchiveResponse> {
+async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: YearRequest): Promise<ArchiveData> {
   const q = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
@@ -264,7 +268,7 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: Year
         await wait();
         continue;
       } // network hiccup
-      throw new Error(`Couldn't reach the weather service for ${year}: ${e.message}`);
+      throw new Error(`Couldn't reach the weather service for ${year}: ${e instanceof Error ? e.message : String(e)}`);
     }
     let json: ArchiveResponse | null = null;
     try {
@@ -273,7 +277,7 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: Year
       /* not JSON, e.g. a proxy error page */
     }
 
-    if (res.ok && json?.hourly?.time) return json;
+    if (res.ok && json?.hourly?.time) return { ...json, hourly: json.hourly };
     const reason = json?.reason || text.slice(0, 120).trim() || res.statusText;
     if (res.status === 429 && /daily|hourly/i.test(reason)) {
       throw new Error(`Open-Meteo's free usage limit was reached (${reason}). Try again later, or use an API key.`);

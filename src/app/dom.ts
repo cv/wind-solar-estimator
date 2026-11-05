@@ -46,7 +46,7 @@ export function flash(btn: HTMLElement, text: string, ms: number = 2000): void {
   b.dataset.label ??= b.textContent;
   b.textContent = text;
   b._flash = setTimeout(() => {
-    b.textContent = b.dataset.label;
+    b.textContent = b.dataset.label ?? null;
   }, ms);
 }
 

@@ -3,9 +3,9 @@ import { ELEVATION_NOTE_M } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, span } from "../app/format.ts";
 import { state } from "../app/state.ts";
+import type { Analysis } from "../app/state.ts";
 import type { Station } from "../data/stations.ts";
 import type { CurveCheck } from "../model/powerCurve.ts";
-import type { ModelParams, SimResult } from "../model/simulate.ts";
 import type { BlendStats } from "../wind/blend.ts";
 import type { Homogeneity } from "../wind/homogeneity.ts";
 import { renderClampStatus } from "./verdict.ts";
@@ -16,16 +16,20 @@ import { pickStation } from "../wind/stationChoice.ts";
 /** One report note: its style (info, caution or problem) and its HTML. */
 export type Note = [cls: "info" | "warn" | "bad", html: string];
 
-export function renderNotes(r: SimResult, p: ModelParams, check: CurveCheck): void {
-  renderClampStatus(r, p, check);
+export function renderNotes(a: Analysis, check: CurveCheck): void {
+  const { result: r, params: p, wx, source: src } = a;
+  renderClampStatus(a, check);
   const items: Note[] = [];
-  if (check.worstRatio > 1) {
+  // atKmh is only null when no point has power, so never when the ratio exceeds 1.
+  if (check.worstRatio > 1 && check.atKmh !== null) {
     const area = `${fmt(p.captureAreaM2, p.captureAreaM2 < 10 ? 2 : 1)} m² of capture area (${p.captureDesc})`;
     const aug = p.augmentation > 1 ? `, even with ${fmt(p.augmentation, 1)}× duct augmentation` : "";
     if (p.clampPhysics) {
+      // analyse.ts makes the uncapped run whenever the curve exceeds the limit with the cap on.
+      if (!a.uncapped) throw new Error("renderNotes: the curve exceeds the limit but the uncapped run is missing");
       items.push([
         "warn",
-        `<strong>Power curve:</strong> output is capped at the physical limit for ${area}, which takes wind energy from ${fmt(state.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`,
+        `<strong>Power curve:</strong> output is capped at the physical limit for ${area}, which takes wind energy from ${fmt(a.uncapped.windKwh)} to ${fmt(r.windKwh)} kWh a year.`,
       ]);
     } else {
       items.push([
@@ -36,7 +40,6 @@ export function renderNotes(r: SimResult, p: ModelParams, check: CurveCheck): vo
       ]);
     }
   }
-  const src = state.source;
   if (src?.stats) {
     const st = src.stats;
     items.push([
@@ -45,13 +48,13 @@ export function renderNotes(r: SimResult, p: ModelParams, check: CurveCheck): vo
         `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
         `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`,
     ]);
-    items.push(...stationChecks(src.station, st, state.wx.elevation));
+    items.push(...stationChecks(src.station, st, wx.elevation));
   } else if (src?.error) {
     items.push([
       "warn",
       `<strong>Station data:</strong> couldn't load readings from ${esc(src.station.name)} (${esc(src.error)}), so this report uses the weather model. Press <em>Analyse this site</em> to try again.`,
     ]);
-  } else if (src) {
+  } else if (src?.unused !== undefined) {
     items.push([
       "warn",
       `<strong>Station data:</strong> ${esc(src.station.name)} has wind readings for only ${pct(src.unused)} of these hours, so this report uses the weather model${src.station.explicit ? "" : ". Pick the station under <em>Wind data</em> to use it anyway"}.`,
@@ -75,8 +78,8 @@ export function renderNotes(r: SimResult, p: ModelParams, check: CurveCheck): vo
       "warn",
       `<strong>Hub height:</strong> below 10 m the wind is extrapolated downward, and wind near roofs and the ground is turbulent and hard to predict.`,
     ]);
-  if (state.wx.missing > 0)
-    items.push(["warn", `<strong>Missing data:</strong> ${fmt(state.wx.missing)} hours had gaps and were skipped.`]);
+  if (wx.missing > 0)
+    items.push(["warn", `<strong>Missing data:</strong> ${fmt(wx.missing)} hours had gaps and were skipped.`]);
   $("#notes").innerHTML = items.map(([cls, html]) => `<li class="${cls}">${html}</li>`).join("");
 }
 
@@ -113,7 +116,8 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
     ]);
   }
   const h = st.homogeneity;
-  if (h?.issue === "step") {
+  // issue names a test that found something, so its result is set.
+  if (h?.issue === "step" && h.step) {
     const s = h.step;
     const recent = s.to - s.year + 1;
     const fix =
@@ -126,7 +130,7 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
         `relative to the weather model than in ${span(s.from, s.year - 1)}. A jump like this usually means the instrument was moved, raised or replaced, not that the climate changed, ` +
         `so the years before and after don't measure the same thing.${fix}`,
     ]);
-  } else if (h?.issue === "trend") {
+  } else if (h?.issue === "trend" && h.trend) {
     const t = h.trend;
     out.push([
       "warn",
@@ -142,8 +146,9 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
 export function homogeneityText(h: Homogeneity | null | undefined): string {
   if (!h || h.years < 5) return "";
   const signed = (x: number): string => `${x > 0 ? "+" : "−"}${pct(Math.abs(x))}`;
-  if (h.issue === "step") return `; record steps ${signed(h.step.change)} relative to the model in ${h.step.year}`;
-  if (h.issue === "trend")
+  if (h.issue === "step" && h.step)
+    return `; record steps ${signed(h.step.change)} relative to the model in ${h.step.year}`;
+  if (h.issue === "trend" && h.trend)
     return `; record drifts ${signed(h.trend.change)} relative to the model over ${span(h.trend.from, h.trend.to)}`;
   return `; no step or drift relative to the model across ${h.years} years`;
 }

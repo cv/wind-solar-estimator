@@ -20,7 +20,8 @@ export function loadStations(): Promise<RankedStation[] | null> {
     lon = Number(form.elements.lon.value);
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90) return Promise.resolve([]);
   const key = `${lat.toFixed(3)}|${lon.toFixed(3)}`;
-  if (state.stations.key === key) return state.stations.promise;
+  const current = state.stations;
+  if (current.key === key && current.promise) return current.promise;
   // Each station's height above (+) or below (−) the site; "auto" weighs it against distance.
   const promise: Promise<RankedStation[] | null> = Promise.all([findStations(lat, lon), siteElevation(lat, lon)])
     .then(([list, elevation]) =>
@@ -112,7 +113,8 @@ export function renderStationPicker(): void {
   else if (list === null) text = "Couldn't load the list of weather stations, so the weather model is used.";
   else if (!list.length)
     text = `No Environment Canada station with hourly records within ${SEARCH_RADIUS_KM} km, so the weather model is used.`;
-  else if (active) {
+  // active implies req (it is resolved from it above).
+  else if (active && req) {
     text = `Hourly wind measured at ${active.name}, ${fromSite(active)}${riseText(active, " and ")}. Hours the station missed are filled from the weather model.`;
     const nearest = active.explicit ? null : list.find(autoEligible(req));
     if (nearest && nearest.id !== active.id) {

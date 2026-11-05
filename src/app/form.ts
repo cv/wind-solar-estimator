@@ -17,6 +17,7 @@ const FORM_KEYS = Object.keys(DEFAULTS) as FormKey[];
 
 /** The load preset named key (any string, e.g. from a share link), if there is one. */
 export function loadPreset(key: string | undefined): LoadPreset | undefined {
+  if (key === undefined) return undefined;
   return (LOAD_PRESETS as Readonly<Record<string, LoadPreset | undefined>>)[key];
 }
 
