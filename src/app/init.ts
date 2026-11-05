@@ -13,6 +13,7 @@ import { renderSoc } from "../report/charts.ts";
 import { downloadCsv } from "../report/csv.ts";
 import { initCurveEditor, syncCurveEditor } from "../ui/curveEditor.ts";
 import { initMap, setLocation, placeSearch } from "../ui/map.ts";
+import { initScrub } from "../ui/scrub.ts";
 import { loadStations, renderStationPicker, chooseWindSource } from "../ui/stationPicker.ts";
 
 const resizeCharts = (): void => {
@@ -31,6 +32,7 @@ export function init(): void {
   wirePrint();
   setChartDefaults();
   initCurveEditor();
+  initScrub();
   if ("lat" in fromHash) startAnalyse(); // opened from a shared link
 }
 

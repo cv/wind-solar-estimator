@@ -4,6 +4,7 @@ import type { FormInput } from "./constants.ts";
 import { $, form, formError, status } from "./dom.ts";
 import { setForm, readForm, writeHash, InputError, dataRequest, modelParams, loadPreset } from "./form.ts";
 import { esc } from "./format.ts";
+import type { ChangeOptions } from "./hooks.ts";
 import { state, runCtl } from "./state.ts";
 import type { ChosenStation, DataRequest, LoadedWeather, PhysicsLimit, WindSource } from "./state.ts";
 import { fetchStationHours } from "../data/stations.ts";
@@ -240,7 +241,7 @@ export function combineWind(
   return { wx: blended.wx, source: { kind: "measured", station, stats: blended.stats } };
 }
 
-export function onChange(name: string): void {
+export function onChange(name: string, { live = false }: ChangeOptions = {}): void {
   if (name === "apiKey") {
     localStorage.setItem(API_KEY_STORAGE, form.elements.apiKey.value.trim());
     return;
@@ -257,9 +258,12 @@ export function onChange(name: string): void {
   }
   writeHash(readForm());
   clearTimeout(runCtl.debounce);
-  runCtl.debounce = setTimeout(() => {
-    if (name === "lat" || name === "lon" || name === "years" || name === "endYear")
-      loadStations().then(renderStationPicker).catch(showFailure);
-    startAnalyse({ fetchIfNeeded: false });
-  }, 250);
+  runCtl.debounce = setTimeout(
+    () => {
+      if (name === "lat" || name === "lon" || name === "years" || name === "endYear")
+        loadStations().then(renderStationPicker).catch(showFailure);
+      startAnalyse({ fetchIfNeeded: false });
+    },
+    live ? 0 : 250,
+  ); // typing pauses before a run; a dragged value runs every frame it can
 }

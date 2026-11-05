@@ -57,6 +57,11 @@
   .chart {
     height: 210px;
   }
+  .scrub {
+    color: inherit;
+    border-bottom: 0;
+    background: none;
+  }
   .tag,
   .notes li {
     -webkit-print-color-adjust: exact;

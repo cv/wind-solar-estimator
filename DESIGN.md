@@ -311,6 +311,13 @@ Quiet and exact: small radii, hairlines, colour reserved for meaning.
 - **Error:** Problem Red border on the Problem Wash, marked `aria-invalid`. The message (label size, 600, Problem Ink) appears directly under the field or field row at fault, or under the Analyse button for non-field errors; on submit the field's group opens and the field takes focus.
 - **Disabled:** 50% opacity, not-allowed cursor.
 
+### Draggable numbers
+Assumptions that appear in the report are controls where they stand, so the reader changes the system without leaving the result: the report header's turbines, hub height, solar size, battery and grid price, and the per-turbine installed cost under the payback figure.
+- **Look:** the number in Grid Blue (the action colour) with a dashed underline in the same colour, tabular figures, never wrapping; hover and drag add the Info Wash behind it. The cursor is a horizontal resize arrow, held across the page during a drag.
+- **Behaviour:** drag sideways to step the value (each field has its own step, bounds and pixels per step); the report recomputes on every step, not after a pause, so figures, verdict and charts move with the pointer. The sidebar field follows, and so does the share link.
+- **Keyboard:** each number is an ARIA slider and a tab stop with the focus ring; arrows step it (Shift or Page Up/Down: ten steps), Home and End go to its bounds. Focus stays on the number through the re-render.
+- **Print:** plain text in the surrounding colour, no underline.
+
 ### Power curve editor
 The power curve is edited where it can be seen: a 200px chart at the top of the Wind turbines group, above the curve's text area. It plots the curve in Wind Blue with draggable points (white-ringed, 4px, 6px when active) against the physical (Betz) limit for the capture area, a Problem Red dashed line with the region above it in Problem Wash and labelled "Beyond the physical limit" in Problem Ink. A point above the limit turns Problem Red.
 - **Direct manipulation:** drag a point to change its output (snapped to about 1/400 of the axis); it moves sideways in 0.5 km/h steps only after a few pixels of sideways travel, so an up-or-down drag keeps its speed, and never past its neighbours. Double-click adds a point, or removes the one under the pointer. The axes hold still during a drag and refit when it ends.

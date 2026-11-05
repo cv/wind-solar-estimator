@@ -3,20 +3,33 @@ import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, money } from "../app/format.ts";
 import type { DataRequest, WindSource } from "../app/state.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
+import { scrubbable } from "./scrubbable.ts";
 
 /** A value's unit as a span, or nothing when it has none (""). */
 const unitSpan = (unit: string): string => (unit === "" ? "" : `<span class="unit">${esc(unit)}</span>`);
 
+/** A supporting line: text, or HTML already escaped (for draggable numbers). */
+type Sub = string | { html: string };
+
 /** A supporting line, or nothing when there is none (""). */
-const subLine = (sub: string): string => (sub === "" ? "" : `<dd class="sub">${esc(sub)}</dd>`);
+function subLine(sub: Sub): string {
+  const html = typeof sub === "string" ? esc(sub) : sub.html;
+  return html === "" ? "" : `<dd class="sub">${html}</dd>`;
+}
 
 /** One figure: label, value (with optional unit) and a supporting line. */
-export const figure = (label: string, value: string, unit: string, sub: string, cls = ""): string =>
+export const figure = (label: string, value: string, unit: string, sub: Sub, cls = ""): string =>
   `<div><dt>${esc(label)}</dt><dd class="value ${cls}">${esc(value)}${unitSpan(unit)}</dd>${subLine(sub)}</div>`;
 
 /** One supporting statistic: label, value (with optional unit) and a supporting line. */
 const stat = (label: string, value: string, unit: string, sub: string): string =>
   `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unitSpan(unit)}</dd>${subLine(sub)}</div>`;
+
+/** "on $20,000 installed", the cost per turbine draggable (with the total when there are several). */
+function installed(p: ModelParams, capex: number): Sub {
+  const each = scrubbable("turbineCost", p.turbineCost, money(p.turbineCost));
+  return { html: p.nTurbines === 1 ? `on ${each} installed` : `on ${esc(money(capex))} installed (${each} each)` };
+}
 
 export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest, source: WindSource | null): void {
   const measured = source?.kind === "measured" ? source.stats : null;
@@ -31,8 +44,8 @@ export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest, so
     figure("Grid purchases cut by", fmt(cut), "kWh/yr", cutShare),
     figure("Savings from wind", money(e.savings), "/yr", `${money(e.netSavings)}/yr after maintenance`),
     Number.isFinite(e.payback)
-      ? figure("Simple payback", fmt(e.payback, e.payback < 10 ? 1 : 0), "years", `on ${money(e.capex)} installed`)
-      : figure("Simple payback", "Never", "", `on ${money(e.capex)} installed`),
+      ? figure("Simple payback", fmt(e.payback, e.payback < 10 ? 1 : 0), "years", installed(p, e.capex))
+      : figure("Simple payback", "Never", "", installed(p, e.capex)),
   ].join("");
 
   // Supporting figures only: anything already in the summary or the assumptions isn't repeated here.

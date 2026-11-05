@@ -117,6 +117,27 @@ export const DEFAULTS: Readonly<FormValues> = {
   omPerTurbine: "200",
 };
 
+/** How a number in the report can be dragged to change its field: a notch's size, bounds, pixels per notch, and its name. */
+export interface ScrubSpec {
+  step: number;
+  min: number;
+  max: number;
+  px: number;
+  label: string;
+}
+
+/** The fields the report lets the reader change in place (bounds within what the form accepts). */
+export const SCRUB = {
+  nTurbines: { step: 1, min: 1, max: 50, px: 14, label: "Number of turbines" },
+  hubHeight: { step: 1, min: 3, max: 60, px: 6, label: "Hub height, metres" },
+  pvKwp: { step: 0.5, min: 0, max: 200, px: 6, label: "Solar size, kWp" },
+  battKwh: { step: 1, min: 0, max: 500, px: 3, label: "Battery capacity, kWh" },
+  price: { step: 0.01, min: 0, max: 2, px: 6, label: "Grid price per kWh" },
+  turbineCost: { step: 500, min: 0, max: 500_000, px: 4, label: "Installed cost per turbine" },
+} as const satisfies Record<string, ScrubSpec>;
+export type ScrubField = keyof typeof SCRUB;
+export const isScrubField = (k: string): k is ScrubField => Object.hasOwn(SCRUB, k);
+
 /** A form field name, as opposed to any other string (e.g. a share-link key). */
 export const isFormKey = (k: string): k is FormKey => Object.hasOwn(DEFAULTS, k);
 
