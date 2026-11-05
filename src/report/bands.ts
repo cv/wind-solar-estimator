@@ -27,26 +27,54 @@ export function topYears(paybacks: readonly number[]): number {
   return finite.length === 0 ? 25 : Math.min(50, Math.max(25, Math.ceil(Math.max(...finite) / 5) * 5));
 }
 
-/** Shades the verdict bands across the plot and names them at its right edge. */
-export const verdictBands: Plugin<"line"> = {
-  id: "verdictBands",
-  beforeDatasetsDraw(chart: ChartJs<"line">) {
-    const { ctx, chartArea: a, scales } = chart;
-    const y = scales["y"];
-    if (!y) return;
-    ctx.save();
-    ctx.font = `600 11px ${getComputedStyle(chart.canvas).fontFamily}`;
-    ctx.textAlign = "right";
-    ctx.textBaseline = "top";
-    for (const b of BANDS) {
-      const top = Math.max(a.top, y.getPixelForValue(Math.min(b.to, y.max)));
-      const bottom = Math.min(a.bottom, y.getPixelForValue(b.from));
+/** The parts of a chart the bands draw on (any chart type). */
+type BandChart = Pick<ChartJs, "ctx" | "chartArea" | "scales" | "canvas">;
+
+/** Shades the verdict bands across the plot along the payback axis, each named in its ink. */
+function drawBands(chart: BandChart, along: "x" | "y"): void {
+  const { ctx, chartArea: a, scales } = chart;
+  const s = scales[along];
+  if (!s) return;
+  ctx.save();
+  ctx.font = `600 11px ${getComputedStyle(chart.canvas).fontFamily}`;
+  ctx.textBaseline = "top";
+  for (const b of BANDS) {
+    const from = s.getPixelForValue(b.from),
+      to = s.getPixelForValue(Math.min(b.to, s.max));
+    ctx.fillStyle = b.wash;
+    if (along === "y") {
+      const top = Math.max(a.top, to),
+        bottom = Math.min(a.bottom, from);
       if (bottom <= top) continue;
-      ctx.fillStyle = b.wash;
       ctx.fillRect(a.left, top, a.right - a.left, bottom - top);
       ctx.fillStyle = b.ink;
+      ctx.textAlign = "right";
       ctx.fillText(b.label, a.right - 6, top + 4);
+    } else {
+      const left = Math.max(a.left, from),
+        right = Math.min(a.right, to);
+      if (right <= left) continue;
+      ctx.fillRect(left, a.top, right - left, a.bottom - a.top);
+      ctx.fillStyle = b.ink;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(b.label, left + 4, a.top - 3); // above the bars (the chart leaves room: BANDS_ABOVE_PX)
     }
-    ctx.restore();
-  },
+  }
+  ctx.restore();
+}
+
+/** Verdict bands for payback on the y axis (line charts). */
+export const verdictBands: Plugin<"line"> = {
+  id: "verdictBands",
+  beforeDatasetsDraw: (chart) => drawBands(chart, "y"),
+};
+
+/** Room above a horizontal bar chart for verdictBandsX's labels. */
+export const BANDS_ABOVE_PX = 18;
+
+/** Verdict bands for payback on the x axis (horizontal bars), named above the plot. */
+export const verdictBandsX: Plugin<"bar"> = {
+  id: "verdictBandsX",
+  beforeDatasetsDraw: (chart) => drawBands(chart, "x"),
 };

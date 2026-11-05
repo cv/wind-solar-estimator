@@ -58,8 +58,38 @@ export interface LoadedWeather {
   key: string;
   req: DataRequest;
   wx: Weather;
+  /** The weather model alone, for blending in other stations' wind (app/stationCompare.ts). */
+  model: Weather;
   /** null when the run used the weather model alone. */
   source: WindSource | null;
+}
+
+/** A nearby station's wind blended into the weather model for the loaded site and period, or why it can't be. */
+export interface StationWind {
+  station: RankedStation;
+  wx: Weather | null;
+  /** Why there is no wx ("" when there is). */
+  reason: string;
+}
+
+/** Comparing what each nearby station's wind would say: key = site and period (app/compareState.ts). */
+export interface StationCompare {
+  key: string;
+  status: "loading" | "ready";
+  /** Stations to compare; winds fills in one station at a time. */
+  total: number;
+  winds: StationWind[];
+  abort: AbortController;
+}
+
+/** One wind source's payback for the current inputs: a station's id, or "model" for the weather model alone. */
+export interface WindCase {
+  id: string;
+  label: string;
+  payback: number;
+  inUse: boolean;
+  /** Why there is no payback ("" when there is). */
+  reason: string;
 }
 
 export interface AppState {
@@ -70,6 +100,8 @@ export interface AppState {
   /** The latest completed analysis (null before one): read it through analysis(). */
   analysis: Analysis | null;
   stations: StationListState;
+  /** The latest station comparison (null before one). */
+  compare: StationCompare | null;
   stationLayer: Leaflet.LayerGroup | null;
   /** Chart.js charts by canvas id. */
   charts: Record<string, Chart>;
@@ -84,6 +116,7 @@ export const state: AppState = {
   loaded: null,
   analysis: null,
   stations: { key: null, status: "loading" },
+  compare: null,
   stationLayer: null,
   charts: {},
   map: null,
@@ -114,6 +147,8 @@ export interface Analysis {
   sensitivity: SensitivityPoint[] | null;
   /** Payback for other turbine counts and hub heights; null until worked out, after the sensitivity. */
   setups: SetupPoint[] | null;
+  /** Payback with each compared station's wind and the model's; null unless a comparison is loaded. */
+  windCases: WindCase[] | null;
 }
 
 /**

@@ -13,7 +13,8 @@ the map) and it:
    shared by wind and solar, and the battery, with and without the turbines;
 3. reports wind energy, capacity factor, grid purchases, self-sufficiency, savings and
    simple payback (and how payback would change if the wind at the turbine were up to 30%
-   weaker or stronger than the data, and for one to four turbines at 8 to 30 m), with charts, a monthly table, CSV export and a printable report.
+   weaker or stronger than the data, and for one to four turbines at 8 to 30 m; on request, with each nearby station's measured
+   wind, shown on the map, in the station list and in the report), with charts, a monthly table, CSV export and a printable report.
 
 All assumptions are editable and update the results instantly. In the report itself, the turbines, hub height, solar size, battery,
 grid price and installed cost can be dragged sideways (or stepped with the arrow keys) and

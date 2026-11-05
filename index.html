@@ -40,6 +40,8 @@
         <input type="hidden" name="windSource">
         <label>Wind data <select id="stationSelect" aria-describedby="stationHint"></select></label>
         <p class="hint station-hint" id="stationHint"></p>
+        <button type="button" class="secondary small" id="compareStations" hidden>Compare the stations</button>
+        <p class="hint" id="compareHint" hidden></p>
         <button type="submit" id="run" class="primary">Analyse this site</button>
         <p id="formError" class="form-error" role="alert" hidden></p>
         <p class="hint">The first analysis of a site downloads its weather history, which can take a minute or two. After that it's cached in this browser.</p>
@@ -191,6 +193,11 @@
           <figcaption id="setupsText" class="hinge-text"></figcaption>
           <div class="chart"><canvas id="chSetups" role="img" aria-label="Simple payback by hub height for each number of turbines"></canvas></div>
           <p class="hint screen-only">Click a point to try that setup.</p>
+        </figure>
+        <figure class="card" id="windCard" hidden>
+          <figcaption id="windText" class="hinge-text"></figcaption>
+          <div class="chart" id="windChartBox"><canvas id="chWind" role="img" aria-label="Simple payback with each nearby station's measured wind and with the weather model alone"></canvas></div>
+          <p class="hint screen-only">Click a bar to use that wind data.</p>
         </figure>
       </section>
 

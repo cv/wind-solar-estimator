@@ -1,5 +1,5 @@
 // Start-up: fill the form from the URL, set up the map and wire every event handler.
-import { analyse, onChange, showFailure, startAnalyse } from "./analyse.ts";
+import { analyse, onChange, showFailure, startAnalyse, startCompareStations } from "./analyse.ts";
 import { MONTHS, API_KEY_STORAGE, DEFAULTS, DEFAULTS_V1 } from "./constants.ts";
 import type { FormOverrides } from "./constants.ts";
 import { $, form, flash, isFormField, status } from "./dom.ts";
@@ -23,6 +23,7 @@ const resizeCharts = (): void => {
 export function init(): void {
   hooks.onChange = onChange;
   hooks.analyse = () => startAnalyse();
+  hooks.compareStations = startCompareStations;
   fillSelects();
   const fromHash = restoreForm();
   initSite();
@@ -69,6 +70,7 @@ function initSite(): void {
   initMap({ onPinClick: chooseWindSource });
   const stationSelect = $("#stationSelect", HTMLSelectElement);
   stationSelect.addEventListener("change", () => chooseWindSource(stationSelect.value));
+  $("#compareStations").addEventListener("click", () => hooks.compareStations());
   void loadStations(); // never rejects: a failed search resolves to null
 }
 

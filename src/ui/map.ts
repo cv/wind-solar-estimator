@@ -1,10 +1,11 @@
 // The Leaflet map: site marker, station pins and place search.
 import { COLORS } from "../app/constants.ts";
 import { $, form } from "../app/dom.ts";
-import { esc, numberOrZero } from "../app/format.ts";
+import { esc, fmt, numberOrZero } from "../app/format.ts";
 import { hooks } from "../app/hooks.ts";
 import { state } from "../app/state.ts";
-import type { ChosenStation, RankedStation } from "../app/state.ts";
+import type { ChosenStation, RankedStation, WindCase } from "../app/state.ts";
+import { MARGINAL_YEARS, PROMISING_YEARS } from "../report/verdict.ts";
 import { riseText, stationPlace } from "../app/stationText.ts";
 import type * as Leaflet from "leaflet";
 import { searchPlaces } from "../data/places.ts";
@@ -21,7 +22,29 @@ function ignorePinClick(): void {
 
 let pinClick: (value: string) => void = ignorePinClick;
 
-export function renderStationPins(list: readonly RankedStation[], active: ChosenStation | null): void {
+/** good, warn or bad: the verdict band a payback falls in. */
+function tone(pb: number): string {
+  if (pb <= PROMISING_YEARS) return "good";
+  return pb <= MARGINAL_YEARS ? "warn" : "bad";
+}
+
+/** A station's payback beside its pin ("19 yr", "never"), in its verdict's ink; null when it wasn't worked out. */
+function pinLabel(s: RankedStation, w: WindCase | undefined): Leaflet.Marker | null {
+  if (w?.reason !== "") return null;
+  const text = Number.isFinite(w.payback) ? `${fmt(w.payback, w.payback < 10 ? 1 : 0)} yr` : "never";
+  const icon = L.divIcon({
+    className: `pin-label ${tone(w.payback)}`,
+    html: `<span>${esc(text)}</span>`,
+    iconSize: [0, 0],
+  });
+  return L.marker([s.lat, s.lon], { icon, interactive: false, keyboard: false });
+}
+
+export function renderStationPins(
+  list: readonly RankedStation[],
+  active: ChosenStation | null,
+  cases: readonly WindCase[] | null = null,
+): void {
   if (!state.map) return;
   state.stationLayer?.remove();
   const pins = list.map((s): Leaflet.CircleMarker => {
@@ -41,7 +64,14 @@ export function renderStationPins(list: readonly RankedStation[], active: Chosen
       .on("click", () => pinClick(`eccc:${s.id}`));
     return m;
   });
-  state.stationLayer = L.layerGroup(pins).addTo(state.map);
+  const labels = list.flatMap(
+    (s) =>
+      pinLabel(
+        s,
+        cases?.find((w) => w.id === s.id),
+      ) ?? [],
+  );
+  state.stationLayer = L.layerGroup([...pins, ...labels]).addTo(state.map);
   // The picker is the keyboard route to the same choice, so the pins aren't tab stops.
   for (const m of pins) m.getElement()?.setAttribute("tabindex", "-1");
 }

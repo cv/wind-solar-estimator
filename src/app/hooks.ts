@@ -10,10 +10,12 @@ export interface AppHooks {
   onChange(name: string, opts?: ChangeOptions): void;
   /** Run the analysis now. */
   analyse(): void;
+  /** Download the nearby stations' records and show the payback each would give. */
+  compareStations(): void;
 }
 
 function ignore(): void {
   // Until init wires the real handlers.
 }
 
-export const hooks: AppHooks = { onChange: ignore, analyse: ignore };
+export const hooks: AppHooks = { onChange: ignore, analyse: ignore, compareStations: ignore };

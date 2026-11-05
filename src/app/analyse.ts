@@ -16,6 +16,7 @@ import { simulate } from "../model/simulate.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 import { render } from "../report/render.ts";
 import { scheduleSensitivity } from "./sensitivity.ts";
+import { compareStations } from "./stationCompare.ts";
 import { loadStations, resolveStation, renderStationPicker } from "../ui/stationPicker.ts";
 import { blendStation } from "../wind/blend.ts";
 
@@ -50,7 +51,10 @@ export async function analyse({ fetchIfNeeded = true }: { fetchIfNeeded?: boolea
   }
 
   simulateAndRender(loaded, v, params);
-  if (fetchIfNeeded) revealReport();
+  if (fetchIfNeeded) {
+    revealReport();
+    renderStationPicker(); // offers "Compare the stations" now there is a report to compare against
+  }
 }
 
 /** Clears the marks and message a previous run left on invalid fields. */
@@ -106,7 +110,7 @@ async function loadWeather(req: DataRequest): Promise<LoadedWeather | null> {
   try {
     const [wx, obs] = await downloadAll(req, abortCtl.signal, showProgress);
     if (token !== runCtl.token) return null;
-    const loaded: LoadedWeather = { ...combineWind(wx, obs, req.station), key: requestKey(req), req };
+    const loaded: LoadedWeather = { ...combineWind(wx, obs, req.station), model: wx, key: requestKey(req), req };
     state.loaded = loaded;
     return loaded;
   } catch (e: unknown) {
@@ -184,7 +188,17 @@ async function fetchStationObs(
 /** Simulates with these parameters (and the capped or uncapped variant the power-curve check calls for), then renders. */
 function simulateAndRender({ wx, req, source }: LoadedWeather, v: FormInput, params: ModelParams): void {
   const result = simulate(wx, params);
-  const a = { wx, req, source, params, result, limit: physicsLimit(wx, params), sensitivity: null, setups: null };
+  const a = {
+    wx,
+    req,
+    source,
+    params,
+    result,
+    limit: physicsLimit(wx, params),
+    sensitivity: null,
+    setups: null,
+    windCases: null,
+  };
   state.analysis = a;
   status("");
   render(v);
@@ -218,6 +232,11 @@ export function showFailure(e: unknown): void {
   // eslint-disable-next-line no-console -- intended: an unexpected bug's details belong in the developer console
   console.error(e);
   status(esc(failureText(e)), "error");
+}
+
+/** Starts the station comparison without waiting for it; a failure is reported by showFailure. */
+export function startCompareStations(): void {
+  compareStations().catch(showFailure);
 }
 
 /** Starts analyse without waiting for it (event handlers); a failure is reported by showFailure. */

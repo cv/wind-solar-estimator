@@ -4,7 +4,8 @@ import { $, form } from "../app/dom.ts";
 import { fmt } from "../app/format.ts";
 import { hooks } from "../app/hooks.ts";
 import { state } from "../app/state.ts";
-import type { ChosenStation, RankedStation, StationListState } from "../app/state.ts";
+import type { ChosenStation, RankedStation, StationListState, WindCase } from "../app/state.ts";
+import { comparableStations, currentCompare } from "../app/compareState.ts";
 import { autoEligible, fromSite, missingYears, riseText, stationPlace, yearsOverlap } from "../app/stationText.ts";
 import type { Period } from "../app/stationText.ts";
 import { siteElevation } from "../data/elevation.ts";
@@ -70,9 +71,45 @@ export function renderStationPicker(): void {
   const list = stations.status === "ready" ? stations.list : [];
   const req = pickerPeriod();
   const active = stations.status === "ready" && req ? resolveStation(form.elements.windSource.value, list, req) : null;
-  fillStationOptions($("#stationSelect", HTMLSelectElement), list, req, active);
+  const cases = currentCompare() ? (state.analysis?.windCases ?? null) : null;
+  fillStationOptions($("#stationSelect", HTMLSelectElement), list, req, active, cases);
   $("#stationHint").textContent = stationHint(nearCanada(lat, lon), stations, req, active);
-  renderStationPins(list, active);
+  renderStationPins(list, active, cases);
+  renderCompareControl();
+}
+
+/** " · pays back in about 19 years" for a compared source ("" when it wasn't compared). */
+function caseSuffix(cases: readonly WindCase[] | null, id: string): string {
+  const w = cases?.find((c) => c.id === id);
+  if (!w) return "";
+  if (w.reason !== "") return ` · ${w.reason}`;
+  return Number.isFinite(w.payback)
+    ? ` · pays back in about ${fmt(w.payback, w.payback < 10 ? 1 : 0)} years`
+    : " · never pays back";
+}
+
+/** The "Compare the stations" button and its hint: offered once there is a report for what's loaded. */
+function renderCompareControl(): void {
+  const btn = $("#compareStations", HTMLButtonElement),
+    hint = $("#compareHint");
+  const c = currentCompare();
+  const n = comparableStations().length;
+  const a = state.analysis;
+  const show = a !== null && a.wx === state.loaded?.wx && n > 0;
+  btn.hidden = !show || c?.status === "ready";
+  hint.hidden = !show;
+  if (!show) return;
+  if (c?.status === "ready") {
+    hint.textContent = "The payback each station's wind would give is on the map, in the list above and in the report.";
+    return;
+  }
+  btn.disabled = c !== null;
+  btn.textContent = c
+    ? `Comparing the stations… ${c.winds.length} of ${c.total}`
+    : `Compare ${n === 1 ? "the station" : `the ${n} stations`}`;
+  hint.textContent = c
+    ? "Each station's records are downloaded once and kept in this browser."
+    : "See the payback each nearby station's measured wind would give, and the weather model's. Records not kept yet are downloaded first, which can take a minute or two.";
 }
 
 /** The period, read leniently: validation messages belong to Analyse, not to this picker. */
@@ -88,10 +125,14 @@ function fillStationOptions(
   list: readonly RankedStation[],
   req: Period | null,
   active: ChosenStation | null,
+  cases: readonly WindCase[] | null,
 ): void {
-  sel.replaceChildren(new Option("Weather model only (ERA5)", "model"));
+  sel.replaceChildren(new Option(`Weather model only (ERA5)${caseSuffix(cases, "model")}`, "model"));
   for (const s of list) {
-    const o = new Option(`${s.name}, ${stationPlace(s)} · ${s.first}–${s.last}`, `eccc:${s.id}`);
+    const o = new Option(
+      `${s.name}, ${stationPlace(s)} · ${s.first}–${s.last}${caseSuffix(cases, s.id)}`,
+      `eccc:${s.id}`,
+    );
     if (req && yearsOverlap(s, req) < 1) {
       o.disabled = true;
       o.text += " (no records for these years)";
