@@ -11,6 +11,10 @@ export const figure = (label: string, value: string, unit: string, sub: string, 
   (sub ? `<dd class="sub">${esc(sub)}</dd>` : "") +
   `</div>`;
 
+/** One supporting statistic: label, value (with optional unit) and a supporting line. */
+const stat = (label: string, value: string, unit: string, sub: string): string =>
+  `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
+
 export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest): void {
   const A = r.pvOnly,
     B = r.withWind,
@@ -27,8 +31,6 @@ export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest): v
       : figure("Simple payback", "Never", "", `on ${money(e.capex)} installed`),
   ].join("");
 
-  const stat = (label: string, value: string, unit: string, sub: string): string =>
-    `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
   // Supporting figures only: anything already in the summary or the assumptions isn't repeated here.
   $("#stats").innerHTML = [
     stat(

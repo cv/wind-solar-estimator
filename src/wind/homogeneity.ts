@@ -50,6 +50,8 @@ export interface HomogeneityOptions {
   minSide?: number;
 }
 
+const avg = (a: readonly number[]): number => a.reduce((s, v) => s + v, 0) / a.length;
+
 /**
  * Looks for a break in a station record by comparing it with the weather model year by
  * year: the ratio of their annual means cancels windy and calm years, so what's left is
@@ -72,7 +74,6 @@ export function checkHomogeneity(
   const n = ys.length;
   const out: Homogeneity = { years: n, ratios: ys, trend: null, step: null, issue: null };
   if (n < minYears) return out;
-  const avg = (a: readonly number[]): number => a.reduce((s, v) => s + v, 0) / a.length;
   const r = ys.map((y) => y.ratio),
     x = ys.map((y) => y.year);
   const mr = avg(r),

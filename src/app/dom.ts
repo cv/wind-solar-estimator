@@ -36,18 +36,20 @@ export function formError(message: string, field?: FormField | null): void {
   field?.setAttribute("aria-describedby", "formError");
 }
 
-/** A button that can show a brief confirmation; _flash is its pending restore timer. */
-type FlashButton = HTMLElement & { _flash?: ReturnType<typeof setTimeout> };
+/** Each flashing button's pending restore timer. */
+const flashTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
 
 // Brief confirmation on the button that was pressed.
 export function flash(btn: HTMLElement, text: string, ms: number = 2000): void {
-  const b: FlashButton = btn;
-  clearTimeout(b._flash);
-  b.dataset.label ??= b.textContent;
-  b.textContent = text;
-  b._flash = setTimeout(() => {
-    b.textContent = b.dataset.label ?? null;
-  }, ms);
+  clearTimeout(flashTimers.get(btn));
+  btn.dataset.label ??= btn.textContent;
+  btn.textContent = text;
+  flashTimers.set(
+    btn,
+    setTimeout(() => {
+      btn.textContent = btn.dataset.label ?? null;
+    }, ms),
+  );
 }
 
 /** How a status message is styled: progress or info, a hint that results are out of date, or an error. */

@@ -150,8 +150,10 @@ export async function fetchWeather({
     while (next < years.length) {
       const idx = next++;
       const yearKey = ["y", lat, lon, years[idx], tilt, azimuth].join("|");
+      // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
       let part = await dbGet<YearPart>(yearKey);
       if (!part) {
+        // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
         part = compactYear(await fetchYear({ lat, lon, year: years[idx], tilt, azimuth, apiKey, signal }));
         dbPut(yearKey, part); // best effort, not awaited
       }
@@ -210,10 +212,11 @@ export async function fetchWeather({
   return wx;
 }
 
+const col = (a: (number | null)[]): Float32Array => Float32Array.from(a, (x) => (x == null ? NaN : x));
+
 /** Typed arrays keep the IndexedDB cache small; missing values become NaN. */
 function compactYear(json: ArchiveData): YearPart {
   const h = json.hourly;
-  const col = (a: (number | null)[]) => Float32Array.from(a, (x) => (x == null ? NaN : x));
   return {
     latitude: json.latitude,
     longitude: json.longitude,
@@ -260,15 +263,20 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: Year
     const wait = () => sleep(10000 * (attempt + 1), signal);
     let res: Response, text: string;
     try {
+      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
       res = await fetch(url, { signal });
+      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
       text = await res.text();
     } catch (e) {
       if (signal?.aborted) throw e;
       if (retry) {
+        // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
         await wait();
         continue;
       } // network hiccup
-      throw new Error(`Couldn't reach the weather service for ${year}: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error(`Couldn't reach the weather service for ${year}: ${e instanceof Error ? e.message : String(e)}`, {
+        cause: e,
+      });
     }
     let json: ArchiveResponse | null = null;
     try {
@@ -285,6 +293,7 @@ async function fetchYear({ lat, lon, year, tilt, azimuth, apiKey, signal }: Year
     // Retry rate limits, server errors and garbled replies; a 400 means a bad request, so don't.
     if (retry && (res.ok || res.status === 429 || res.status >= 500)) {
       const after = Number(res.headers.get("retry-after"));
+      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
       await (after > 0 ? sleep(after * 1000, signal) : wait());
       continue;
     }

@@ -3,11 +3,13 @@ import { readForm } from "../app/form.ts";
 import { analysis, state } from "../app/state.ts";
 import { assumptionRows, monthlyRows } from "./tables.ts";
 
+/** One CSV cell: numbers rounded to 2 decimals, everything else quoted. */
+const q = (c: string | number): string =>
+  typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${String(c).replace(/"/g, '""')}"`;
+
 export function downloadCsv(): void {
   if (!state.result) return; // nothing analysed yet
   const { result: r, params: p, req, wx } = analysis();
-  const q = (c: string | number): string =>
-    typeof c === "number" ? String(Math.round(c * 100) / 100) : `"${String(c).replace(/"/g, '""')}"`;
   const { head, rows, total } = monthlyRows(r);
   const lines: (string | number)[][] = [
     ["Wind + solar site estimate", readForm().place || ""],

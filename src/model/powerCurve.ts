@@ -48,7 +48,7 @@ export function parseCurve(text: string): CurvePoint[] {
     pts.push([v, w]);
   }
   if (pts.length < 2) throw new Error("Power curve needs at least two points");
-  return pts.sort((a, b) => a[0] - b[0]);
+  return pts.toSorted((a, b) => a[0] - b[0]);
 }
 
 export const formatCurve = (pts: readonly CurvePoint[]): string => pts.map(([v, w]) => `${v}, ${w}`).join("\n");

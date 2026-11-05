@@ -22,8 +22,8 @@ function quantiles(sorted: Float64Array, q: number): Float64Array {
 
 /** Fits a monotone mapping that turns the distribution of x into that of y (paired samples). */
 export function fitQuantileMap(x: ArrayLike<number>, y: ArrayLike<number>, q: number = QUANTILES): QuantileMap {
-  const xs = Float64Array.from(x).sort();
-  const ys = Float64Array.from(y).sort();
+  const xs = Float64Array.from(x).toSorted();
+  const ys = Float64Array.from(y).toSorted();
   return { qx: quantiles(xs, q), qy: quantiles(ys, q) };
 }
 

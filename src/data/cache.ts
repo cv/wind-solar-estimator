@@ -11,9 +11,9 @@ function openDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
   dbPromise ??= new Promise<IDBDatabase | null>((resolve) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
+    req.addEventListener("upgradeneeded", () => req.result.createObjectStore(STORE));
+    req.addEventListener("success", () => resolve(req.result));
+    req.addEventListener("error", () => resolve(null));
   });
   return dbPromise;
 }
@@ -24,8 +24,8 @@ export async function dbGet<T>(key: string): Promise<T | null> {
   if (!db) return null;
   return new Promise<T | null>((resolve) => {
     const req = db.transaction(STORE).objectStore(STORE).get(key);
-    req.onsuccess = () => resolve((req.result as T | undefined) || null);
-    req.onerror = () => resolve(null);
+    req.addEventListener("success", () => resolve((req.result as T | undefined) || null));
+    req.addEventListener("error", () => resolve(null));
   });
 }
 

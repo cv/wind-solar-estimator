@@ -59,6 +59,12 @@ export const axis = <T extends object = Record<never, never>>(
   extra: T = {} as T,
 ): { title: { display: boolean; text: string } } & T => ({ title: { display: true, text: title }, ...extra });
 
+const round = (a: readonly number[]): number[] => a.map((x) => Math.round(x));
+const positive = (x: number): number | null => (x > 0 ? x : null);
+/** State-of-charge fractions as percentages to one decimal, keeping gaps. */
+const asPct = (a: readonly (number | null)[]): (number | null)[] =>
+  a.map((x) => (x == null ? null : Math.round(x * 1000) / 10));
+
 export function renderCharts(r: SimResult, p: ModelParams): void {
   // Wind speed distribution and energy by speed
   let last = r.hist.hours.length - 1;
@@ -96,7 +102,6 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
     },
   });
 
-  const round = (a: readonly number[]): number[] => a.map((x) => Math.round(x));
   drawChart("chMonthly", {
     data: {
       labels: [...MONTHS],
@@ -156,7 +161,6 @@ export function renderCharts(r: SimResult, p: ModelParams): void {
 
   const curve = makeCurveFn(p.curvePts);
   const speeds = Array.from({ length: 61 }, (_, i) => i);
-  const positive = (x: number): number | null => (x > 0 ? x : null);
   drawChart("chCurve", {
     type: "line",
     data: {
@@ -209,8 +213,6 @@ export function renderSoc(): void {
 function drawSoc(r: SimResult, p: ModelParams): void {
   const mo = Number($<HTMLSelectElement>("#socMonth").value) || 0;
   const hours = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
-  const asPct = (a: readonly (number | null)[]): (number | null)[] =>
-    a.map((x) => (x == null ? null : Math.round(x * 1000) / 10));
   drawChart("chSoc", {
     type: "line",
     data: {

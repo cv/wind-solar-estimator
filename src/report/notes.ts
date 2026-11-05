@@ -4,12 +4,12 @@ import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, span } from "../app/format.ts";
 import { state } from "../app/state.ts";
 import type { Analysis } from "../app/state.ts";
+import { autoEligible, fromSite, missingYears } from "../app/stationText.ts";
 import type { Station } from "../data/stations.ts";
 import type { CurveCheck } from "../model/powerCurve.ts";
 import type { BlendStats } from "../wind/blend.ts";
 import type { Homogeneity } from "../wind/homogeneity.ts";
 import { renderClampStatus } from "./verdict.ts";
-import { missingYears, autoEligible, fromSite } from "../ui/stationPicker.ts";
 import { POOR_CORRELATION } from "../wind/blend.ts";
 import { pickStation } from "../wind/stationChoice.ts";
 
@@ -142,10 +142,12 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
   return out;
 }
 
+/** A change as a signed percentage, e.g. "+4%" or "−4%". */
+const signed = (x: number): string => `${x > 0 ? "+" : "−"}${pct(Math.abs(x))}`;
+
 /** One line on the station record's consistency, for the assumptions table. */
 export function homogeneityText(h: Homogeneity | null | undefined): string {
   if (!h || h.years < 5) return "";
-  const signed = (x: number): string => `${x > 0 ? "+" : "−"}${pct(Math.abs(x))}`;
   if (h.issue === "step" && h.step)
     return `; record steps ${signed(h.step.change)} relative to the model in ${h.step.year}`;
   if (h.issue === "trend" && h.trend)

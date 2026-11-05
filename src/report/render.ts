@@ -4,13 +4,13 @@ import type { FormValues } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
 import { esc } from "../app/format.ts";
 import { analysis, state } from "../app/state.ts";
+import { stationPlace } from "../app/stationText.ts";
 import type { CurveCheck } from "../model/powerCurve.ts";
 import { renderCharts } from "./charts.ts";
 import { renderFigures } from "./figures.ts";
 import { renderNotes } from "./notes.ts";
 import { renderMonthly, renderAssumptions } from "./tables.ts";
 import { renderVerdict } from "./verdict.ts";
-import { stationPlace } from "../ui/stationPicker.ts";
 
 export function render(v: FormValues, check: CurveCheck): void {
   const a = analysis();

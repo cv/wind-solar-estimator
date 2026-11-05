@@ -4,6 +4,7 @@ import { $ } from "../app/dom.ts";
 import { esc, fmt, pct, money } from "../app/format.ts";
 import type { DataRequest } from "../app/state.ts";
 import { state } from "../app/state.ts";
+import { fromSite } from "../app/stationText.ts";
 import type { Station } from "../data/stations.ts";
 import type { Weather } from "../data/weather.ts";
 import type { LoadPreset } from "../model/load.ts";
@@ -11,7 +12,6 @@ import { LOAD_PRESETS } from "../model/load.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 import type { BlendStats } from "../wind/blend.ts";
 import { homogeneityText } from "./notes.ts";
-import { fromSite } from "../ui/stationPicker.ts";
 
 /** One row of the monthly table: a label, then kWh for wind, solar, use and the two import cases. */
 export type MonthlyRow = [label: string, ...kwh: number[]];
@@ -40,10 +40,12 @@ export function monthlyRows(r: SimResult): MonthlyTable {
   return { head: ["Month", "Wind", "Solar", "Use", "Bought: solar + battery", "Bought: with wind"], rows, total };
 }
 
+/** One table row: the month label, then each kWh figure. */
+const tr = ([label, ...kwh]: MonthlyRow, tag: string = "td"): string =>
+  `<tr><${tag}>${esc(label)}</${tag}>${kwh.map((c) => `<${tag}>${fmt(c)}</${tag}>`).join("")}</tr>`;
+
 export function renderMonthly(r: SimResult): void {
   const { head, rows, total } = monthlyRows(r);
-  const tr = ([label, ...kwh]: MonthlyRow, tag: string = "td"): string =>
-    `<tr><${tag}>${esc(label)}</${tag}>${kwh.map((c) => `<${tag}>${fmt(c)}</${tag}>`).join("")}</tr>`;
   $("#monthlyTable").innerHTML =
     `<caption class="visually-hidden">Monthly energy in kWh for an average year</caption><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>` +
     `<tbody>${rows.map((row) => tr(row)).join("")}</tbody><tfoot>${tr(total)}</tfoot>`;

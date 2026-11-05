@@ -1,13 +1,25 @@
 // The Leaflet map: site marker, station pins and place search.
-import { analyse, onChange } from "../app/analyse.ts";
 import { COLORS } from "../app/constants.ts";
 import { $, form } from "../app/dom.ts";
 import { esc } from "../app/format.ts";
+import { hooks } from "../app/hooks.ts";
 import { state } from "../app/state.ts";
 import type { ChosenStation, RankedStation } from "../app/state.ts";
+import { riseText, stationPlace } from "../app/stationText.ts";
 import type * as Leaflet from "leaflet";
 import { searchPlaces } from "../data/places.ts";
-import { stationPlace, riseText, chooseWindSource } from "./stationPicker.ts";
+
+/** What the map calls back into: picking a station by clicking its pin. */
+export interface MapOptions {
+  /** A station pin was clicked; value is the picker's option value ("eccc:<id>"). */
+  onPinClick(value: string): void;
+}
+
+function ignorePinClick(): void {
+  // Until initMap is given the real handler.
+}
+
+let pinClick: (value: string) => void = ignorePinClick;
 
 export function renderStationPins(list: readonly RankedStation[], active: ChosenStation | null): void {
   if (!state.map) return;
@@ -17,6 +29,8 @@ export function renderStationPins(list: readonly RankedStation[], active: Chosen
       const on = active?.id === s.id;
       const m = L.circleMarker([s.lat, s.lon], {
         radius: on ? 7 : 5,
+        // A pin click picks the station; without this it also bubbles to the map and moves the site.
+        bubblingMouseEvents: false,
         color: on ? COLORS.wind : "#556074",
         weight: on ? 2 : 1,
         fillColor: on ? COLORS.wind : "#ffffff",
@@ -25,7 +39,7 @@ export function renderStationPins(list: readonly RankedStation[], active: Chosen
         .bindTooltip(
           `${s.name}: ${stationPlace(s)}${riseText(s)}, hourly records ${s.first}–${s.last}${on ? " (in use)" : ""}`,
         )
-        .on("click", () => chooseWindSource(`eccc:${s.id}`));
+        .on("click", () => pinClick(`eccc:${s.id}`));
       return m;
     }),
   ).addTo(state.map);
@@ -33,7 +47,8 @@ export function renderStationPins(list: readonly RankedStation[], active: Chosen
   state.stationLayer.eachLayer((m) => (m as Leaflet.CircleMarker).getElement()?.setAttribute("tabindex", "-1"));
 }
 
-export function initMap(): void {
+export function initMap({ onPinClick }: MapOptions): void {
+  pinClick = onPinClick;
   if (typeof L === "undefined") {
     $("#map").hidden = true;
     return;
@@ -64,7 +79,7 @@ export function setLocation(lat: number, lon: number, name: string, { pan = fals
   form.elements.windSource.value = "auto"; // a station picked for the old spot may not suit the new one
   state.marker?.setLatLng([lat, lon]);
   if (pan) state.map?.setView([lat, lon], 8);
-  onChange("lat");
+  hooks.onChange("lat");
 }
 
 export async function placeSearch(): Promise<void> {
@@ -91,7 +106,7 @@ export async function placeSearch(): Promise<void> {
       b.addEventListener("click", () => {
         ul.hidden = true;
         setLocation(pl.lat, pl.lon, pl.name, { pan: true });
-        analyse();
+        hooks.analyse();
       });
       li.append(b);
       ul.append(li);

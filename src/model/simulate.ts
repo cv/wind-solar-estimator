@@ -226,7 +226,9 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
   hist.energy = hist.energy.map(perYear);
   const socDay = (arr: readonly number[]): SocDay =>
     Array.from({ length: 12 }, (_, mo) =>
-      Array.from({ length: 24 }, (_, h) => (soc.count[mo * 24 + h] ? arr[mo * 24 + h] / soc.count[mo * 24 + h] : null)),
+      Array.from({ length: 24 }, (_slot, h) =>
+        soc.count[mo * 24 + h] ? arr[mo * 24 + h] / soc.count[mo * 24 + h] : null,
+      ),
     );
 
   const scenario = (b: Battery): Scenario => ({
@@ -265,7 +267,7 @@ export function simulate(wx: SimWeather, p: ModelParams): SimResult {
     pvOnly: A,
     withWind: B,
     monthly: m,
-    yearly: [...byYear.entries()].sort((a, b) => a[0] - b[0]).map(([year, kwh]) => ({ year, kwh })),
+    yearly: [...byYear.entries()].toSorted((a, b) => a[0] - b[0]).map(([year, kwh]) => ({ year, kwh })),
     hist,
     socDay: { pvOnly: socDay(soc.pvOnly), withWind: socDay(soc.withWind) },
     econ: {

@@ -6,5 +6,3 @@ declare global {
   const L: typeof Leaflet;
   const Chart: typeof ChartJs;
 }
-
-export {};

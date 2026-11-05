@@ -123,7 +123,7 @@ export function blendStation<W extends BlendWeather = Weather>(wx: W, obs: Stati
   }
 
   const yearly = [...years]
-    .sort((a, b) => a[0] - b[0])
+    .toSorted((a, b) => a[0] - b[0])
     .map(([year, [h, k, s, m]]): YearlyMeans => ({
       year,
       coverage: k / h,

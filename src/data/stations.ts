@@ -159,7 +159,7 @@ export async function findStations(
       direction: direction(lat, lon, s.lat, s.lon),
     }))
     .filter((s) => s.distanceKm <= radiusKm)
-    .sort((a, b) => a.distanceKm - b.distanceKm);
+    .toSorted((a, b) => a.distanceKm - b.distanceKm);
 }
 
 /**
@@ -183,8 +183,10 @@ export async function fetchStationHours({
     while (next < years.length) {
       const idx = next++;
       const key = `eccc|${id}|${years[idx]}`;
+      // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
       let part = (memory.get(key) as StationHours | undefined) || (await dbGet<StationHours>(key));
       if (!part) {
+        // oxlint-disable-next-line no-await-in-loop -- worker pool: each worker takes one year at a time to cap concurrent requests
         part = await fetchStationYear(id, years[idx], signal);
         dbPut(key, part); // past years never change, so they're kept for good
       }
@@ -245,13 +247,16 @@ async function getText(url: string, signal: AbortSignal | undefined, what: strin
     const retry = attempt < MAX_RETRIES;
     let res: Response | undefined;
     try {
+      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
       res = await fetch(url, { signal });
+      // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
       if (res.ok) return await res.text();
     } catch (e) {
       if (signal?.aborted) throw e;
       if (!retry)
         throw new Error(
           `Couldn't reach Environment Canada's climate service for ${what}: ${e instanceof Error ? e.message : String(e)}`,
+          { cause: e },
         );
     }
     if (res && !(res.status === 429 || res.status >= 500))
@@ -259,6 +264,7 @@ async function getText(url: string, signal: AbortSignal | undefined, what: strin
     if (!retry)
       throw new Error(`Environment Canada's climate service is busy (${res?.status}). Press Analyse again to resume.`);
     const after = Number(res?.headers.get("retry-after"));
+    // oxlint-disable-next-line no-await-in-loop -- retry with backoff: each attempt must wait for the previous one
     await sleep(after > 0 ? after * 1000 : 5000 * (attempt + 1), signal);
   }
 }

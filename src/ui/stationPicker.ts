@@ -1,18 +1,16 @@
 // Measured wind: finding nearby stations, choosing one, and the "Wind data" picker.
-import { onChange } from "../app/analyse.ts";
-import { AUTO_STATION_KM, ELEVATION_SAY_M } from "../app/constants.ts";
+import { ELEVATION_SAY_M } from "../app/constants.ts";
 import { $, form } from "../app/dom.ts";
 import { fmt } from "../app/format.ts";
+import { hooks } from "../app/hooks.ts";
 import { state } from "../app/state.ts";
-import type { ChosenStation, DataRequest, RankedStation } from "../app/state.ts";
+import type { ChosenStation, RankedStation } from "../app/state.ts";
+import { autoEligible, fromSite, missingYears, riseText, stationPlace, yearsOverlap } from "../app/stationText.ts";
+import type { Period } from "../app/stationText.ts";
 import { siteElevation } from "../data/elevation.ts";
 import { SEARCH_RADIUS_KM, nearCanada, findStations } from "../data/stations.ts";
-import type { Station } from "../data/stations.ts";
 import { renderStationPins } from "./map.ts";
 import { pickStation } from "../wind/stationChoice.ts";
-
-/** The years a run covers (inclusive), as resolveStation and its helpers read them. */
-export type Period = Pick<DataRequest, "startYear" | "endYear">;
 
 /** Starts (or reuses) the search for stations around the pin; resolves to a list, or null if the search failed. */
 export function loadStations(): Promise<RankedStation[] | null> {
@@ -44,9 +42,6 @@ export function loadStations(): Promise<RankedStation[] | null> {
   return promise;
 }
 
-export const yearsOverlap = (s: Station, req: Period): number =>
-  Math.min(s.last, req.endYear) - Math.max(s.first, req.startYear) + 1;
-
 /** The station whose wind to use, or null for the weather model alone. */
 export function resolveStation(
   choice: string,
@@ -60,25 +55,6 @@ export function resolveStation(
   }
   return pickStation(list, autoEligible(req), missingYears(req));
 }
-
-/** Years of the period a station's record doesn't cover. */
-export const missingYears =
-  (req: Period) =>
-  (s: Station): number =>
-    req.endYear - req.startYear + 1 - Math.max(0, yearsOverlap(s, req));
-
-/** Stations "auto" may use: close enough, with enough years of records in the period. */
-export const autoEligible =
-  (req: Period) =>
-  (s: Station): boolean =>
-    s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= Math.min(5, req.endYear - req.startYear + 1);
-
-export const stationPlace = (s: Station): string =>
-  s.distanceKm < 1 ? "at the site" : `${fmt(s.distanceKm)} km ${s.direction}`;
-export const fromSite = (s: Station): string => (s.distanceKm < 1 ? "at the site" : `${stationPlace(s)} of the site`);
-/** ", 330 m higher" when the height difference is worth mentioning. */
-export const riseText = (s: RankedStation, joiner: string = ", "): string =>
-  Math.abs(s.rise) >= ELEVATION_SAY_M ? `${joiner}${fmt(Math.abs(s.rise))} m ${s.rise > 0 ? "higher" : "lower"}` : "";
 
 /** The "Wind data" picker, its hint and the station pins on the map. */
 export function renderStationPicker(): void {
@@ -135,5 +111,5 @@ export function renderStationPicker(): void {
 export function chooseWindSource(value: string): void {
   form.elements.windSource.value = value;
   renderStationPicker();
-  onChange("windSource");
+  hooks.onChange("windSource");
 }

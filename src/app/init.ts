@@ -4,6 +4,7 @@ import { MONTHS, API_KEY_STORAGE, DEFAULTS, DEFAULTS_V1 } from "./constants.ts";
 import type { FormOverrides } from "./constants.ts";
 import { $, form, flash, status } from "./dom.ts";
 import type { FormField } from "./dom.ts";
+import { hooks } from "./hooks.ts";
 import { setForm, readForm, writeHash, readHash, syncCapture, loadPreset } from "./form.ts";
 import { state } from "./state.ts";
 import { clearStationMemory } from "../data/stations.ts";
@@ -14,7 +15,11 @@ import { downloadCsv } from "../report/csv.ts";
 import { initMap, setLocation, placeSearch } from "../ui/map.ts";
 import { loadStations, renderStationPicker, chooseWindSource } from "../ui/stationPicker.ts";
 
+const resizeCharts = (): void => Object.values(state.charts).forEach((c) => c.resize());
+
 export function init(): void {
+  hooks.onChange = onChange;
+  hooks.analyse = () => analyse();
   const sel = form.elements.loadProfile;
   const presets: [string, { label: string }][] = [
     ...Object.entries(LOAD_PRESETS),
@@ -36,7 +41,7 @@ export function init(): void {
   syncCapture();
   form.elements.apiKey.value = localStorage.getItem(API_KEY_STORAGE) || "";
   $<HTMLInputElement>("#placeSearch").value = form.elements.place.value;
-  initMap();
+  initMap({ onPinClick: chooseWindSource });
   $("#stationSelect").addEventListener("change", (e) => chooseWindSource((e.target as HTMLSelectElement).value));
   loadStations();
 
@@ -104,7 +109,6 @@ export function init(): void {
     flash($("#clearCache"), "Cache cleared");
     status("Cached weather data cleared.");
   });
-  const resizeCharts = () => Object.values(state.charts).forEach((c) => c.resize());
   // A printed report shows everything: expand collapsed sections, then restore them.
   let closedForPrint: HTMLDetailsElement[] = [];
   window.addEventListener("beforeprint", () => {

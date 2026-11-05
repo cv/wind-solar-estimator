@@ -3,13 +3,89 @@
   "plugins": [
     "typescript",
     "unicorn",
-    "oxc"
+    "oxc",
+    "import"
   ],
   "categories": {
-    "correctness": "error"
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
   },
   "ignorePatterns": [
     "dist",
     "node_modules"
+  ],
+  "rules": {
+    "import/no-cycle": "error",
+    "oxc/no-map-spread": "off"
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/model/**",
+        "src/wind/**",
+        "src/data/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/app/*",
+                  "**/ui/*",
+                  "**/report/*"
+                ],
+                "message": "Library code (model, wind, data) must not depend on the UI."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/report/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/ui/*",
+                  "**/app/analyse*",
+                  "**/app/init*"
+                ],
+                "message": "The report renders an Analysis; it must not depend on the UI controls or the run."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/ui/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/app/analyse*",
+                  "**/app/init*"
+                ],
+                "message": "UI controls report changes through callbacks wired in app/init.ts, not by importing the run."
+              }
+            ]
+          }
+        ]
+      }
+    }
   ]
 }
