@@ -106,6 +106,10 @@ npm test
 Push to GitHub, then *Settings → Pages → Deploy from a branch → `main` / root*. The
 `.nojekyll` file makes Pages serve the files as they are.
 
+Browsers may cache each file for hours, so `index.html` loads the site's own JS and CSS
+through URLs versioned by content (an import map). After changing any of them, run
+`npm run stamp` before committing; `npm test` fails if the versions are out of date.
+
 ## Data and licences
 
 - Weather: Open-Meteo historical weather API (ERA5, Copernicus Climate Change Service),
