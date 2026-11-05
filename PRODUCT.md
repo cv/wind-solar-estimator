@@ -30,7 +30,7 @@ _Inferred from the current build; confirm or correct._
 
 - **Both solo and in the room.** A salesperson prepares an analysis alone before a meeting and sends or prints the report, and also runs it live in front of a customer on a laptop or shared screen.
 - Reports travel as a shareable link (all assumptions encoded in the URL), a printed or PDF report, and a CSV of monthly figures.
-- Weather comes from Open-Meteo's historical API (ERA5 reanalysis, roughly 28 km grid cells). First analysis of a site downloads data for a minute or two; it's cached in the browser afterwards.
+- Weather comes from Open-Meteo's historical API (ERA5 reanalysis, roughly 28 km grid cells). In Canada, wind comes from the nearest Environment Canada station with hourly records when one is close enough, with gaps filled from ERA5. First analysis of a site downloads data for a minute or two; it's cached in the browser afterwards.
 - Typical inputs a salesperson changes: location, number of turbines, hub height, power curve, the customer's annual electricity use and profile, battery size, and local prices.
 
 ## Capabilities and Constraints
@@ -38,7 +38,7 @@ _Inferred from the current build; confirm or correct._
 - **Today:** static single-page app, browser-only, no build step and no backend, hosted on GitHub Pages. MIT licensed, public repository.
 - **Later:** a backend or paid data sources are acceptable if they earn their place. Not decided yet.
 - Open-Meteo's free tier is for non-commercial use; commercial use needs an API key, which the tool accepts and keeps in the browser only (never in shared links).
-- Results are indicative, not a bankable energy assessment. Reanalysis wind is uncalibrated unless the user enters a measured site mean.
+- Results are indicative, not a bankable energy assessment. Reanalysis wind is uncalibrated unless the user enters a measured site mean or a station is used; station wind is measured at an open site, not at the customer's.
 - Terminology in use: power curve, hub height, capacity factor, self-sufficiency, grid purchases, export credit, simple payback, site wind calibration, physical (Betz) limit.
 
 ## Brand Commitments

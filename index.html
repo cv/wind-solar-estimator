@@ -38,6 +38,9 @@
           <label>Latitude <input name="lat" type="number" step="0.0001" min="-90" max="90" required></label>
           <label>Longitude <input name="lon" type="number" step="0.0001" min="-180" max="180" required></label>
         </div>
+        <input type="hidden" name="windSource">
+        <label>Wind data <select id="stationSelect" aria-describedby="stationHint"></select></label>
+        <p class="hint station-hint" id="stationHint"></p>
         <button type="submit" id="run" class="primary">Analyse this site</button>
         <p id="formError" class="form-error" role="alert" hidden></p>
         <p class="hint">The first analysis of a site downloads its weather history, which can take a minute or two. After that it's cached in this browser.</p>
@@ -212,6 +215,7 @@
 
 <footer class="foot">
   Weather data: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (ERA5, Copernicus Climate Change Service), CC&nbsp;BY&nbsp;4.0.
+  Station data: <a href="https://climate.weather.gc.ca/" target="_blank" rel="noopener">Environment and Climate Change Canada</a>, <a href="https://open.canada.ca/en/open-government-licence-canada" target="_blank" rel="noopener">Open Government Licence – Canada</a>.
   Map: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.
   Indicative estimates only.
 </footer>

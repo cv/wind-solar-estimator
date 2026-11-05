@@ -1,6 +1,8 @@
 // UI: form <-> URL hash, map, data loading, rendering. Chart.js and Leaflet are loaded as globals.
 import { EXAMPLE_ROTOR_M, circleArea, exampleCurve, parseCurve, formatCurve, checkCurve, betzLimitW, makeCurveFn, LOAD_PRESETS, simulate } from "./model.js";
 import { fetchWeather, searchPlaces, clearWeatherCache } from "./weather.js";
+import { findStations, fetchStationHours, nearCanada, clearStationMemory, SEARCH_RADIUS_KM } from "./stations.js";
+import { blendStation } from "./blend.js";
 
 const $ = (sel) => document.querySelector(sel);
 const form = $("#form");
@@ -8,10 +10,12 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const API_KEY_STORAGE = "siteEstimator.apiKey";
 const COLORS = { wind: "#1f77b4", solar: "#f2a900", load: "#444", grey: "#9aa3b5", limit: "#c62828" };
 const ERA5_CELL_DEG = 0.25;
+const AUTO_STATION_KM = 50; // "auto" uses the nearest station with hourly records within this distance
+const MIN_AUTO_COVERAGE = 0.5; // ...if it has wind readings for at least this share of the hours
 
 const DEFAULTS = {
   place: "Amarillo, Texas, United States",
-  lat: "35.2220", lon: "-101.8313", years: "20", endYear: String(new Date().getFullYear() - 1),
+  lat: "35.2220", lon: "-101.8313", windSource: "auto", years: "20", endYear: String(new Date().getFullYear() - 1),
   nTurbines: "1", hubHeight: "18", curve: formatCurve(exampleCurve()), captureShape: "round", captureM: String(EXAMPLE_ROTOR_M), captureW: "", captureH: "", augmentation: "1",
   clampPhysics: false, densityCorrection: true, windLossPct: "5",
   siteMeanKmh: "", windScale: "1",
@@ -23,7 +27,7 @@ const DEFAULTS = {
   currency: "$", price: "0.20", exportCredit: "0.08", turbineCost: "25000", omPerTurbine: "250",
 };
 
-const state = { loading: false, wx: null, wxKey: null, req: null, params: null, result: null, capped: null, charts: {}, map: null, marker: null, cell: null };
+const state = { loading: false, wx: null, wxKey: null, req: null, source: null, stations: { key: null }, stationLayer: null, params: null, result: null, capped: null, charts: {}, map: null, marker: null, cell: null };
 
 // ---------- formatting ----------
 
@@ -113,7 +117,92 @@ function dataRequest(v) {
   return { lat, lon, startYear: endYear - Math.round(years) + 1, endYear, tilt, azimuth, compass, apiKey: v.apiKey };
 }
 
-const requestKey = (r) => [r.lat.toFixed(4), r.lon.toFixed(4), r.startYear, r.endYear, r.tilt, r.azimuth].join("|");
+const requestKey = (r) => [r.lat.toFixed(4), r.lon.toFixed(4), r.startYear, r.endYear, r.tilt, r.azimuth, r.station?.id ?? "model"].join("|");
+
+// ---------- measured wind: nearby stations ----------
+
+/** Starts (or reuses) the search for stations around the pin; resolves to a list, or null if the search failed. */
+function loadStations() {
+  const lat = Number(form.elements.lat.value), lon = Number(form.elements.lon.value);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90) return Promise.resolve([]);
+  const key = `${lat.toFixed(3)}|${lon.toFixed(3)}`;
+  if (state.stations.key === key) return state.stations.promise;
+  const promise = findStations(lat, lon).catch((e) => { console.warn(e); return null; });
+  state.stations = { key, promise, list: undefined };
+  renderStationPicker();
+  promise.then((list) => {
+    if (state.stations.key !== key) return;
+    state.stations.list = list;
+    renderStationPicker();
+  });
+  return promise;
+}
+
+const yearsOverlap = (s, req) => Math.min(s.last, req.endYear) - Math.max(s.first, req.startYear) + 1;
+
+/** The station whose wind to use, or null for the weather model alone. */
+function resolveStation(choice, list, req) {
+  if (choice === "model" || !list?.length) return null;
+  if (choice.startsWith("eccc:")) {
+    const picked = list.find((s) => s.id === choice.slice(5));
+    if (picked) return { ...picked, explicit: true };
+  }
+  const need = Math.min(5, req.endYear - req.startYear + 1);
+  return list.find((s) => s.distanceKm <= AUTO_STATION_KM && yearsOverlap(s, req) >= need) || null;
+}
+
+const stationPlace = (s) => `${fmt(s.distanceKm)} km ${s.direction}`;
+
+/** The "Wind data" picker, its hint and the station pins on the map. */
+function renderStationPicker() {
+  const sel = $("#stationSelect");
+  const hint = $("#stationHint");
+  const lat = Number(form.elements.lat.value), lon = Number(form.elements.lon.value);
+  const { list } = state.stations;
+  const choice = form.elements.windSource.value;
+  // The period, read leniently: validation messages belong to Analyse, not to this picker.
+  const years = Number(form.elements.years.value), endYear = Number(form.elements.endYear.value);
+  const req = years >= 1 && endYear > 1900 ? { startYear: endYear - Math.round(years) + 1, endYear } : null;
+  const active = list && req ? resolveStation(choice, list, req) : null;
+
+  sel.replaceChildren(new Option("Weather model only (ERA5)", "model"));
+  for (const s of list || []) {
+    const o = new Option(`${s.name}, ${stationPlace(s)} · ${s.first}–${s.last}`, `eccc:${s.id}`);
+    if (req && yearsOverlap(s, req) < 1) { o.disabled = true; o.text += " (no records for these years)"; }
+    sel.add(o);
+  }
+  sel.value = active ? `eccc:${active.id}` : "model";
+
+  let text;
+  if (!nearCanada(lat, lon)) text = "Measured station data is available for sites in Canada. Elsewhere the tool uses the weather model.";
+  else if (list === undefined) text = "Looking for nearby weather stations…";
+  else if (list === null) text = "Couldn't load the list of weather stations, so the weather model is used.";
+  else if (!list.length) text = `No Environment Canada station with hourly records within ${SEARCH_RADIUS_KM} km, so the weather model is used.`;
+  else if (active) text = `Hourly wind measured at ${active.name}, ${stationPlace(active)} of the site. Hours the station missed are filled from the weather model.`;
+  else text = "Pick a station to use its measured wind instead of the weather model's.";
+  hint.textContent = text;
+  renderStationPins(list || [], active);
+}
+
+function renderStationPins(list, active) {
+  if (!state.map) return;
+  state.stationLayer?.remove();
+  state.stationLayer = L.layerGroup(list.map((s) => {
+    const on = active?.id === s.id;
+    const m = L.circleMarker([s.lat, s.lon], { radius: on ? 7 : 5, color: on ? COLORS.wind : "#556074", weight: on ? 2 : 1, fillColor: on ? COLORS.wind : "#ffffff", fillOpacity: on ? 0.9 : 0.8 })
+      .bindTooltip(`${s.name}: ${stationPlace(s)}, hourly records ${s.first}–${s.last}${on ? " (in use)" : ""}`)
+      .on("click", () => chooseWindSource(`eccc:${s.id}`));
+    return m;
+  })).addTo(state.map);
+  // The picker is the keyboard route to the same choice, so the pins aren't tab stops.
+  state.stationLayer.eachLayer((m) => m.getElement()?.setAttribute("tabindex", "-1"));
+}
+
+function chooseWindSource(value) {
+  form.elements.windSource.value = value;
+  renderStationPicker();
+  onChange("windSource");
+}
 
 /** Frontal capture area (m²) and a short description of how it was entered. */
 function captureParams(v) {
@@ -222,9 +311,10 @@ async function analyse({ fetchIfNeeded = true } = {}) {
     return;
   }
 
+  req.station = resolveStation(v.windSource, await loadStations(), req);
   if (requestKey(req) !== state.wxKey) {
     if (!fetchIfNeeded) {
-      if (state.result && !state.loading) status("The location, period or panel orientation changed. Press <strong>Analyse this site</strong> to load weather data for it.", "stale");
+      if (state.result && !state.loading) status("The location, period, panel orientation or wind data changed. Press <strong>Analyse this site</strong> to load weather data for it.", "stale");
       return;
     }
     const token = ++runToken;
@@ -235,19 +325,27 @@ async function analyse({ fetchIfNeeded = true } = {}) {
     runBtn.textContent = "Loading weather…";
     const period = req.startYear === req.endYear ? String(req.endYear) : `${req.startYear}–${req.endYear}`;
     state.loading = true;
-    try {
-      const wx = await fetchWeather({
-        ...req,
-        signal: abortCtl.signal,
-        onProgress: (done, total) => {
-          if (token !== runToken) return;
-          runBtn.textContent = `Loading weather… ${done} of ${total}`;
-          status(`Loading hourly weather for ${period}… ${done} of ${total} year${total === 1 ? "" : "s"}` +
-            `<div class="progress"><div style="width:${Math.round((100 * done) / total)}%"></div></div>`);
-        },
-      });
+    // Weather model and station years download side by side; progress counts both.
+    const progress = { model: [0, req.endYear - req.startYear + 1], station: [0, req.station ? req.endYear - req.startYear + 1 : 0] };
+    const what = req.station ? `hourly weather and ${esc(req.station.name)} station readings` : "hourly weather";
+    const showProgress = (part) => (done, total) => {
       if (token !== runToken) return;
-      Object.assign(state, { wx, wxKey: requestKey(req), req });
+      progress[part] = [done, total];
+      const d = progress.model[0] + progress.station[0], t = progress.model[1] + progress.station[1];
+      runBtn.textContent = `Loading weather… ${Math.round((100 * d) / t)}%`;
+      status(`Loading ${what} for ${period}…` + `<div class="progress"><div style="width:${Math.round((100 * d) / t)}%"></div></div>`);
+    };
+    try {
+      const signal = abortCtl.signal;
+      const [wx, obs] = await Promise.all([
+        fetchWeather({ ...req, signal, onProgress: showProgress("model") }),
+        req.station
+          ? fetchStationHours({ id: req.station.id, startYear: req.startYear, endYear: req.endYear, signal, onProgress: showProgress("station") })
+            .catch((e) => { if (signal.aborted) throw e; return { error: e.message || String(e) }; })
+          : null,
+      ]);
+      if (token !== runToken) return;
+      Object.assign(state, { ...combineWind(wx, obs, req.station), wxKey: requestKey(req), req });
     } catch (e) {
       if (token !== runToken || e?.name === "AbortError") return;
       status(esc(e.message || e), "error");
@@ -271,6 +369,20 @@ async function analyse({ fetchIfNeeded = true } = {}) {
   }
 }
 
+/**
+ * Uses the station's readings when it has enough of them (any amount above the minimum
+ * when picked by hand); otherwise the weather model, with a note saying why.
+ */
+function combineWind(wx, obs, station) {
+  if (!station) return { wx, source: null };
+  if (obs.error) return { wx, source: { station, error: obs.error } };
+  const blended = blendStation(wx, obs);
+  if (!blended || (!station.explicit && blended.stats.coverage < MIN_AUTO_COVERAGE)) {
+    return { wx, source: { station, unused: blended ? blended.stats.coverage : 0 } };
+  }
+  return { wx: blended.wx, source: { station, stats: blended.stats } };
+}
+
 // ---------- rendering ----------
 
 function render(v, check) {
@@ -281,7 +393,8 @@ function render(v, check) {
   $("#print").disabled = false;
 
   const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
-  $("#reportHead").innerHTML = `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} year${wx.years === 1 ? "" : "s"} of hourly weather (${wx.startYear === wx.endYear ? wx.endYear : `${wx.startYear}–${wx.endYear}`}) · ` +
+  $("#reportHead").innerHTML = `<h2>${esc(title)}</h2><p>${req.lat.toFixed(4)}, ${req.lon.toFixed(4)} · ${wx.years} year${wx.years === 1 ? "" : "s"} of hourly weather (${wx.startYear === wx.endYear ? wx.endYear : `${wx.startYear}–${wx.endYear}`})` +
+    (state.source?.stats ? `, wind measured at ${esc(state.source.station.name)} (${stationPlace(state.source.station)})` : "") + ` · ` +
     `${p.nTurbines} turbine${p.nTurbines === 1 ? "" : "s"} at ${p.hubHeight} m, ${p.pvKwp} kWp solar, ${p.battKwh} kWh battery · ${new Date().toLocaleDateString(undefined, { dateStyle: "medium" })}</p>`;
 
   renderVerdict(r, p);
@@ -355,11 +468,22 @@ function renderNotes(r, p, check) {
         `Before quoting customers, measure the electrical output against the free wind speed, and enter the device's full frontal outline as the capture area.`]);
     }
   }
+  const src = state.source;
+  if (src?.stats) {
+    const st = src.stats;
+    items.push(["info", `<strong>Wind data:</strong> measured hourly at ${esc(src.station.name)}, ${stationPlace(src.station)} of the site, at 10 m (${pct(st.coverage)} of hours; the rest filled from the weather model). ` +
+      `Over the same hours the station averaged ${fmt(st.meanStation, 1)} km/h against the model's ${fmt(st.meanModel, 1)}, with ${fmt(st.energyRatio, 1)}× the wind energy. ` +
+      `Stations usually sit in open, flat places such as airports; a site with trees or buildings nearby may see less wind.`]);
+  } else if (src?.error) {
+    items.push(["warn", `<strong>Station data:</strong> couldn't load readings from ${esc(src.station.name)} (${esc(src.error)}), so this report uses the weather model. Press <em>Analyse this site</em> to try again.`]);
+  } else if (src) {
+    items.push(["warn", `<strong>Station data:</strong> ${esc(src.station.name)} has wind readings for only ${pct(src.unused)} of these hours, so this report uses the weather model${src.station.explicit ? "" : ". Pick the station under <em>Wind data</em> to use it anyway"}.`]);
+  }
   if (p.siteMeanKmh > 0) {
     items.push(["warn", `<strong>Wind data:</strong> scaled ×${fmt(r.scale, 2)} so the mean at hub height matches the measured ${fmt(p.siteMeanKmh, 1)} km/h. The weather data alone gave ${fmt(r.modelHubMean, 1)} km/h.`]);
   } else if (p.windScale !== 1) {
     items.push(["warn", `<strong>Wind data:</strong> scaled ×${fmt(p.windScale, 2)} by hand.`]);
-  } else {
+  } else if (!src?.stats) {
     items.push(["warn", `<strong>Wind data:</strong> not calibrated. It's averaged over a ~28 km grid cell, and terrain, trees and buildings can change the wind at the turbine a lot; energy rises with the cube of wind speed. Enter a measured mean under <em>Site wind calibration</em> if one exists.`]);
   }
   if (p.hubHeight < 10) items.push(["warn", `<strong>Hub height:</strong> below 10 m the wind is extrapolated downward, and wind near roofs and the ground is turbulent and hard to predict.`]);
@@ -389,7 +513,11 @@ function renderFigures(r, p, req) {
     `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
   // Supporting figures only: anything already in the summary or the assumptions isn't repeated here.
   $("#stats").innerHTML = [
-    stat("Mean wind at hub", fmt(r.meanHub, 1), "km/h", `Weather data: ${fmt(r.meanW10, 1)} at 10 m, ${fmt(r.meanW100, 1)} at 100 m`),
+    stat("Mean wind at hub", fmt(r.meanHub, 1), "km/h", state.source?.stats ? `${fmt(r.meanW10, 1)} at 10 m, measured with gaps filled` : `Weather data: ${fmt(r.meanW10, 1)} at 10 m, ${fmt(r.meanW100, 1)} at 100 m`),
+    ...(state.source?.stats ? [
+      stat("Station vs weather model", `${fmt(state.source.stats.meanStation, 1)} vs ${fmt(state.source.stats.meanModel, 1)}`, "km/h", `at 10 m, same hours; ${fmt(state.source.stats.energyRatio, 1)}× the wind energy`),
+      stat("Measured hours", pct(state.source.stats.coverage, 1), "", `${fmt(state.source.stats.filled)} hours filled from the model`),
+    ] : []),
     stat("Turbines producing", pct(r.generatingShare), "", "of all hours"),
     p.nTurbines > 1 ? stat("Per turbine", fmt(r.windKwhPerTurbine), "kWh/yr", `${fmt(r.windKwhPerTurbine / 365, 1)} kWh a day`) : "",
     stat("Wind cost per kWh", money(e.costPerKwh20, 2), "", `over 20 years, vs ${money(p.price, 2)} from the grid`),
@@ -554,13 +682,20 @@ function assumptionRows(r, p, req, wx) {
   return [
     ["Site", `${req.lat.toFixed(4)}, ${req.lon.toFixed(4)}; weather grid cell centred ${wx.gridLat}, ${wx.gridLon}; elevation ${fmt(wx.elevation)} m; ${wx.timezone}`],
     ["Weather data", `ERA5 reanalysis via Open-Meteo, hourly, ${wx.startYear}–${wx.endYear} (${fmt(wx.n)} hours, ${fmt(wx.missing)} missing)`],
-    ["Wind at hub", `${p.hubHeight} m, from 10 m and 100 m winds with an hourly shear exponent (mean ${fmt(r.meanAlpha, 2)}); scaled ×${fmt(r.scale, 2)}; air density correction ${p.densityCorrection ? "on" : "off"}; ${p.windLossPct}% losses`],
+    ...(state.source?.stats ? [["Wind data", windDataText(state.source)]] : []),
+    ["Wind at hub", `${p.hubHeight} m, from ${state.source?.stats ? "the 10 m wind with the weather model's" : "10 m and 100 m winds with an"} hourly shear exponent (mean ${fmt(r.meanAlpha, 2)}); scaled ×${fmt(r.scale, 2)}; air density correction ${p.densityCorrection ? "on" : "off"}; ${p.windLossPct}% losses`],
     ["Turbines", `${p.nTurbines} × ${fmt(ratedKw, 2)} kW peak; ${p.curvePts.length}-point power curve; capture area ${fmt(p.captureAreaM2, 2)} m² (${p.captureDesc}), augmentation ×${fmt(p.augmentation, 1)}; ${p.clampPhysics ? "capped at" : "not capped at"} the physical limit`],
     ["Solar", `${p.pvKwp} kWp, tilt ${req.tilt}°, facing ${req.compass}°; ${p.pvLossPct}% losses; ${p.tempCoeffPct}%/°C`],
     ["Electricity use", `${fmt(p.loadKwh)} kWh/yr, ${LOAD_PRESETS[p.loadProfile]?.label ?? "custom profile"}`],
     ["Battery", `${p.battKwh} kWh, ${p.battKw} kW, kept above ${fmt(p.battMinSoc * 100)}%, ${fmt(p.battRte * 100)}% round trip; charged from surplus, then surplus exported`],
     ["Economics", `grid ${money(p.price, 2)}/kWh, export credit ${money(p.exportCredit, 2)}/kWh, ${money(p.turbineCost)} installed and ${money(p.omPerTurbine)}/yr maintenance per turbine; no inflation, discounting or incentives`],
   ];
+}
+
+function windDataText({ station: s, stats: st }) {
+  return `measured hourly at ${s.name} (Environment and Climate Change Canada, climate ID ${s.id}), ${stationPlace(s)} of the site, ` +
+    `elevation ${fmt(s.elevation)} m, 10 m mast; ${pct(st.coverage, 1)} of hours measured, the rest filled from ERA5 at the site ` +
+    `through a seasonal quantile mapping fitted on ${fmt(st.measured)} shared hours (correlation ${fmt(st.correlation, 2)})`;
 }
 
 function renderAssumptions(r, p, req, wx) {
@@ -609,6 +744,7 @@ function setLocation(lat, lon, name, { pan = false } = {}) {
   form.elements.lat.value = lat.toFixed(4);
   form.elements.lon.value = lon.toFixed(4);
   form.elements.place.value = name;
+  form.elements.windSource.value = "auto"; // a station picked for the old spot may not suit the new one
   state.marker?.setLatLng([lat, lon]);
   if (pan) state.map?.setView([lat, lon], 8);
   onChange("lat");
@@ -662,7 +798,10 @@ function onChange(name) {
   }
   writeHash(readForm());
   clearTimeout(debounce);
-  debounce = setTimeout(() => analyse({ fetchIfNeeded: false }), 250);
+  debounce = setTimeout(() => {
+    if (name === "lat" || name === "lon" || name === "years" || name === "endYear") loadStations().then(renderStationPicker);
+    analyse({ fetchIfNeeded: false });
+  }, 250);
 }
 
 function init() {
@@ -679,11 +818,13 @@ function init() {
   form.elements.apiKey.value = localStorage.getItem(API_KEY_STORAGE) || "";
   $("#placeSearch").value = form.elements.place.value;
   initMap();
+  $("#stationSelect").addEventListener("change", (e) => chooseWindSource(e.target.value));
+  loadStations();
 
   form.addEventListener("submit", (e) => { e.preventDefault(); analyse(); });
   form.addEventListener("input", (e) => {
     if (!e.target.name) return;
-    if (e.target.name === "lat" || e.target.name === "lon") form.elements.place.value = "";
+    if (e.target.name === "lat" || e.target.name === "lon") { form.elements.place.value = ""; form.elements.windSource.value = "auto"; }
     if (e.target.name.startsWith("capture")) syncCapture();
     onChange(e.target.name);
   });
@@ -704,7 +845,10 @@ function init() {
   });
   $("#clearCache").addEventListener("click", async () => {
     await clearWeatherCache();
+    clearStationMemory();
     state.wxKey = null;
+    state.stations = { key: null };
+    loadStations();
     flash($("#clearCache"), "Cache cleared");
     status("Cached weather data cleared.");
   });

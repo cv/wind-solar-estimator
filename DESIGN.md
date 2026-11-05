@@ -217,7 +217,7 @@ Each state has a solid tone, a wash for backgrounds, a line for borders and an i
 - **Good** (`good`, `good-wash`, `good-ink`): viable verdict tag.
 - **Caution** (`warn`, `warn-wash`, `warn-line`, `warn-ink`): marginal verdicts, notes and stale-result status.
 - **Problem** (`bad`, `bad-wash`, `bad-line`, `bad-ink`): not-viable or unverified verdicts, physics warnings, invalid fields, error status.
-- **Info Wash** (`info-wash`): neutral progress status while weather downloads.
+- **Info Wash** (`info-wash`): neutral progress status while weather downloads, and the note naming the station whose measured wind is in use.
 
 ### Neutral
 - **Field Paper** (`paper`): page background and the panel's note strip; tinted toward the brand blue.
@@ -313,13 +313,13 @@ Quiet and exact: small radii, hairlines, colour reserved for meaning.
 
 ### Navigation
 - **App bar:** slim, Night Grid Blue blending to Grid Blue left to right; the wordmark in Signal Green (800 weight), the product title in white, a "Prototype" pill badge, and on-dark buttons pushed right. On small screens the buttons wrap below and share the width.
-- **Sidebar groups:** each assumption group is a disclosure with a small chevron and a Night Grid Blue heading that turns Grid Blue on hover; groups are separated by hairlines. The Site group is always open and holds search, map and coordinates. Disclosure rows are at least 44px tall.
+- **Sidebar groups:** each assumption group is a disclosure with a small chevron and a Night Grid Blue heading that turns Grid Blue on hover; groups are separated by hairlines. The Site group is always open and holds search, map, coordinates and the Wind data picker (weather model or a nearby measured station, with a one-line hint saying which is in use). Stations show on the map as small hollow circles; the one in use is filled Wind Blue. The picker is the keyboard route; the pins aren't tab stops. Disclosure rows are at least 44px tall.
 
 ### Summary (signature)
 The report's first surface: the verdict headline with its status tag, one or two sentences of plain explanation (second in Muted Ink), then a hairline and four key figures in an auto-fit grid. Wind energy is set in Wind Blue; the others in Report Ink. Each figure has a term above and a short qualifier below.
 
 ### Notes
-Caveats that change how to read the result, shown directly under the summary as a list of washed boxes (caution or problem), max 72ch, with the first phrase bolded. No side stripe.
+Caveats that change how to read the result, shown directly under the summary as a list of washed boxes (caution or problem), max 72ch, with the first phrase bolded. No side stripe. A neutral note (Info Wash, Night Grid Blue ink, Hairline Strong border) states where measured station wind came from; it still carries its caveat.
 
 ### Stat rows
 Definition list of supporting statistics at the top of "Behind the numbers": Muted Ink term, Stat-size value, optional caption sub-line.

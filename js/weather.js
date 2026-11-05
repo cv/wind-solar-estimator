@@ -3,13 +3,13 @@
 // Free tier: non-commercial use only, ~10,000 weighted calls per day per IP;
 // 20 years for one site costs about 500 of those. Commercial use needs an API key.
 
+import { dbGet, dbPut, dbClear } from "./cache.js";
+
 const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 const ARCHIVE_COMMERCIAL = "https://customer-archive-api.open-meteo.com/v1/archive";
 const GEOCODE = "https://geocoding-api.open-meteo.com/v1/search";
 const CONCURRENCY = 4;
 const MAX_RETRIES = 4;
-const DB_NAME = "site-estimator-weather";
-const DB_VERSION = 1;
 
 const memory = new Map();
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
@@ -53,13 +53,14 @@ export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, years.length) }, worker));
 
   const offset = parts[0].offset;
-  const cols = { year: [], month: [], hour: [], w10: [], w100: [], temp: [], gti: [] };
+  const cols = { t: [], year: [], month: [], hour: [], w10: [], w100: [], temp: [], gti: [] };
   let missing = 0;
   for (const part of parts) {
     for (let i = 0; i < part.time.length; i++) {
       const w10 = part.w10[i], w100 = part.w100[i], t = part.temp[i], g = part.gti[i];
       if (Number.isNaN(w10) || Number.isNaN(w100) || Number.isNaN(t) || Number.isNaN(g)) { missing++; continue; }
       const d = new Date((part.time[i] + offset) * 1000);
+      cols.t.push(Math.round(part.time[i] / 3600)); // UTC hour number, to line up with station records
       cols.year.push(d.getUTCFullYear());
       cols.month.push(d.getUTCMonth());
       cols.hour.push(d.getUTCHours());
@@ -78,6 +79,7 @@ export async function fetchWeather({ lat, lon, startYear, endYear, tilt, azimuth
     gridLon: parts[0].longitude,
     elevation: parts[0].elevation,
     timezone: parts[0].timezone,
+    t: Int32Array.from(cols.t),
     year: Uint16Array.from(cols.year),
     month: Uint8Array.from(cols.month),
     hour: Uint8Array.from(cols.hour),
@@ -166,38 +168,7 @@ export async function searchPlaces(name, signal) {
   }));
 }
 
-// ---- IndexedDB cache (typed arrays are stored as-is) ----
-
-function openDb() {
-  if (typeof indexedDB === "undefined") return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => req.result.createObjectStore("weather");
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
-  });
-}
-
-async function dbGet(key) {
-  const db = await openDb();
-  if (!db) return null;
-  return new Promise((resolve) => {
-    const req = db.transaction("weather").objectStore("weather").get(key);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => resolve(null);
-  });
-}
-
-async function dbPut(key, value) {
-  const db = await openDb();
-  if (!db) return;
-  try {
-    db.transaction("weather", "readwrite").objectStore("weather").put(value, key);
-  } catch { /* quota or private mode: skip caching */ }
-}
-
 export async function clearWeatherCache() {
   memory.clear();
-  const db = await openDb();
-  if (db) db.transaction("weather", "readwrite").objectStore("weather").clear();
+  await dbClear();
 }

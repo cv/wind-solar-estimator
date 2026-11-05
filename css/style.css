@@ -212,6 +212,7 @@ input.invalid, textarea.invalid { border-color: var(--bad); background: var(--ba
 .notes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
 .notes li { max-width: 72ch; padding: var(--s3) var(--s4); border-radius: var(--radius-sm); font-size: var(--t-body); line-height: 1.5; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink); }
 .notes li.bad { background: var(--bad-bg); border-color: var(--bad-line); color: var(--bad-ink); }
+.notes li.info { background: var(--info-bg); border-color: var(--line-strong); color: var(--blue-dark); }
 .notes li strong:first-child { font-weight: 700; }
 
 .block { display: flex; flex-direction: column; gap: var(--s3); }

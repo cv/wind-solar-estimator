@@ -5,7 +5,9 @@ solar PV and a battery at any location. Enter coordinates (or search a place, or
 the map) and it:
 
 1. downloads hourly 10 m and 100 m wind, temperature and sunlight on the panels for
-   every hour of up to 40 years (ERA5 reanalysis via [Open-Meteo](https://open-meteo.com/));
+   every hour of up to 40 years (ERA5 reanalysis via [Open-Meteo](https://open-meteo.com/)),
+   and for sites in Canada, measured hourly wind from the nearest Environment Canada
+   station;
 2. simulates every hour: turbine output from the power curve (at hub height, corrected
    for air density), solar output, the site's electricity use and the battery, with and
    without the turbines;
@@ -34,9 +36,27 @@ real product; replace it with the measured curve of the turbine being sold.
 ## Wind data accuracy
 
 ERA5 averages over a ~28 km grid cell. It can understate or overstate wind at a
-particular site, sometimes by a large margin compared with local weather stations. Enter a measured long-term mean under *Site wind
-calibration* where one exists. For sales use, consider calibrating against the
-[Global Wind Atlas](https://globalwindatlas.info/) (250 m resolution) or nearby stations.
+particular site, sometimes by a large margin: at Claresholm, Alberta (2022–2024) the
+station measured a 22% higher mean wind than ERA5 and about 3× the wind energy (mean of
+speed³), because ERA5 smooths away gusts.
+
+For sites in Canada the tool therefore looks for Environment and Climate Change Canada
+stations with hourly records within 100 km (the station archive behind the Canadian
+Centre for Climate Services) and, by default, uses the nearest one within 50 km that has
+wind readings for at least half of the period. Any station in the list can be picked
+under *Wind data*, or on the map.
+
+- **Measured hours** use the station's reading (10 m, a 2-minute mean at the top of the hour).
+- **Missing hours** are filled from ERA5 at the site through a seasonal quantile mapping
+  fitted on the hours both have, so filled hours follow the station's own spread of wind
+  speeds rather than ERA5's smoother one.
+- **Hub height** comes from the station's 10 m wind with ERA5's hour-by-hour 10–100 m
+  shear exponent.
+
+Stations usually sit in open, flat places such as airports, so a farm with trees or
+buildings may see less wind. Elsewhere, enter a measured long-term mean under *Site wind
+calibration* where one exists, or compare with the
+[Global Wind Atlas](https://globalwindatlas.info/) (250 m resolution).
 
 ## Running it
 
@@ -66,7 +86,10 @@ Push to GitHub, then *Settings → Pages → Deploy from a branch → `main` / r
   calls a day per IP; 20 years for one site costs about 500. For commercial use, buy an
   Open-Meteo API key and enter it under *Weather data* (it stays in the browser and is
   never put in shared links).
-- Downloaded weather is cached in the browser (IndexedDB), so revisiting a site is instant.
+- Station wind: Environment and Climate Change Canada climate archive via the
+  [MSC GeoMet API](https://api.weather.gc.ca/), Open Government Licence – Canada. No key needed.
+- Downloaded weather, station lists and station readings are cached in the browser
+  (IndexedDB), so revisiting a site makes no requests.
 - Map: Leaflet with OpenStreetMap tiles. Charts: Chart.js. Both load from CDNs.
 
 ## Layout
@@ -76,8 +99,11 @@ Push to GitHub, then *Settings → Pages → Deploy from a branch → `main` / r
 | `index.html`, `css/style.css` | Page and styles |
 | `js/app.js` | Form, URL state, map, rendering |
 | `js/weather.js` | Open-Meteo downloads, retries and caching; place search |
+| `js/stations.js` | Environment Canada station search and hourly wind downloads |
+| `js/blend.js` | Station + ERA5 combination: alignment, quantile-mapped gap filling (pure) |
+| `js/cache.js` | Shared IndexedDB cache |
 | `js/model.js` | Hourly simulation (pure functions, no DOM) |
-| `tests/model.test.mjs` | Model tests (`npm test`) |
+| `tests/*.test.mjs` | Model, blending and station-parsing tests (`npm test`) |
 
 ## Limitations
 
