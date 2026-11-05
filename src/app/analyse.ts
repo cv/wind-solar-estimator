@@ -109,7 +109,7 @@ async function loadWeather(req: DataRequest): Promise<LoadedWeather | null> {
     return loaded;
   } catch (e: unknown) {
     if (token !== runCtl.token || (e instanceof Error && e.name === "AbortError")) return null;
-    status(esc((e instanceof Error && e.message) || String(e)), "error");
+    status(esc(failureText(e)), "error");
     return null;
   } finally {
     if (token === runCtl.token) {
@@ -175,7 +175,7 @@ async function fetchStationObs(
     onProgress,
   }).catch((e: unknown): StationObs => {
     if (signal.aborted) throw e;
-    return { error: (e instanceof Error && e.message) || String(e) };
+    return { error: failureText(e) };
   });
 }
 
@@ -206,11 +206,14 @@ function revealReport(): void {
   });
 }
 
+/** An error's message, or the thrown value as text (also for an Error whose message is empty). */
+const failureText = (e: unknown): string => (e instanceof Error && e.message !== "" ? e.message : String(e));
+
 /** Reports a failure nothing else caught (a bug, not bad input): logged, and shown as an error status. */
 export function showFailure(e: unknown): void {
   // eslint-disable-next-line no-console -- intended: an unexpected bug's details belong in the developer console
   console.error(e);
-  status(esc((e instanceof Error && e.message) || String(e)), "error");
+  status(esc(failureText(e)), "error");
 }
 
 /** Starts analyse without waiting for it (event handlers); a failure is reported by showFailure. */
@@ -231,7 +234,7 @@ export function combineWind(
   if (!station || !obs) return { wx, source: null };
   if ("error" in obs) return { wx, source: { kind: "failed", station, error: obs.error } };
   const blended = blendStation(wx, obs);
-  if (!blended || (!station.explicit && blended.stats.coverage < MIN_AUTO_COVERAGE)) {
+  if (!blended || (station.explicit !== true && blended.stats.coverage < MIN_AUTO_COVERAGE)) {
     return { wx, source: { kind: "sparse", station, coverage: blended ? blended.stats.coverage : 0 } };
   }
   return { wx: blended.wx, source: { kind: "measured", station, stats: blended.stats } };

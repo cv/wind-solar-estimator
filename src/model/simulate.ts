@@ -207,7 +207,7 @@ const socDayOf = (arr: Float64Array, count: Float64Array): SocDay =>
   Array.from({ length: 12 }, (_, mo) =>
     Array.from({ length: 24 }, (_slot, h) => {
       const c = f64(count, mo * 24 + h);
-      return c ? fraction(f64(arr, mo * 24 + h) / c) : null;
+      return c > 0 ? fraction(f64(arr, mo * 24 + h) / c) : null;
     }),
   );
 

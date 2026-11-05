@@ -174,8 +174,8 @@ const yearlyMeans = (years: YearSums): YearlyMeans[] =>
     .map(([year, [h, k, s, m]]): YearlyMeans => ({
       year,
       coverage: k / h,
-      station: k ? s / k : Number.NaN,
-      model: k ? m / k : Number.NaN,
+      station: k > 0 ? s / k : Number.NaN,
+      model: k > 0 ? m / k : Number.NaN,
     }));
 
 /**

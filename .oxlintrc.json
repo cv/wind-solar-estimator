@@ -1,13 +1,21 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
     "perf": "error",
     "pedantic": "error"
   },
-  "ignorePatterns": ["dist", "node_modules"],
+  "ignorePatterns": [
+    "dist",
+    "node_modules"
+  ],
   "rules": {
     "import/no-cycle": "error",
     "oxc/no-map-spread": "off",
@@ -18,7 +26,12 @@
           {
             "from": "package",
             "package": "node:test",
-            "name": ["test", "describe", "it", "suite"]
+            "name": [
+              "test",
+              "describe",
+              "it",
+              "suite"
+            ]
           }
         ]
       }
@@ -58,7 +71,10 @@
         "allowHigherOrderFunctions": true
       }
     ],
-    "typescript/consistent-type-definitions": ["error", "interface"],
+    "typescript/consistent-type-definitions": [
+      "error",
+      "interface"
+    ],
     "typescript/array-type": [
       "error",
       {
@@ -147,7 +163,10 @@
     "eslint/no-console": [
       "error",
       {
-        "allow": ["warn", "error"]
+        "allow": [
+          "warn",
+          "error"
+        ]
       }
     ],
     "unicorn/no-nested-ternary": "error",
@@ -158,19 +177,46 @@
     "unicorn/no-zero-fractions": "error",
     "unicorn/prefer-global-this": "error",
     "typescript/prefer-readonly-parameter-types": "off",
-    "typescript/strict-boolean-expressions": "off",
-    "typescript/strict-void-return": "off"
+    "typescript/strict-boolean-expressions": [
+      "error",
+      {
+        "allowString": false,
+        "allowNumber": false,
+        "allowNullableObject": true,
+        "allowNullableBoolean": false,
+        "allowNullableString": false,
+        "allowNullableNumber": false,
+        "allowAny": false
+      }
+    ],
+    "typescript/strict-void-return": "error",
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      {
+        "considerDefaultExhaustiveForUnions": false,
+        "requireDefaultForNonUnion": true
+      }
+    ],
+    "typescript/no-unnecessary-condition": "error"
   },
   "overrides": [
     {
-      "files": ["src/model/**", "src/wind/**", "src/data/**"],
+      "files": [
+        "src/model/**",
+        "src/wind/**",
+        "src/data/**"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "group": ["**/app/*", "**/ui/*", "**/report/*"],
+                "group": [
+                  "**/app/*",
+                  "**/ui/*",
+                  "**/report/*"
+                ],
                 "message": "Library code (model, wind, data) must not depend on the UI."
               }
             ]
@@ -179,14 +225,20 @@
       }
     },
     {
-      "files": ["src/report/**"],
+      "files": [
+        "src/report/**"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "group": ["**/ui/*", "**/app/analyse*", "**/app/init*"],
+                "group": [
+                  "**/ui/*",
+                  "**/app/analyse*",
+                  "**/app/init*"
+                ],
                 "message": "The report renders an Analysis; it must not depend on the UI controls or the run."
               }
             ]
@@ -195,14 +247,19 @@
       }
     },
     {
-      "files": ["src/ui/**"],
+      "files": [
+        "src/ui/**"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "group": ["**/app/analyse*", "**/app/init*"],
+                "group": [
+                  "**/app/analyse*",
+                  "**/app/init*"
+                ],
                 "message": "UI controls report changes through callbacks wired in app/init.ts, not by importing the run."
               }
             ]
@@ -211,7 +268,9 @@
       }
     },
     {
-      "files": ["scripts/**"],
+      "files": [
+        "scripts/**"
+      ],
       "rules": {
         "eslint/no-console": "off"
       }

@@ -97,7 +97,7 @@ function stationFromFeature(f: unknown): StationRecord | null {
     lat: unknown = coords[1];
   const id = scalar(p["CLIMATE_IDENTIFIER"]);
   const firstDate = p["HLY_FIRST_DATE"];
-  if (!isNumber(lon) || !isNumber(lat) || id === null || !isString(firstDate) || !firstDate) return null;
+  if (!isNumber(lon) || !isNumber(lat) || id === null || !isString(firstDate) || firstDate === "") return null;
   const elevation = scalar(p["ELEVATION"]);
   const name = scalar(p["STATION_NAME"]);
   return {
@@ -263,7 +263,7 @@ export function parseStationCsv(text: string): StationHours {
     for (const line of lines.slice(1)) {
       const c = line.split(",");
       const w = c[iW]?.trim();
-      if (!w) continue;
+      if (w === undefined || w === "") continue;
       const ms = Date.parse(`${at(c, iT).trim()}Z`);
       const v = Number(w);
       if (!Number.isFinite(ms) || !Number.isFinite(v) || v < 0) continue;
@@ -282,7 +282,7 @@ async function getText(url: string, signal: AbortSignal | undefined, what: strin
       res = await fetchOnce(url, signal);
       if (res.ok) return succeeded(await res.text());
     } catch (e) {
-      if (signal?.aborted) throw e;
+      if (signal?.aborted === true) throw e;
       if (!retryAllowed)
         throw new Error(`Couldn't reach Environment Canada's climate service for ${what}: ${errorMessage(e)}`, {
           cause: e,

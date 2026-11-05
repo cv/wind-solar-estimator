@@ -19,7 +19,7 @@ export function render(v: FormValues): void {
   $("#share", HTMLButtonElement).disabled = false;
   $("#print", HTMLButtonElement).disabled = false;
 
-  const title = v.place || `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}`;
+  const title = v.place === "" ? `Site at ${req.lat.toFixed(3)}, ${req.lon.toFixed(3)}` : v.place;
   const measured =
     source?.kind === "measured"
       ? `, wind measured at ${esc(source.station.name)} (${stationPlace(source.station)})`

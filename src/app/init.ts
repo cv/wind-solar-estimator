@@ -76,7 +76,7 @@ function wireForm(): void {
   });
   form.addEventListener("input", (e) => {
     const target = e.target;
-    if (!isFormField(target) || !target.name) return;
+    if (!isFormField(target) || target.name === "") return;
     if (target.name === "lat" || target.name === "lon") {
       form.elements.place.value = "";
       form.elements.windSource.value = "auto";
@@ -124,9 +124,10 @@ function wireReport(): void {
 /** "Use 2008–2025 only" in a station-record note: narrow the period to after the step. */
 function useYearsFromNote(e: Event): void {
   if (!(e.target instanceof Element)) return;
-  const b = e.target.closest<HTMLButtonElement>("button[data-years]");
-  const years = b?.dataset["years"],
-    end = b?.dataset["end"];
+  const b = e.target.closest("button[data-years]");
+  if (!(b instanceof HTMLButtonElement)) return;
+  const years = b.dataset["years"],
+    end = b.dataset["end"];
   if (years === undefined || end === undefined) return;
   form.elements.years.value = years;
   form.elements.endYear.value = end;
@@ -141,7 +142,9 @@ function useYearsFromNote(e: Event): void {
 function wirePrint(): void {
   let closedForPrint: HTMLDetailsElement[] = [];
   globalThis.addEventListener("beforeprint", () => {
-    closedForPrint = [...document.querySelectorAll<HTMLDetailsElement>("#results details:not([open])")];
+    closedForPrint = [...document.querySelectorAll("#results details:not([open])")].filter(
+      (d) => d instanceof HTMLDetailsElement,
+    );
     for (const d of closedForPrint) d.open = true;
     resizeCharts();
   });

@@ -87,7 +87,7 @@ function sourceNotes(src: WindSource, siteElevationM: number, req: DataRequest):
   return [
     [
       "warn",
-      `<strong>Station data:</strong> ${name} has wind readings for only ${pct(src.coverage)} of these hours, so this report uses the weather model${src.station.explicit ? "" : ". Pick the station under <em>Wind data</em> to use it anyway"}.`,
+      `<strong>Station data:</strong> ${name} has wind readings for only ${pct(src.coverage)} of these hours, so this report uses the weather model${src.station.explicit === true ? "" : ". Pick the station under <em>Wind data</em> to use it anyway"}.`,
     ],
   ];
 }
@@ -126,7 +126,7 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
     ]);
   }
   const h = st.homogeneity;
-  if (h?.issue === "step") {
+  if (h.issue === "step") {
     const s = h.step;
     const recent = s.to - s.year + 1;
     const fix =
@@ -139,7 +139,7 @@ export function stationChecks(station: Station, st: BlendStats, siteElevationM: 
         `relative to the weather model than in ${span(s.from, s.year - 1)}. A jump like this usually means the instrument was moved, raised or replaced, not that the climate changed, ` +
         `so the years before and after don't measure the same thing.${fix}`,
     ]);
-  } else if (h?.issue === "trend") {
+  } else if (h.issue === "trend") {
     const t = h.trend;
     out.push([
       "warn",

@@ -78,8 +78,11 @@ function archiveUrl({ lat, lon, year, tilt, azimuth, apiKey }: YearRequest): str
     timezone: "auto",
     timeformat: "unixtime",
   });
-  if (apiKey) q.set("apikey", apiKey);
-  return `${apiKey ? ARCHIVE_COMMERCIAL : ARCHIVE}?${q}`;
+  if (apiKey !== undefined && apiKey !== "") {
+    q.set("apikey", apiKey);
+    return `${ARCHIVE_COMMERCIAL}?${q}`;
+  }
+  return `${ARCHIVE}?${q}`;
 }
 
 /** The body as JSON, or null if it isn't JSON (e.g. a proxy error page). */
@@ -92,8 +95,12 @@ function parseJsonOrNull(text: string): unknown {
 }
 
 /** Why a reply failed: the API's reason (error replies are { error: true, reason: "..." }), else the body or status text. */
-const failureReason = (json: unknown, { res, text }: Reply): string =>
-  (isRecord(json) && isString(json["reason"]) && json["reason"]) || text.slice(0, 120).trim() || res.statusText;
+function failureReason(json: unknown, { res, text }: Reply): string {
+  const reason = isRecord(json) ? json["reason"] : undefined;
+  if (isString(reason) && reason !== "") return reason;
+  const body = text.slice(0, 120).trim();
+  return body === "" ? res.statusText : body;
+}
 
 /** Accepts a valid reply, asks to retry rate limits, server errors and garbled replies, and throws otherwise. */
 function checkReply(reply: Reply, year: number, retryAllowed: boolean): Attempt<ArchiveData> {
@@ -124,7 +131,7 @@ export async function fetchYear(req: YearRequest): Promise<ArchiveData> {
     try {
       reply = await readReply(url, signal);
     } catch (e) {
-      if (signal?.aborted) throw e;
+      if (signal?.aborted === true) throw e;
       if (retryAllowed) return tryAgain(); // network hiccup
       throw new Error(`Couldn't reach the weather service for ${year}: ${errorMessage(e)}`, { cause: e });
     }

@@ -23,7 +23,6 @@ test("checkHomogeneity leaves a steady record alone, even when it differs from t
 test("checkHomogeneity finds a step (an instrument moved or replaced)", () => {
   const h = checkHomogeneity(yearlyRecord((y) => (y < 2008 ? 0.85 : 1.4)));
   assert.equal(h.issue, "step");
-  assert.ok(h.step);
   assert.equal(h.step.year, 2008);
   close(h.step.change, 0.65, 0.05);
 });
@@ -31,7 +30,6 @@ test("checkHomogeneity finds a step (an instrument moved or replaced)", () => {
 test("checkHomogeneity finds a steady drift (trees growing around the mast)", () => {
   const h = checkHomogeneity(yearlyRecord((y) => 1.4 - 0.02 * (y - 2006)));
   assert.equal(h.issue, "trend");
-  assert.ok(h.trend);
   close(h.trend.change, -0.27, 0.05);
 });
 

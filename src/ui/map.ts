@@ -1,7 +1,7 @@
 // The Leaflet map: site marker, station pins and place search.
 import { COLORS } from "../app/constants.ts";
 import { $, form } from "../app/dom.ts";
-import { esc } from "../app/format.ts";
+import { esc, numberOrZero } from "../app/format.ts";
 import { hooks } from "../app/hooks.ts";
 import { state } from "../app/state.ts";
 import type { ChosenStation, RankedStation } from "../app/state.ts";
@@ -52,8 +52,8 @@ export function initMap({ onPinClick }: MapOptions): void {
     $("#map").hidden = true;
     return;
   }
-  const lat = Number(form.elements.lat.value) || 0,
-    lon = Number(form.elements.lon.value) || 0;
+  const lat = numberOrZero(form.elements.lat.value),
+    lon = numberOrZero(form.elements.lon.value);
   const map = L.map("map", { scrollWheelZoom: false }).setView([lat, lon], 6);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 18,
@@ -84,7 +84,7 @@ export function setLocation(lat: number, lon: number, name: string, { pan = fals
 export async function placeSearch(): Promise<void> {
   const q = $("#placeSearch", HTMLInputElement).value.trim();
   const ul = $("#placeResults", HTMLUListElement);
-  if (!q) {
+  if (q === "") {
     ul.hidden = true;
     return;
   }

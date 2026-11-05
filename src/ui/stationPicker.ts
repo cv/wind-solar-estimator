@@ -54,7 +54,7 @@ export function resolveStation(
   list: readonly RankedStation[] | null | undefined,
   req: Period,
 ): ChosenStation | null {
-  if (choice === "model" || !list?.length) return null;
+  if (choice === "model" || list == null || list.length === 0) return null;
   if (choice.startsWith("eccc:")) {
     const picked = list.find((s) => s.id === choice.slice(5));
     if (picked) return { ...picked, explicit: true };
@@ -122,7 +122,7 @@ function stationHint(
 
 /** For a station chosen automatically over the nearest eligible one, why it was preferred ("" otherwise). */
 function chosenOver(list: readonly RankedStation[], req: Period, active: ChosenStation): string {
-  const nearest = active.explicit ? null : list.find(autoEligible(req));
+  const nearest = active.explicit === true ? null : list.find(autoEligible(req));
   if (!nearest || nearest.id === active.id) return "";
   return ` Chosen over ${nearest.name}, which is ${nearest.distanceKm < active.distanceKm - 0.5 ? "closer" : "as close"} but ${whyNotNearest(nearest, active, req)}.`;
 }

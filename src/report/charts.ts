@@ -2,7 +2,7 @@
 import { at } from "../util/checked.ts";
 import { MONTHS, COLORS } from "../app/constants.ts";
 import { $ } from "../app/dom.ts";
-import { fmt } from "../app/format.ts";
+import { fmt, numberOrZero } from "../app/format.ts";
 import { state } from "../app/state.ts";
 import { betzLimitW } from "../model/physics.ts";
 import { makeCurveFn } from "../model/powerCurve.ts";
@@ -179,7 +179,7 @@ export function renderSoc(): void {
 }
 
 function drawSoc(r: SimResult, p: ModelParams): void {
-  const mo = Number($("#socMonth", HTMLSelectElement).value) || 0;
+  const mo = numberOrZero($("#socMonth", HTMLSelectElement).value);
   const hours = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
   drawChart("chSoc", {
     type: "line",

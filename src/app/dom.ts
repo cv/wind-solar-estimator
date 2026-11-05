@@ -11,7 +11,8 @@ export function $<T extends Element>(sel: string, type: abstract new () => T): T
 export function $(sel: string, type: abstract new () => Element = HTMLElement): Element {
   const el = document.querySelector(sel);
   if (!el) throw new Error(`No element matches ${sel}`);
-  if (!(el instanceof type)) throw new Error(`${sel} is not a ${type.name}`);
+  const tag = el.localName; // read first: a failed instanceof against Element narrows el to never
+  if (!(el instanceof type)) throw new Error(`${sel} is a <${tag}>, expected ${type.name}`);
   return el;
 }
 
@@ -58,8 +59,8 @@ export const form = findForm();
 export function formError(message: string, field?: FormField | null): void {
   const el = $("#formError");
   el.textContent = message;
-  el.hidden = !message;
-  if (!message) return;
+  el.hidden = message === "";
+  if (message === "") return;
   (field ? (field.closest(".row") ?? field.closest("label") ?? field) : $("#run")).after(el);
   field?.setAttribute("aria-describedby", "formError");
 }
@@ -85,7 +86,7 @@ export type StatusKind = "info" | "stale" | "error";
 
 export function status(html: string, kind: StatusKind = "info"): void {
   const el = $("#status");
-  el.hidden = !html;
+  el.hidden = html === "";
   el.className = `status ${kind}`;
-  el.innerHTML = html || "";
+  el.innerHTML = html;
 }

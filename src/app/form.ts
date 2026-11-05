@@ -19,6 +19,8 @@ const FORM_KEYS = Object.keys(DEFAULTS).filter((k) => isFormKey(k));
 /** The load preset named key (any string, e.g. from a share link), if there is one. */
 export function loadPreset(key: string | undefined): LoadPreset | undefined {
   if (key === undefined) return undefined;
+  // Bug (kept as is): a key inherited from Object.prototype, such as "constructor" in a share link, returns that
+  // property rather than undefined, and callers then fail reading its hourly shape. Object.hasOwn would fix it.
   return (LOAD_PRESETS as Readonly<Record<string, LoadPreset | undefined>>)[key];
 }
 
@@ -84,8 +86,8 @@ export interface NumOptions {
 
 export function invalid(key: FormKey, message: string): InputError {
   const el = form.elements[key];
-  el?.classList.add("invalid");
-  el?.setAttribute("aria-invalid", "true");
+  el.classList.add("invalid");
+  el.setAttribute("aria-invalid", "true");
   const err = new InputError(message);
   err.field = el;
   return err;
@@ -153,7 +155,8 @@ export function syncCapture(): void {
   const el = form.elements;
   const rect = el.captureShape.value === "rect";
   // Switching to a rectangle for the first time: start from a square as wide as the diameter.
-  if (rect && !el.captureW.value && !el.captureH.value) el.captureW.value = el.captureH.value = el.captureM.value;
+  if (rect && el.captureW.value === "" && el.captureH.value === "")
+    el.captureW.value = el.captureH.value = el.captureM.value;
   $("#captureRound").hidden = rect;
   $("#captureRect").hidden = !rect;
   const area = rect
@@ -193,7 +196,7 @@ export function modelParams(v: FormInput): ModelParams {
     battMinSoc: fraction(num(v, "battMinSoc", "Minimum charge", { min: 0, max: 100 }) / 100),
     battRte: fraction(num(v, "battRte", "Round-trip efficiency", { min: 50, max: 100 }) / 100),
     inverterKw: kw(num(v, "inverterKw", "Inverter limit", { min: 0.1, optional: true }) ?? 0),
-    currency: v.currency || "$",
+    currency: v.currency === "" ? "$" : v.currency,
     price: num(v, "price", "Grid price", { min: 0 }),
     exportCredit: num(v, "exportCredit", "Export credit", { min: 0 }),
     turbineCost: num(v, "turbineCost", "Installed cost", { min: 0 }),

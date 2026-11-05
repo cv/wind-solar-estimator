@@ -12,7 +12,7 @@ export function downloadCsv(): void {
   const { result: r, params: p, req, wx, source } = state.analysis;
   const { head, rows, total } = monthlyRows(r);
   const lines: Array<Array<string | number>> = [
-    ["Wind + solar site estimate", readForm().place || ""],
+    ["Wind + solar site estimate", readForm().place],
     ["Latitude", req.lat],
     ["Longitude", req.lon],
     ...assumptionRows(r, p, req, wx, source),

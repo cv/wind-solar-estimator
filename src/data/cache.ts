@@ -11,7 +11,9 @@ async function openDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return null;
   dbPromise ??= new Promise<IDBDatabase | null>((resolve) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.addEventListener("upgradeneeded", () => req.result.createObjectStore(STORE));
+    req.addEventListener("upgradeneeded", () => {
+      req.result.createObjectStore(STORE);
+    });
     req.addEventListener("success", () => resolve(req.result));
     req.addEventListener("error", () => resolve(null));
   });

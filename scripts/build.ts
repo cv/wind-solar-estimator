@@ -22,7 +22,8 @@ const writeIndex: esbuild.Plugin = {
       const find = (entry: string): string | undefined => outputs.find(([, o]) => o.entryPoint === entry)?.[0];
       const js = find("src/main.ts");
       const css = outputs.find(([file]) => file.endsWith(".css") && !file.endsWith(".map"))?.[0];
-      if (!js || !css) throw new Error("build: missing JS or CSS output");
+      if (js === undefined || js === "" || css === undefined || css === "")
+        throw new Error("build: missing JS or CSS output");
       const template = await readFile("index.html", "utf8");
       if (!template.includes(PLACEHOLDER)) throw new Error(`index.html has no ${PLACEHOLDER}`);
       const tags = [

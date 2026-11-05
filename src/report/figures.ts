@@ -4,13 +4,19 @@ import { esc, fmt, pct, money } from "../app/format.ts";
 import type { DataRequest, WindSource } from "../app/state.ts";
 import type { ModelParams, SimResult } from "../model/simulate.ts";
 
+/** A value's unit as a span, or nothing when it has none (""). */
+const unitSpan = (unit: string): string => (unit === "" ? "" : `<span class="unit">${esc(unit)}</span>`);
+
+/** A supporting line, or nothing when there is none (""). */
+const subLine = (sub: string): string => (sub === "" ? "" : `<dd class="sub">${esc(sub)}</dd>`);
+
 /** One figure: label, value (with optional unit) and a supporting line. */
 export const figure = (label: string, value: string, unit: string, sub: string, cls = ""): string =>
-  `<div><dt>${esc(label)}</dt><dd class="value ${cls}">${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
+  `<div><dt>${esc(label)}</dt><dd class="value ${cls}">${esc(value)}${unitSpan(unit)}</dd>${subLine(sub)}</div>`;
 
 /** One supporting statistic: label, value (with optional unit) and a supporting line. */
 const stat = (label: string, value: string, unit: string, sub: string): string =>
-  `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unit ? `<span class="unit">${esc(unit)}</span>` : ""}</dd>${sub ? `<dd class="sub">${esc(sub)}</dd>` : ""}</div>`;
+  `<div><dt>${esc(label)}</dt><dd>${esc(value)}${unitSpan(unit)}</dd>${subLine(sub)}</div>`;
 
 export function renderFigures(r: SimResult, p: ModelParams, req: DataRequest, source: WindSource | null): void {
   const measured = source?.kind === "measured" ? source.stats : null;
